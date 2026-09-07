@@ -50,7 +50,16 @@ Saved screenshots at every QA width are in [`preview/screenshots/`](./preview/sc
 | `npm run start` | Serve the production build |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript, no emit |
-| `npm run qa:screenshots` | Screenshots every page at 390/430/768/1024/1440 and reports overflow + console errors (dev server must be running) |
+| `npm run qa:screenshots` | Screenshots every page at 390/430/768/1024/1440 and reports overflow + console errors (a server must be running; set `BASE_URL` for anything other than port 3000) |
+
+### If `npm run dev` shows a 500 with "Cannot find module './933.js'"
+
+`next build` and `next dev` share the `.next` folder and their output does not mix. If you
+ran a build and then went back to `npm run dev`, delete `.next` and start again:
+
+```bash
+rm -rf .next && npm run dev
+```
 
 ## Project layout
 
