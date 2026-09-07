@@ -48,3 +48,6 @@ CLAUDE.local.md
 # temporary
 tmp/
 temp/
+
+# TypeScript build info
+tsconfig.tsbuildinfo
