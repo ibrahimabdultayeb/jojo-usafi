@@ -4,6 +4,7 @@ import { AdminPage } from "@/components/admin/AdminShell";
 import { Badge, Card, SectionTitle, StatTile } from "@/components/admin/ui";
 import { formatTsh } from "@/lib/admin/format";
 import { Icon } from "@/components/ui/Icon";
+import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { customers, orderTotals, orders, STAGE_LABEL, STAGE_TONE } from "@/mocks/admin/data";
 
 export function generateStaticParams() {
@@ -39,7 +40,7 @@ export default async function AdminCustomerPage({ params }: { params: Promise<{ 
           rel="noopener noreferrer"
           className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 font-display text-sm font-bold text-white transition-colors hover:bg-brand-700"
         >
-          <Icon name="whatsapp" className="h-4 w-4" />
+          <WhatsAppIcon className="h-5 w-5" />
           WhatsApp customer
         </a>
         <a

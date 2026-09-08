@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
-import { Icon, WhatsAppGlyph, type IconName } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
+import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { useLocale } from "@/lib/i18n/client";
 import { whatsappLink } from "@/lib/site";
 
@@ -134,7 +135,7 @@ export function TrackOrderView() {
             rel="noopener noreferrer"
             className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-[#25D366] px-5 text-sm font-bold text-white transition-[filter] hover:brightness-95"
           >
-            <WhatsAppGlyph className="h-4 w-4" />
+            <WhatsAppIcon className="h-5 w-5" />
             {t.track.helpCta}
           </a>
         </div>

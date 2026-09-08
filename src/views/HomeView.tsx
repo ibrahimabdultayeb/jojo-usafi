@@ -14,7 +14,9 @@ import { site } from "@/lib/site";
 export function HomeView({ locale }: { locale: Locale }) {
   const t = getDictionary(locale);
   const categories = getCategories();
-  const bestSellers = getBestSellers(8);
+  // Ten so the widest shelf is two complete rows of five; narrower
+  // column counts trim the tail themselves (see ProductGrid).
+  const bestSellers = getBestSellers(10);
   const shop = localePath(locale, "/shop");
 
   return (
@@ -28,7 +30,7 @@ export function HomeView({ locale }: { locale: Locale }) {
           eyebrow={t.home.thisMonth}
           action={{ label: t.home.shopAll, href: shop }}
         />
-        <ProductGrid products={bestSellers} locale={locale} priorityCount={4} />
+        <ProductGrid products={bestSellers} locale={locale} priorityCount={5} variant="twoRows" />
       </section>
 
       {categories.map((category) => (
@@ -37,7 +39,7 @@ export function HomeView({ locale }: { locale: Locale }) {
             title={category.name}
             action={{ label: t.home.viewAll, href: `${shop}?category=${category.slug}` }}
           />
-          <ProductGrid products={getCategoryRail(category.id, 4)} locale={locale} />
+          <ProductGrid products={getCategoryRail(category.id, 5)} locale={locale} variant="rail" />
         </section>
       ))}
 

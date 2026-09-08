@@ -27,7 +27,7 @@ interface ProductPhotoProps {
 /** Rendered width hints so the browser picks a sensible source. */
 const SIZES: Record<NonNullable<ProductPhotoProps["size"]>, string> = {
   thumb: "80px",
-  card: "(min-width: 1024px) 320px, (min-width: 640px) 33vw, 50vw",
+  card: "(min-width: 1280px) 250px, (min-width: 1024px) 230px, (min-width: 768px) 33vw, 50vw",
   detail: "(min-width: 1024px) 560px, 100vw",
 };
 

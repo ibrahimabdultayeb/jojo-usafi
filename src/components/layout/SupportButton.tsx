@@ -1,6 +1,6 @@
 "use client";
 
-import { WhatsAppGlyph } from "@/components/ui/Icon";
+import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { useCart } from "@/lib/cart";
 import { useLocale } from "@/lib/i18n/client";
 import { site, whatsappLink } from "@/lib/site";
@@ -34,7 +34,7 @@ export function SupportButton() {
           : "bottom-[calc(1.25rem+env(safe-area-inset-bottom))] sm:bottom-6"
       }`}
     >
-      <WhatsAppGlyph className="h-7 w-7" />
+      <WhatsAppIcon className="h-7 w-7" />
     </a>
   );
 }

@@ -13,6 +13,7 @@ export function Logo({ compact = false }: { compact?: boolean }) {
   return (
     <Link
       href={path("/")}
+      data-qa-anchor={compact ? undefined : "logo"}
       className="group flex min-h-11 shrink-0 items-center gap-2 lg:gap-2.5"
       aria-label={t.header.homeLabel}
     >

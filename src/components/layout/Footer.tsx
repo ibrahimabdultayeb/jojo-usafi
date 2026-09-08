@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Icon, WhatsAppGlyph } from "@/components/ui/Icon";
+import { Icon } from "@/components/ui/Icon";
+import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { getCategories } from "@/lib/catalogue/queries";
 import { fill, getDictionary, localePath, type Locale } from "@/lib/i18n";
 import { site, whatsappLink } from "@/lib/site";
@@ -36,7 +37,7 @@ export function Footer({ locale }: { locale: Locale }) {
             rel="noopener noreferrer"
             className="mt-5 inline-flex min-h-12 items-center gap-2 rounded-full bg-[#25D366] px-5 text-sm font-bold text-white transition-[filter] hover:brightness-95"
           >
-            <WhatsAppGlyph className="h-4 w-4" />
+            <WhatsAppIcon className="h-5 w-5" />
             {t.footer.whatsappCta}
           </a>
         </div>

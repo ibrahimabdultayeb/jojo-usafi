@@ -4,14 +4,26 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { StableText } from "@/components/ui/StableText";
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 import { Logo } from "@/components/layout/Logo";
 import { MobileMenu } from "@/components/layout/MobileMenu";
 import { useCart } from "@/lib/cart";
 import { useLocale } from "@/lib/i18n/client";
+import type { Dictionary } from "@/lib/i18n";
 import { stripLocale } from "@/lib/i18n/config";
 
-/** Floating layer: `z-40` — sticky, and below anything that floats over content. */
+/**
+ * Floating layer: `z-40` — sticky, and below anything that floats over content.
+ *
+ * LANGUAGE STABILITY
+ *   The header is the one piece of chrome on every page, so it is where a
+ *   language switch is most obvious. Each nav label and the cart label reserve
+ *   the width of their longest translation (`StableText`), which pins the nav
+ *   block and therefore everything measured from it: the search field keeps its
+ *   width, and the language control and cart button keep their position.
+ *   Switching EN ↔ SW changes the words inside the frame and not the frame.
+ */
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
@@ -21,11 +33,13 @@ export function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [term, setTerm] = useState("");
 
-  const nav = [
-    { label: t.nav.home, href: "/" },
-    { label: t.nav.shop, href: "/shop" },
-    { label: t.nav.track, href: "/track-order" },
-    { label: t.nav.contact, href: "/contact" },
+  // `pick` is how each slot finds its own translations, so the reserved width
+  // follows the dictionary instead of a number written down here.
+  const nav: { key: string; label: string; pick: (d: Dictionary) => string; href: string }[] = [
+    { key: "home", label: t.nav.home, pick: (d) => d.nav.home, href: "/" },
+    { key: "shop", label: t.nav.shop, pick: (d) => d.nav.shop, href: "/shop" },
+    { key: "track", label: t.nav.track, pick: (d) => d.nav.track, href: "/track-order" },
+    { key: "contact", label: t.nav.contact, pick: (d) => d.nav.contact, href: "/contact" },
   ];
 
   useEffect(() => {
@@ -50,11 +64,16 @@ export function Header() {
         <div className="shell flex h-14 items-center gap-1 sm:h-16 sm:gap-4 lg:h-20 lg:gap-6">
           <Logo />
 
-          <nav className="hidden shrink-0 items-center gap-1 lg:flex" aria-label="Main">
+          <nav
+            data-qa-anchor="nav"
+            className="hidden shrink-0 items-center gap-1 lg:flex"
+            aria-label="Main"
+          >
             {nav.map((item) => (
               <Link
                 key={item.href}
                 href={path(item.href)}
+                data-qa-anchor={`nav-${item.key}`}
                 aria-current={isActive(item.href) ? "page" : undefined}
                 className={`rounded-full px-4 py-2 text-sm font-bold transition-colors ${
                   isActive(item.href)
@@ -62,13 +81,14 @@ export function Header() {
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 }`}
               >
-                {item.label}
+                <StableText pick={item.pick}>{item.label}</StableText>
               </Link>
             ))}
           </nav>
 
           <form
             onSubmit={submitSearch}
+            data-qa-anchor="search"
             className="relative hidden max-w-md flex-1 md:block"
             role="search"
           >
@@ -89,13 +109,14 @@ export function Header() {
           <div className="flex-1 md:hidden" />
 
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            <LanguageSwitcher className="hidden lg:inline-flex" />
+            <LanguageSwitcher className="hidden lg:inline-flex" anchor="language" />
 
             <button
               type="button"
               onClick={() => setSearchOpen((v) => !v)}
               aria-expanded={searchOpen}
               aria-label={t.header.searchLabel}
+              data-qa-anchor="search-toggle"
               className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 md:hidden"
             >
               <Icon name={searchOpen ? "close" : "search"} className="h-5 w-5" />
@@ -105,10 +126,15 @@ export function Header() {
               type="button"
               onClick={openCart}
               aria-label={t.meta.cartTitle}
+              data-qa-anchor="cart"
               className="relative flex h-11 items-center gap-2 rounded-full bg-slate-900 px-3.5 text-xs font-bold tracking-wide text-white shadow-md transition-colors hover:bg-brand-600 sm:px-5"
             >
               <Icon name="cart" className="h-4 w-4" />
-              <span className="hidden lg:inline">{t.header.cart}</span>
+              {/* CART / KIKAPU. Reserved, or the language control to its left
+                  moves every time the language changes. */}
+              <span className="hidden lg:inline">
+                <StableText pick={(d) => d.header.cart}>{t.header.cart}</StableText>
+              </span>
               {hydrated && count > 0 && (
                 <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-500 px-1 text-[11px] font-black text-white ring-2 ring-white">
                   {count}
@@ -120,6 +146,7 @@ export function Header() {
               type="button"
               onClick={() => setMenuOpen(true)}
               aria-label={t.header.openMenu}
+              data-qa-anchor="menu"
               className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 lg:hidden"
             >
               <Icon name="menu" className="h-5 w-5" />

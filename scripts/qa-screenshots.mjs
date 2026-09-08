@@ -13,6 +13,8 @@
  *   - the hero down control failing to scroll
  *   - the language chooser or the EN/SW switcher failing
  *   - a withheld product (EP01-A01) or an orphan image (EP23-A02) leaking out
+ *   - a product shelf with the wrong number of columns, or a row left part-full
+ *   - the interface moving around the shopper when the language changes
  *
  *   node scripts/qa-screenshots.mjs
  *   BASE_URL=http://localhost:3000 node scripts/qa-screenshots.mjs
@@ -46,13 +48,24 @@ const seedCart = JSON.stringify(
   publishable.slice(0, 3).map((p, i) => ({ sku: p.sku, quantity: i + 1 })),
 );
 
+/**
+ * `columns` is the number of product cards a shelf must show per row at that
+ * width — the density contract from ProductGrid.tsx, asserted rather than
+ * eyeballed in a screenshot.
+ */
 const widths = [
-  { name: "390-iphone", width: 390, height: 844, mobile: true },
-  { name: "430-iphone-max", width: 430, height: 932, mobile: true },
-  { name: "768-tablet", width: 768, height: 1024, mobile: true },
-  { name: "1024-laptop", width: 1024, height: 768, mobile: false },
-  { name: "1440-desktop", width: 1440, height: 900, mobile: false },
+  { name: "390-iphone", width: 390, height: 844, mobile: true, columns: 2 },
+  { name: "430-iphone-max", width: 430, height: 932, mobile: true, columns: 2 },
+  { name: "768-tablet", width: 768, height: 1024, mobile: true, columns: 3 },
+  { name: "1024-laptop", width: 1024, height: 768, mobile: false, columns: 4 },
+  { name: "1440-desktop", width: 1440, height: 900, mobile: false, columns: 5 },
 ];
+
+/**
+ * How far a persistent control may move when the language changes. Sub-pixel
+ * layout rounding is real and harmless; anything a shopper could see is not.
+ */
+const LOCALE_DRIFT_TOLERANCE = 2;
 
 const locales = [
   { code: "en", prefix: "" },
@@ -250,6 +263,60 @@ async function checkFloatingCollisions(tab, label) {
   for (const hit of overlaps) fail(`FLOATING LAYER COLLISION — ${label}: ${hit}`);
 }
 
+/**
+ * The shelf shows the agreed number of cards per row, and a fixed-length shelf
+ * never ends in a part-full row.
+ *
+ * Two separate things are asserted, because they fail separately:
+ *   - the grid really resolves to `expected` columns at this width, which is
+ *     what "five products per row on desktop" actually means;
+ *   - a `rail` or `twoRows` shelf shows a whole number of rows, so no card is
+ *     left dangling on its own under a full one. A shelf given fewer products
+ *     than a single row needs is exempt: showing the three that exist is right.
+ */
+async function checkProductGrids(tab, label, expected) {
+  const grids = await tab.evaluate(() => {
+    return [...document.querySelectorAll('[data-qa="product-grid"]')].map((grid) => {
+      const visible = [...grid.children].filter(
+        (card) => getComputedStyle(card).display !== "none",
+      );
+      const tops = visible.map((card) => Math.round(card.getBoundingClientRect().top));
+      return {
+        variant: grid.dataset.qaVariant,
+        supplied: grid.children.length,
+        visible: visible.length,
+        // How many cards share the topmost row — the real, rendered answer.
+        firstRow: tops.length ? tops.filter((top) => top === tops[0]).length : 0,
+        columns: getComputedStyle(grid)
+          .gridTemplateColumns.split(" ")
+          .filter(Boolean).length,
+      };
+    });
+  });
+
+  if (grids.length === 0) return;
+
+  for (const grid of grids) {
+    if (grid.columns !== expected) {
+      fail(`GRID COLUMNS — ${label}: ${grid.variant} shelf has ${grid.columns}, expected ${expected}`);
+    }
+
+    // The rendered row has to agree with the column count, or the cards are
+    // wrapping early for a reason the computed style does not show.
+    if (grid.visible >= expected && grid.firstRow !== expected) {
+      fail(`GRID FIRST ROW — ${label}: ${grid.firstRow} card(s) in the top row, expected ${expected}`);
+    }
+
+    if (grid.variant === "grid") continue;
+    if (grid.supplied < expected) continue;
+    if (grid.visible % grid.columns !== 0) {
+      fail(
+        `PART-FULL SHELF ROW — ${label}: ${grid.variant} shows ${grid.visible} card(s) in ${grid.columns} columns`,
+      );
+    }
+  }
+}
+
 /** The photo on the product page must belong to the SKU being viewed. */
 async function checkProductPhotoMatchesSku(tab, label, sku) {
   const src = await tab.evaluate(() => {
@@ -287,6 +354,7 @@ async function screenshotPass(browser) {
         // 44px is a touch requirement, so it is enforced on touch viewports.
         if (viewport.mobile) await checkTouchTargets(tab, label);
         await checkFloatingCollisions(tab, label);
+        await checkProductGrids(tab, label, viewport.columns);
         if (page.name === "product") {
           await checkProductPhotoMatchesSku(tab, label, sampleProduct.sku);
         }
@@ -337,6 +405,118 @@ async function adminPass(browser) {
 
       await tab.close();
       await context.close();
+    }
+  }
+}
+
+/**
+ * LOCALE LAYOUT STABILITY
+ *
+ * Changing language should change words, not furniture. English and Kiswahili
+ * labels are different lengths, and a header laid out around whichever one is
+ * on screen shifts the search field, the language control and the cart button
+ * sideways every time the shopper switches — which reads as a glitch even
+ * though nothing is broken.
+ *
+ * So the persistent controls are marked `data-qa-anchor` in the markup and this
+ * pass loads the same page in both languages at every QA width and compares
+ * their boxes. It asserts nothing about the translated text itself: "Track
+ * Order" and "Fuatilia Agizo" are allowed to be different widths. What is not
+ * allowed is the slot around them changing size or position, because that is
+ * what drags unrelated controls across the screen.
+ *
+ * WHAT IS COMPARED, AND WHY IT DIFFERS BY PLACE
+ *   Horizontal position and width are compared everywhere. Sideways movement is
+ *   the glitch being hunted, and no honest translation requires it.
+ *
+ *   Vertical position and height are compared only inside the header, which is
+ *   fixed furniture that must not move at all. Further down a page, a
+ *   translated paragraph is entitled to take one more line than its English
+ *   original and push what follows down with it. Failing that would leave only
+ *   two ways to pass — reserving blank vertical space, or shrinking the type —
+ *   and both are worse than the wrap they would be hiding.
+ */
+const stabilityPages = [
+  { name: "home", path: "/" },
+  { name: "shop", path: "/shop" },
+  { name: "product", path: `/product/${sampleProduct.slug}` },
+];
+
+/** Every anchored control that is actually on screen, and where it sits. */
+async function anchorBoxes(browser, viewport, locale, pagePath) {
+  const context = await browser.newContext({
+    viewport: { width: viewport.width, height: viewport.height },
+    isMobile: viewport.mobile,
+    hasTouch: viewport.mobile,
+    userAgent: viewport.mobile ? devices["iPhone 14 Pro"].userAgent : undefined,
+  });
+  await seedStorage(context, locale.code, false);
+
+  const tab = await context.newPage();
+  await tab.goto(`${BASE_URL}${locale.prefix}${pagePath}`, { waitUntil: "networkidle" });
+  // Web fonts change text metrics, so the comparison has to happen after they
+  // have swapped in — otherwise both sides are measured in the fallback face.
+  await tab.evaluate(() => document.fonts.ready);
+  await tab.waitForTimeout(200);
+
+  const boxes = await tab.evaluate(() => {
+    const found = {};
+    for (const el of document.querySelectorAll("[data-qa-anchor]")) {
+      const style = getComputedStyle(el);
+      if (style.display === "none" || style.visibility === "hidden") continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) continue;
+      found[el.dataset.qaAnchor] = {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        // Header controls are held to vertical stability as well.
+        inHeader: el.closest("header") !== null,
+      };
+    }
+    return found;
+  });
+
+  await context.close();
+  return boxes;
+}
+
+async function localeStabilityPass(browser) {
+  const [english, kiswahili] = locales;
+
+  for (const viewport of widths) {
+    for (const page of stabilityPages) {
+      const label = `${page.name} @ ${viewport.width}px`;
+      const en = await anchorBoxes(browser, viewport, english, page.path);
+      const sw = await anchorBoxes(browser, viewport, kiswahili, page.path);
+
+      const anchors = new Set([...Object.keys(en), ...Object.keys(sw)]);
+      let moved = 0;
+
+      for (const anchor of anchors) {
+        if (!en[anchor] || !sw[anchor]) {
+          fail(`LOCALE ANCHOR MISSING — ${label}: "${anchor}" renders in only one language`);
+          continue;
+        }
+
+        const sides = en[anchor].inHeader ? ["x", "y", "width", "height"] : ["x", "width"];
+        const drift = sides
+          .map((side) => ({ side, delta: sw[anchor][side] - en[anchor][side] }))
+          .filter(({ delta }) => Math.abs(delta) > LOCALE_DRIFT_TOLERANCE);
+
+        if (drift.length > 0) {
+          moved += 1;
+          const detail = drift
+            .map(({ side, delta }) => `${side} ${delta > 0 ? "+" : ""}${delta.toFixed(1)}px`)
+            .join(", ");
+          fail(`LOCALE LAYOUT SHIFT — ${label}: "${anchor}" moved ${detail} in Kiswahili`);
+        }
+      }
+
+      console.log(
+        `${label}: ${anchors.size} anchored control(s), ${moved === 0 ? "stable" : `${moved} moved`}`,
+      );
     }
   }
 }
@@ -503,6 +683,8 @@ async function run() {
   await screenshotPass(browser);
   console.log("\n--- admin ---");
   await adminPass(browser);
+  console.log("\n--- locale layout stability ---");
+  await localeStabilityPass(browser);
   console.log("\n--- behaviour checks ---");
   await behaviourPass(browser);
 
@@ -513,7 +695,10 @@ async function run() {
     `${widths.length * (locales.length * pages.length + adminPages.length)} screenshots captured.`,
   );
   if (problems.length === 0) {
-    console.log("PASS — no overflow, console errors, broken images, small targets or collisions.");
+    console.log(
+      "PASS — no overflow, console errors, broken images, small targets, collisions,\n" +
+        "       wrong shelf columns or locale layout shifts.",
+    );
   } else {
     for (const problem of problems) console.log(problem);
     console.log(`\nFAIL — ${problems.length} problem(s).`);

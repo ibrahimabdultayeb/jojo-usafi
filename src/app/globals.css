@@ -84,6 +84,67 @@
   .edge-fade {
     mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent);
   }
+
+  /* -------------------------------------------------------------------------
+     COMPLETE SHELF ROWS
+
+     A homepage product shelf is a fixed length, and the grid it sits in changes
+     from 2 to 3 to 4 to 5 columns (see ProductGrid.tsx). Those numbers do not
+     divide the same count, so a shelf sized for the widest row leaves an orphan
+     card dangling under a full row at some narrower width — which reads as a
+     bug rather than as the end of a list.
+
+     So the shelf is always handed enough products for the widest row and the
+     tail is trimmed here to whatever completes the last row:
+
+       .shelf-rail       given  5  shows  4 / 3 / 4 / 5    one row, every width
+       .shelf-two-rows   given 10  shows  8 / 9 / 8 / 10   two rows, every width
+
+     The breakpoints mirror Tailwind's md / lg / xl exactly. `display: flex`
+     restores a card rather than `block` because ProductCard's root is a flex
+     column. Later rules win on equal specificity, so the order below is the
+     behaviour — do not reorder these blocks.
+
+     Shop All deliberately uses neither: a part-full last row there is simply
+     where the catalogue ends.
+     ------------------------------------------------------------------------- */
+  .shelf-rail > :nth-child(n + 5) {
+    display: none;
+  }
+  @media (min-width: 48rem) {
+    .shelf-rail > :nth-child(n + 4) {
+      display: none;
+    }
+  }
+  @media (min-width: 64rem) {
+    .shelf-rail > :nth-child(4) {
+      display: flex;
+    }
+  }
+  @media (min-width: 80rem) {
+    .shelf-rail > :nth-child(5) {
+      display: flex;
+    }
+  }
+
+  .shelf-two-rows > :nth-child(n + 9) {
+    display: none;
+  }
+  @media (min-width: 48rem) {
+    .shelf-two-rows > :nth-child(9) {
+      display: flex;
+    }
+  }
+  @media (min-width: 64rem) {
+    .shelf-two-rows > :nth-child(9) {
+      display: none;
+    }
+  }
+  @media (min-width: 80rem) {
+    .shelf-two-rows > :nth-child(n + 9) {
+      display: flex;
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

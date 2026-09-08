@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
+import { StableText } from "@/components/ui/StableText";
 import { ScrollToSection } from "@/components/ui/ScrollToSection";
 import { fill, getDictionary, localePath, type Locale } from "@/lib/i18n";
 import { site } from "@/lib/site";
@@ -54,19 +55,26 @@ export function Hero({ locale }: { locale: Locale }) {
           {fill(t.hero.body, { area: site.serviceArea })}
         </p>
 
+        {/* The two hero actions keep their size across languages, so the most
+            prominent button row on the site is the same row in both. The
+            anchors sit on the buttons rather than on this row: the row is as
+            wide as the centred column, which the translated headline and body
+            copy legitimately size. */}
         <div className="flex flex-col justify-center gap-3 sm:flex-row md:gap-4">
           <Link
             href={localePath(locale, "/shop")}
+            data-qa-anchor="hero-cta-shop"
             className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-slate-900 px-8 font-display text-base font-bold text-white shadow-xl transition-all hover:-translate-y-0.5 hover:bg-brand-600 hover:shadow-brand-200 md:px-10 md:text-lg"
           >
-            {t.hero.ctaShop}
+            <StableText pick={(d) => d.hero.ctaShop}>{t.hero.ctaShop}</StableText>
             <Icon name="arrowRight" className="h-5 w-5" />
           </Link>
           <Link
             href={localePath(locale, "/track-order")}
+            data-qa-anchor="hero-cta-track"
             className="inline-flex min-h-14 items-center justify-center rounded-full border-2 border-slate-200 bg-white px-8 font-display text-base font-bold text-slate-900 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 md:px-10 md:text-lg"
           >
-            {t.hero.ctaTrack}
+            <StableText pick={(d) => d.hero.ctaTrack}>{t.hero.ctaTrack}</StableText>
           </Link>
         </div>
       </div>

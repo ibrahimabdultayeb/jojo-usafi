@@ -4,7 +4,9 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { StableText, WidthReserver } from "@/components/ui/StableText";
 import type { Category } from "@/lib/catalogue/types";
+import { localeVariants } from "@/lib/i18n";
 import { useLocale } from "@/lib/i18n/client";
 
 interface ShopControlsProps {
@@ -12,6 +14,16 @@ interface ShopControlsProps {
   activeCategory?: string;
   activeSort: string;
 }
+
+/**
+ * LANGUAGE STABILITY
+ *   The category chips carry catalogue names, which are English on both sides
+ *   of the site and so never move. The two controls that *are* translated are
+ *   the leading "All" chip — which would shift every chip after it — and the
+ *   sort menu, whose width a browser takes from its widest option. Both reserve
+ *   the longest translation so the filter row is the same row in both
+ *   languages.
+ */
 
 export function ShopControls({ categories, activeCategory, activeSort }: ShopControlsProps) {
   const router = useRouter();
@@ -37,6 +49,14 @@ export function ShopControls({ categories, activeCategory, activeSort }: ShopCon
     [params, pathname],
   );
 
+  // Every sort label in every language. The widest of them sizes the control.
+  const sortReserveVariants = [
+    ...localeVariants((d) => d.shop.sortFeatured),
+    ...localeVariants((d) => d.shop.sortPriceAsc),
+    ...localeVariants((d) => d.shop.sortPriceDesc),
+    ...localeVariants((d) => d.shop.sortName),
+  ];
+
   const chip = (active: boolean) =>
     `inline-flex min-h-11 items-center whitespace-nowrap rounded-full border px-5 text-sm font-bold shadow-sm transition-all ${
       active
@@ -46,9 +66,16 @@ export function ShopControls({ categories, activeCategory, activeSort }: ShopCon
 
   return (
     <div className="mb-8 flex flex-col gap-4 border-y border-slate-100 py-5 md:flex-row md:items-center md:justify-between md:gap-6">
-      <div className="no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0">
-        <Link href={hrefWith("category")} className={chip(!activeCategory)}>
-          {t.shop.filterAll}
+      <div
+        data-qa-anchor="shop-filters"
+        className="no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0"
+      >
+        <Link
+          href={hrefWith("category")}
+          data-qa-anchor="shop-filter-all"
+          className={chip(!activeCategory)}
+        >
+          <StableText pick={(d) => d.shop.filterAll}>{t.shop.filterAll}</StableText>
         </Link>
         {categories.map((category) => (
           <Link
@@ -61,7 +88,14 @@ export function ShopControls({ categories, activeCategory, activeSort }: ShopCon
         ))}
       </div>
 
-      <div className="relative shrink-0">
+      {/* A `<select>` cannot hold the hidden alternates itself, so they share
+          its grid cell: the cell is as wide as the longest option in either
+          language and the select fills it. The reservers copy the select's own
+          padding and type so the width they ask for is the width it needs. */}
+      <div
+        data-qa-anchor="shop-sort"
+        className="relative grid w-full shrink-0 grid-cols-1 grid-rows-1 md:w-auto"
+      >
         <label htmlFor="sort" className="sr-only">
           {t.shop.sortLabel}
         </label>
@@ -69,7 +103,7 @@ export function ShopControls({ categories, activeCategory, activeSort }: ShopCon
           id="sort"
           value={activeSort}
           onChange={(e) => router.push(hrefWith("sort", e.target.value))}
-          className="h-12 w-full cursor-pointer appearance-none rounded-full border border-slate-200 bg-white pr-11 pl-5 text-sm font-bold shadow-sm outline-none focus:border-brand-500 md:w-auto"
+          className="col-start-1 row-start-1 h-12 w-full cursor-pointer appearance-none rounded-full border border-slate-200 bg-white pr-11 pl-5 text-sm font-bold shadow-sm outline-none focus:border-brand-500"
         >
           {sortOptions.map((option) => (
             <option key={option.value} value={option.value}>
@@ -77,6 +111,13 @@ export function ShopControls({ categories, activeCategory, activeSort }: ShopCon
             </option>
           ))}
         </select>
+        {/* Same padding, type and border as the select, so the width these ask
+            for is the width the select would need for that option. Boxes are
+            border-box, so the 1px border really does count. */}
+        <WidthReserver
+          className="h-12 rounded-full border border-transparent pr-11 pl-5 text-sm font-bold"
+          variants={sortReserveVariants}
+        />
         <Icon
           name="chevronDown"
           className="pointer-events-none absolute top-1/2 right-4 h-4 w-4 -translate-y-1/2 text-slate-400"

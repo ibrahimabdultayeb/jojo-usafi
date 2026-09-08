@@ -284,3 +284,131 @@ Ship the 26.6 MB source PNGs, or optimise at request time. Both rejected.
 Impact:
 Committed, reproducible assets. `ProductPhoto` still supplies width, height and `sizes`,
 so there is no layout shift and images below the fold stay lazy.
+
+---
+
+## 2026-09-08 — Five product columns start at 1280px, not 1024px
+
+Decision:
+The product shelf runs 2 / 3 / 4 / 5 columns at `< 768` / `>= 768` / `>= 1024` / `>= 1280`.
+The fifth column arrives at `xl`, not at `lg`.
+
+Reason:
+The EcoPlus reference shows five products per row on a wide desktop and Jojo Usafi was
+showing four. The shell is capped at 1400px, so at 1280px a five-across card is ~227px —
+the same card the four-across laptop layout already ships — while at 1024px it would be
+~176px and would squeeze the product name, the pack size and the price row. Five columns
+were the goal; five cramped columns were not.
+
+Alternatives:
+Five from `lg` (1024px). Rejected: it makes the card narrower than any card currently
+approved. Reducing the card's internal padding or type to fit. Rejected: that is
+redesigning the approved card rather than adding a column.
+
+Impact:
+`ProductGrid` gains an `xl:grid-cols-5` step and the QA gate asserts the rendered column
+count at each width. Card proportions, gaps, image area and price prominence are unchanged.
+
+---
+
+## 2026-09-08 — A fixed-length shelf trims itself to complete rows
+
+Decision:
+Homepage shelves are handed enough products to fill the widest row — 5 for a category
+rail, 10 for best sellers — and CSS trims the tail at narrower column counts, so a rail
+shows 4 / 3 / 4 / 5 and best sellers show 8 / 9 / 8 / 10. Shop All trims nothing.
+
+Reason:
+2, 3, 4 and 5 do not divide the same count. A shelf sized for a five-across row leaves an
+orphan card dangling under a full row at some narrower width, which reads as a bug rather
+than as the end of a list. Trimming in CSS keeps one shelf length in the markup and one
+prerendered page per language.
+
+Alternatives:
+Serve a different product count per breakpoint. Rejected: the count is not known at build
+time and would need client-side measurement. Leave the orphan. Rejected: it is exactly the
+kind of ragged edge the reference does not have.
+
+Impact:
+`.shelf-rail` and `.shelf-two-rows` in `globals.css`, mirroring Tailwind's md/lg/xl. The
+QA gate fails a fixed-length shelf that renders a part-full row. Shop All is exempt on
+purpose: a part-full last row there is where the catalogue ends.
+
+---
+
+## 2026-09-08 — Persistent controls reserve the longest translation
+
+Decision:
+The nav slots, cart label, shop "All" chip, sort menu and hero actions size themselves to
+the longest translation of their label rather than to the one on screen. `StableText`
+renders every locale's version of a label into one grid cell and hides all but the current
+one with `visibility: hidden`.
+
+Reason:
+Kiswahili labels are longer than their English originals, so the header was laid out
+differently in each language: the nav grew, the search field shrank to absorb it, and the
+language control and cart button slid sideways. Switching language looked glitchy even
+though nothing was broken.
+
+Alternatives:
+Hard-coded `min-width` values. Rejected: a guess, in units of a font it cannot see, that
+goes stale the moment a translation is edited. Shrinking the type until Kiswahili fits the
+English width. Rejected outright — it degrades the language rather than fixing the layout.
+Truncating with an ellipsis. Rejected: it hides copy to solve a layout problem.
+
+Impact:
+The browser measures the real strings in the real font, so the reserved widths need no
+maintenance and a third language would be reserved for automatically. The cost is one
+hidden span per label per additional language, on a handful of controls. Body copy and
+headlines deliberately do not reserve, because there the longest translation would open
+gaps rather than close them.
+
+---
+
+## 2026-09-08 — Locale stability is a QA assertion, not a review note
+
+Decision:
+`qa:screenshots` compares the boxes of every `data-qa-anchor` control between English and
+Kiswahili at all five QA widths. Horizontal position and width must match within 2px
+everywhere; vertical position must match as well inside the header.
+
+Reason:
+"The header should not jump" is the kind of thing that is true on the day it is fixed and
+quietly false three commits later. It is cheap to measure and expensive to notice by eye.
+
+Alternatives:
+Pixel-diffing EN against SW screenshots. Rejected: the text is *supposed* to differ, so
+every screenshot would differ; the comparison has to be geometric, not visual.
+
+Impact:
+Vertical drift is deliberately not enforced outside the header: a translated paragraph may
+honestly take one more line than its English original, and failing that would leave only
+reserved blank space or smaller type as ways to pass. Adding a persistent control means
+adding an anchor attribute to it.
+
+---
+
+## 2026-09-08 — One filled WhatsApp mark, and none in the line-icon set
+
+Decision:
+`src/components/ui/WhatsAppIcon.tsx` is the only WhatsApp mark in the repository, used by
+the storefront support button, the mobile menu, the footer, the contact and track-order
+pages and the admin's "WhatsApp customer" actions. `Icon.tsx` carries no `whatsapp` entry
+at all.
+
+Reason:
+The admin's WhatsApp buttons looked broken. `Icon.tsx` draws its set on a 24px grid with a
+2px stroke and `fill: none`, which is right for a cart or a search icon; applied to the
+WhatsApp handset it traced the glyph's silhouette as a scribble instead of filling it. The
+storefront had already worked around this with a separate filled glyph, so the mark existed
+twice and only one of them was correct.
+
+Alternatives:
+Fix the stroke paths in place. Rejected: a brand mark is a filled shape and does not belong
+in a line-icon set. An icon font or an icon package. Rejected: a network request and a
+dependency for one glyph.
+
+Impact:
+Removing the entry makes the wrong thing unreachable rather than merely discouraged. Admin
+action buttons now carry the mark at 20px; icon-only controls keep their 44px target and
+their `aria-label`.

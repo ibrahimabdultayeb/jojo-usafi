@@ -26,7 +26,7 @@ export async function ProductView({ locale, slug }: { locale: Locale; slug: stri
   const brand = getBrand(product.brandId);
   const category = getCategories().find((c) => c.id === product.categoryId);
   const sizes = getFamilySizes(product.familyId);
-  const related = getRelatedProducts(product, 4);
+  const related = getRelatedProducts(product, 5);
   const shop = localePath(locale, "/shop");
   const name = productName(product);
   const altFor = (p: typeof product) =>
@@ -213,7 +213,7 @@ export async function ProductView({ locale, slug }: { locale: Locale; slug: stri
                 : undefined
             }
           />
-          <ProductGrid products={related} locale={locale} />
+          <ProductGrid products={related} locale={locale} variant="rail" />
         </section>
       )}
     </>

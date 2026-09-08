@@ -1,4 +1,5 @@
-import { Icon, WhatsAppGlyph } from "@/components/ui/Icon";
+import { Icon } from "@/components/ui/Icon";
+import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { fill, getDictionary, type Locale } from "@/lib/i18n";
 import { site, whatsappLink } from "@/lib/site";
 
@@ -54,7 +55,7 @@ export function ContactView({ locale }: { locale: Locale }) {
             >
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-700">
                 {channel.key === "whatsapp" ? (
-                  <WhatsAppGlyph className="h-5 w-5" />
+                  <WhatsAppIcon className="h-5 w-5" />
                 ) : (
                   <Icon name={channel.key === "phone" ? "phone" : "mail"} className="h-5 w-5" />
                 )}

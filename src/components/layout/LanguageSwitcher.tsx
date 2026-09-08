@@ -33,7 +33,20 @@ export function switchLocale(locale: Locale, pathname: string) {
   window.location.assign(`${localePath(locale, stripLocale(pathname))}${search}`);
 }
 
-export function LanguageSwitcher({ className = "" }: { className?: string }) {
+/**
+ * The control is the same size in both languages by construction: EN and SW are
+ * both two characters, and each button is a fixed 44px minimum square. Nothing
+ * needs reserving here — it is the labels *around* it that move it, which is
+ * what `StableText` in the header prevents.
+ */
+export function LanguageSwitcher({
+  className = "",
+  anchor,
+}: {
+  className?: string;
+  /** Names this control for the QA locale-stability comparison. */
+  anchor?: string;
+}) {
   const { locale, t } = useLocale();
   const pathname = usePathname();
 
@@ -41,6 +54,7 @@ export function LanguageSwitcher({ className = "" }: { className?: string }) {
     <div
       role="group"
       aria-label={t.language.switchLabel}
+      data-qa-anchor={anchor}
       className={`items-center rounded-full bg-slate-100 p-1 ${className}`}
     >
       {locales.map((option) => {

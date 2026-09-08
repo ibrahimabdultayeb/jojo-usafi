@@ -151,7 +151,23 @@ Nothing in this build writes anything, and every editor says so.
 
 ---
 
-## 8. Layering
+## 8. WhatsApp
+
+The "WhatsApp customer" actions on the order and customer screens use the one canonical
+mark, `src/components/ui/WhatsAppIcon.tsx`, shared with the storefront.
+
+They were drawing `Icon.tsx`'s `whatsapp` entry, which the shared line-icon set rendered
+with its 2px unfilled stroke — tracing the glyph's silhouette as a scribble rather than
+filling it, which is why the buttons looked broken. That entry has been removed rather than
+repaired: a brand mark is a filled shape and does not belong in a line-icon set.
+
+They stay ordinary full-width actions inside the customer card. WhatsApp is a floating
+button on the storefront because a shopper may want support at any moment; in the admin it
+is one of the things you do to an order, and it sits with the others.
+
+---
+
+## 9. Layering
 
 The admin reuses the floating-layer contract documented at the top of `src/app/globals.css`:
 the sticky top bar on **z-40**, the bottom navigation on **z-50**, sheets and toasts on
@@ -159,7 +175,7 @@ the sticky top bar on **z-40**, the bottom navigation on **z-50**, sheets and to
 
 ---
 
-## 9. Verified
+## 10. Verified
 
 `npm run qa:screenshots` audits all ten admin screens alongside the storefront at
 390 / 430 / 768 / 1024 / 1440: no horizontal overflow, no console errors, no broken images, no

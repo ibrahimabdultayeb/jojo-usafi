@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { Icon, WhatsAppGlyph } from "@/components/ui/Icon";
+import { Icon } from "@/components/ui/Icon";
+import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 import { Logo } from "@/components/layout/Logo";
 import { getCategories } from "@/lib/catalogue/queries";
@@ -137,7 +138,7 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
             rel="noopener noreferrer"
             className="flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#25D366] px-6 font-display text-base font-bold text-white transition-colors hover:brightness-95"
           >
-            <WhatsAppGlyph className="h-5 w-5" />
+            <WhatsAppIcon className="h-5 w-5" />
             {t.header.chatWithSupport}
           </a>
           <p className="mt-3 text-center text-xs font-medium text-slate-500">
