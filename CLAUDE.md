@@ -221,15 +221,25 @@ It must NOT redesign the EcoPlus visual reference unless explicitly requested.
 
 Operational live database:
 
-Cloud Firestore.
+Supabase PostgreSQL.
 
 Authentication:
 
-Firebase Authentication.
+Supabase Auth.
 
 Product/image storage:
 
-Firebase Storage.
+Supabase Storage.
+
+Authorization boundary:
+
+Supabase Row Level Security.
+
+Schema management:
+
+Supabase migrations / local development.
+
+Firebase is permanently unapproved.
 
 Human-friendly product control:
 
@@ -241,11 +251,11 @@ Google Sheet
       ↕
 secure synchronization layer
       ↕
-Cloud Firestore
+Supabase PostgreSQL
       ↕
 Storefront + Admin Dashboard
 
-The public website should read Firestore.
+The public website should read Supabase.
 
 Do NOT query Google Sheets directly for every storefront page request.
 
@@ -255,11 +265,11 @@ Do NOT query Google Sheets directly for every storefront page request.
 
 The user must be able to change catalogue information through Google Sheets.
 
-Those changes must synchronize to Firestore.
+Those changes must synchronize to Supabase.
 
 Admin-dashboard changes must:
 
-1. update Firestore immediately
+1. update Supabase immediately
 2. synchronize to the corresponding Google Sheet field
 3. be recorded in an audit/sync log
 
@@ -302,9 +312,11 @@ Use:
 - TypeScript
 - Tailwind CSS
 - Vercel
-- Cloud Firestore
-- Firebase Authentication
-- Firebase Storage
+- Supabase PostgreSQL
+- Supabase Auth
+- Supabase Storage
+- Supabase Row Level Security
+- Supabase migrations / local development
 - Google Sheets API
 - Google Apps Script when appropriate
 - Playwright
@@ -378,7 +390,7 @@ When relevant, verify:
 - integration tests
 - production build
 - Playwright tests
-- Firestore rules
+- Supabase Row Level Security policies
 - mobile layout
 - laptop/desktop layout
 - loading states
@@ -416,7 +428,8 @@ Never commit:
 - service-account credentials
 - private keys
 - tokens
-- Firebase Admin keys
+- Supabase service-role keys
+- Supabase database passwords
 - Google API private credentials
 
 Never force-push without user approval.
@@ -432,6 +445,9 @@ docs/ARCHITECTURE.md
 docs/BUSINESS_RULES.md
 docs/DATA_MODEL.md
 docs/UI_REFERENCE.md
+docs/CATALOGUE.md
+docs/CATALOGUE_REPORT.md (generated — never edit by hand)
+docs/I18N.md
 docs/TESTING_REQUIREMENTS.md
 docs/DECISIONS.md
 docs/PROGRESS.md

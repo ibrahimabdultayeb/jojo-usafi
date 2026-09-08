@@ -1,13 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { announcements } from "@/lib/site";
+import { useLocale } from "@/lib/i18n/client";
 
 /**
  * Thin bar above the header. On phones there is only room for one message at a
  * time, so it rotates; from `sm` up all three sit on one line.
+ *
+ * Floating layer: `z-10` — in flow, and it scrolls away under the sticky header.
  */
 export function AnnouncementBar() {
+  const { t } = useLocale();
+  const announcements = t.announcements;
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -15,10 +19,10 @@ export function AnnouncementBar() {
       setIndex((i) => (i + 1) % announcements.length);
     }, 4000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [announcements.length]);
 
   return (
-    <div className="relative z-50 bg-gradient-to-r from-brand-700 via-brand-600 to-emerald-500 text-white">
+    <div className="relative z-10 bg-gradient-to-r from-brand-700 via-brand-600 to-emerald-500 text-white">
       <div className="shell flex h-9 items-center justify-center overflow-hidden">
         <p key={index} className="fade-in text-center text-[11px] font-bold tracking-wide sm:hidden">
           {announcements[index]}

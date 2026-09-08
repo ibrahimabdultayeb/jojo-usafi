@@ -1,13 +1,21 @@
+"use client";
+
 import Link from "next/link";
-import { site } from "@/lib/site";
+import { useLocale } from "@/lib/i18n/client";
 
 /**
  * PLACEHOLDER BRAND MARK — a typographic lockup standing in until the real
  * Jojo Usafi logo exists.
  */
 export function Logo({ compact = false }: { compact?: boolean }) {
+  const { t, path } = useLocale();
+
   return (
-    <Link href="/" className="group flex shrink-0 items-center gap-2 lg:gap-2.5" aria-label={`${site.name} home`}>
+    <Link
+      href={path("/")}
+      className="group flex min-h-11 shrink-0 items-center gap-2 lg:gap-2.5"
+      aria-label={t.header.homeLabel}
+    >
       <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-emerald-500 shadow-lg shadow-brand-600/25 transition-shadow group-hover:shadow-brand-600/40 lg:h-10 lg:w-10">
         <span className="font-display text-lg leading-none font-bold text-white lg:text-xl">J</span>
       </span>

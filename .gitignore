@@ -45,6 +45,11 @@ Thumbs.db
 .claude/settings.local.json
 CLAUDE.local.md
 
+# Restored source inputs: the Product Master CSV and the approved product
+# photography. These are source-only, read by scripts/build-catalogue.mjs, and
+# their committed output lives in public/products and src/lib/catalogue/generated.
+imports/
+
 # temporary
 tmp/
 temp/

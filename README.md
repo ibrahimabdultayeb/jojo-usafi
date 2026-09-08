@@ -3,8 +3,9 @@
 Jojo Usafi is a scalable ecommerce retail store for Dar es Salaam. EcoPlus is the
 first brand catalogue it sells — not the whole store.
 
-**This repository currently contains a frontend-only storefront prototype.** There is
-no Firebase, no Google Sheet connection, no order backend and no payments. See
+**This repository currently contains a frontend-only storefront prototype**, in English
+and Kiswahili, built on the real Product Master and the approved product photography.
+There is no backend, no Google Sheet connection, no order backend and no payments. See
 [`PROTOTYPE_NOTES.md`](./PROTOTYPE_NOTES.md) for exactly what is real and what is mocked.
 
 ## Run it locally
@@ -20,26 +21,31 @@ Then open **http://localhost:3000**.
 
 ### What to look at
 
-| Page | URL |
-| --- | --- |
-| Homepage | http://localhost:3000/ |
-| Shop / catalogue | http://localhost:3000/shop |
-| A category | http://localhost:3000/shop?category=laundry-care |
-| Product detail | http://localhost:3000/product/multix-multipurpose-detergent-lemon-fresh-5lt |
-| Cart | http://localhost:3000/cart |
-| Checkout shell | http://localhost:3000/checkout |
-| Track order shell | http://localhost:3000/track-order |
-| Contact | http://localhost:3000/contact |
+| Page | English | Kiswahili |
+| --- | --- | --- |
+| Homepage | `/` | `/sw` |
+| Shop / catalogue | `/shop` | `/sw/shop` |
+| A category | `/shop?category=housekeeping` | `/sw/shop?category=housekeeping` |
+| Product detail | `/product/multix-multipurpose-detergent-lemon-fresh-5lt` | `/sw/product/…` |
+| Cart | `/cart` | `/sw/cart` |
+| Checkout shell | `/checkout` | `/sw/checkout` |
+| Track order shell | `/track-order` | `/sw/track-order` |
+| Contact | `/contact` | `/sw/contact` |
 
-The cart drawer opens from the **CART** button in the header, and a sticky cart bar
-appears at the bottom of the screen on phones once you add something.
+On a first visit you are asked to choose a language; the choice is remembered. The EN/SW
+switcher is in the header on desktop and in the menu on phones, and switching keeps the
+page you are on, your filters and your cart.
+
+The cart drawer opens from the **CART / KIKAPU** button in the header, and a sticky cart
+bar appears at the bottom on phones once you add something.
 
 ### Seeing the phone experience
 
 Jojo Usafi is mobile first. In Chrome: `F12` → the device-toolbar icon (`Ctrl+Shift+M`)
 → pick **iPhone 14 Pro (390px)** or set the width to **430px**.
 
-Saved screenshots at every QA width are in [`preview/screenshots/`](./preview/screenshots).
+Saved screenshots at every QA width, in both languages, are in
+[`preview/screenshots/`](./preview/screenshots).
 
 ## Scripts
 
@@ -50,7 +56,10 @@ Saved screenshots at every QA width are in [`preview/screenshots/`](./preview/sc
 | `npm run start` | Serve the production build |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript, no emit |
-| `npm run qa:screenshots` | Screenshots every page at 390/430/768/1024/1440 and reports overflow + console errors (a server must be running; set `BASE_URL` for anything other than port 3000) |
+| `npm run catalogue:build` | Rebuild the catalogue and photography from `imports/` |
+| `npm run catalogue:check` | Verify the committed catalogue still matches `imports/` |
+| `npm run i18n:check` | Verify English and Kiswahili carry the same copy keys |
+| `npm run qa:screenshots` | Full QA gate — screenshots and behaviour checks at 390/430/768/1024/1440 in both languages (a server must be running; set `BASE_URL` for anything other than port 3000) |
 
 ### If `npm run dev` shows a 500 with "Cannot find module './933.js'"
 
@@ -61,24 +70,47 @@ ran a build and then went back to `npm run dev`, delete `.next` and start again:
 rm -rf .next && npm run dev
 ```
 
+## The catalogue
+
+The shelf is generated, not hand-written. `scripts/build-catalogue.mjs` reads the Product
+Master CSV and the approved photography from `imports/` — which is source-only and
+git-ignored — and writes the committed product images, catalogue data and validation
+report. SKU is the identity key, images are matched on the exact SKU with no fuzzy
+matching, and a product with no approved photograph is never shown.
+
+Current state: **201 master rows → 95 publishable products**, 106 withheld for having no
+approved photograph. Full detail, including the two items needing Ibrahim's input, is in
+[`docs/CATALOGUE_REPORT.md`](./docs/CATALOGUE_REPORT.md) and
+[`docs/CATALOGUE.md`](./docs/CATALOGUE.md).
+
 ## Project layout
 
 ```
-src/app/                  routes (App Router)
-src/components/layout/    header, footer, announcement bar, mobile menu, cart bar
+src/app/(en)/             English routes
+src/app/(sw)/sw/          Kiswahili routes
+src/views/                one shared implementation per page
+src/components/layout/    header, footer, menu, cart dock, language controls
 src/components/home/      homepage sections
-src/components/product/   product card, product artwork, add-to-cart controls
+src/components/product/   product card, product photo, add-to-cart controls
 src/components/cart/      cart drawer
-src/lib/catalogue/        catalogue types, mock data and the query layer
-src/lib/                  cart state, formatting, site copy, colour tones
-scripts/                  visual QA script
+src/lib/catalogue/        catalogue types, generated data and the query layer
+src/lib/i18n/             locale config, dictionaries, client hook
+src/lib/                  cart state, formatting, site settings, colour tones
+scripts/                  catalogue build, i18n check, QA gate
+public/products/          approved product photography, one file per SKU
 preview/screenshots/      QA screenshots
-docs/                     project constitution, architecture, progress
+docs/                     constitution, architecture, catalogue, i18n, decisions, progress
+imports/                  restored source inputs — source-only, not in Git
 ```
 
 Everything the UI knows about products goes through `src/lib/catalogue/queries.ts`.
-That is the single seam where Cloud Firestore replaces the prototype data later.
+That is the single seam where Supabase replaces the generated data later.
 
 ## Stack
 
-Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · Playwright for visual QA.
+Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · sharp for the
+catalogue image pipeline · Playwright for the QA gate.
+
+Approved backend direction (**not started**): Supabase PostgreSQL, Auth, Storage and Row
+Level Security, on Vercel, with a validated two-way Google Sheet ↔ Supabase sync.
+Firebase is permanently unapproved.

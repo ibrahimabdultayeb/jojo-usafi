@@ -1,0 +1,91 @@
+{
+  "source": {
+    "masterRows": 201,
+    "approvedImageFiles": 96,
+    "distinctBrands": 22,
+    "distinctCategories": 5,
+    "distinctFamilies": 65
+  },
+  "matching": {
+    "strategy": "exact leading SKU token; no fuzzy name matching",
+    "imagesMatchedToMaster": 95,
+    "imagesWithoutMasterRow": [
+      {
+        "sku": "EP23-A02",
+        "file": "EP23-A02 - 5L Spirix Methylated Spirit.png"
+      }
+    ],
+    "imageFilenamesWithoutSkuToken": [],
+    "duplicateImageSkus": [],
+    "masterRowsWithoutApprovedImage": 106
+  },
+  "storefront": {
+    "publishable": 95,
+    "hiddenMissingImage": 106,
+    "hiddenOtherReason": 0,
+    "assetsWritten": 95
+  },
+  "flagged": [
+    {
+      "sku": "EP01-A01",
+      "name": "Multipurpose Detergent Lemon Fresh 20LT",
+      "price": 128,
+      "flags": [
+        "MISSING_APPROVED_IMAGE",
+        "PRICE_IMPLAUSIBLE",
+        "PRICE_INVERSION"
+      ],
+      "publishable": false
+    },
+    {
+      "sku": "EP20-A09",
+      "name": "Antiseptic 250ML",
+      "price": 3000,
+      "flags": [
+        "PRICE_INVERSION"
+      ],
+      "publishable": true
+    }
+  ],
+  "priceInversions": [
+    {
+      "familyId": "EP01-A",
+      "smaller": {
+        "sku": "EP01-A02",
+        "packSize": "5LT",
+        "price": 34000
+      },
+      "larger": {
+        "sku": "EP01-A01",
+        "packSize": "20LT",
+        "price": 128
+      }
+    },
+    {
+      "familyId": "EP20-A",
+      "smaller": {
+        "sku": "EP20-A10",
+        "packSize": "100ML",
+        "price": 3200
+      },
+      "larger": {
+        "sku": "EP20-A09",
+        "packSize": "250ML",
+        "price": 3000
+      }
+    }
+  ],
+  "rules": {
+    "implausiblePriceBelowTzs": 1000,
+    "blockingFlags": [
+      "BRAND_UNRESOLVED",
+      "CATEGORY_UNRESOLVED",
+      "MISSING_APPROVED_IMAGE",
+      "PRICE_IMPLAUSIBLE",
+      "PRICE_MISSING",
+      "PRODUCT_STATUS_NOT_ACTIVE",
+      "WEBSITE_STATUS_NOT_SHOW"
+    ],
+    "note": "Flagged values are never corrected here. Only Ibrahim can confirm commercial data."
+  }
+}

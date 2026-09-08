@@ -2,8 +2,10 @@
 
 import { Icon } from "@/components/ui/Icon";
 import { useCart } from "@/lib/cart";
-import type { Product } from "@/lib/catalogue/types";
 import { fullProductName } from "@/lib/catalogue/queries";
+import type { Product } from "@/lib/catalogue/types";
+import { fill } from "@/lib/i18n";
+import { useLocale } from "@/lib/i18n/client";
 
 /**
  * Compact control used on product cards: a single round "+" that expands into a
@@ -12,13 +14,14 @@ import { fullProductName } from "@/lib/catalogue/queries";
  */
 export function AddToCartControl({ product }: { product: Product }) {
   const { quantityOf, add, setQuantity, hydrated } = useCart();
+  const { t } = useLocale();
   const quantity = hydrated ? quantityOf(product.sku) : 0;
-  const label = fullProductName(product);
+  const name = fullProductName(product);
 
   if (!product.inStock) {
     return (
       <span className="ml-auto inline-flex h-11 shrink-0 items-center rounded-full bg-slate-100 px-4 text-xs font-bold text-slate-500">
-        Out of stock
+        {t.product.outOfStock}
       </span>
     );
   }
@@ -28,7 +31,7 @@ export function AddToCartControl({ product }: { product: Product }) {
       <button
         type="button"
         onClick={() => add(product.sku)}
-        aria-label={`Add ${label} to cart`}
+        aria-label={fill(t.product.addAria, { name })}
         className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-sm transition-colors hover:bg-brand-600"
       >
         <Icon name="plus" className="h-4 w-4" />
@@ -41,7 +44,7 @@ export function AddToCartControl({ product }: { product: Product }) {
       <button
         type="button"
         onClick={() => setQuantity(product.sku, quantity - 1)}
-        aria-label={`Reduce quantity of ${label}`}
+        aria-label={fill(t.product.reduceAria, { name })}
         className="flex h-full w-11 items-center justify-center text-brand-700 transition-colors hover:bg-brand-200"
       >
         <Icon name={quantity === 1 ? "trash" : "minus"} className="h-3.5 w-3.5" />
@@ -52,7 +55,7 @@ export function AddToCartControl({ product }: { product: Product }) {
       <button
         type="button"
         onClick={() => add(product.sku)}
-        aria-label={`Increase quantity of ${label}`}
+        aria-label={fill(t.product.increaseAria, { name })}
         className="flex h-full w-11 items-center justify-center text-brand-700 transition-colors hover:bg-brand-200"
       >
         <Icon name="plus" className="h-3.5 w-3.5" />
@@ -64,13 +67,14 @@ export function AddToCartControl({ product }: { product: Product }) {
 /** Full-width variant for the product detail page. */
 export function AddToCartButton({ product }: { product: Product }) {
   const { quantityOf, add, setQuantity, openCart, hydrated } = useCart();
+  const { t } = useLocale();
   const quantity = hydrated ? quantityOf(product.sku) : 0;
-  const label = fullProductName(product);
+  const name = fullProductName(product);
 
   if (!product.inStock) {
     return (
       <div className="flex min-h-14 w-full items-center justify-center rounded-full bg-slate-100 px-6 font-display text-base font-bold text-slate-500">
-        Out of stock
+        {t.product.outOfStock}
       </div>
     );
   }
@@ -83,7 +87,7 @@ export function AddToCartButton({ product }: { product: Product }) {
         className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-6 font-display text-base font-bold text-white shadow-lg transition-colors hover:bg-brand-600"
       >
         <Icon name="cart" className="h-5 w-5" />
-        Add to cart
+        {t.product.addToCart}
       </button>
     );
   }
@@ -94,18 +98,21 @@ export function AddToCartButton({ product }: { product: Product }) {
         <button
           type="button"
           onClick={() => setQuantity(product.sku, quantity - 1)}
-          aria-label={`Reduce quantity of ${label}`}
+          aria-label={fill(t.product.reduceAria, { name })}
           className="flex h-full w-14 items-center justify-center text-brand-700 transition-colors hover:bg-brand-200"
         >
           <Icon name={quantity === 1 ? "trash" : "minus"} className="h-4 w-4" />
         </button>
-        <span aria-live="polite" className="flex-1 text-center font-display text-lg font-black text-brand-900">
+        <span
+          aria-live="polite"
+          className="flex-1 text-center font-display text-lg font-black text-brand-900"
+        >
           {quantity}
         </span>
         <button
           type="button"
           onClick={() => add(product.sku)}
-          aria-label={`Increase quantity of ${label}`}
+          aria-label={fill(t.product.increaseAria, { name })}
           className="flex h-full w-14 items-center justify-center text-brand-700 transition-colors hover:bg-brand-200"
         >
           <Icon name="plus" className="h-4 w-4" />
@@ -116,7 +123,7 @@ export function AddToCartButton({ product }: { product: Product }) {
         onClick={openCart}
         className="flex h-14 shrink-0 items-center justify-center gap-2 rounded-full bg-slate-900 px-6 font-display text-base font-bold text-white transition-colors hover:bg-brand-600"
       >
-        View cart
+        {t.product.viewCart}
       </button>
     </div>
   );

@@ -1,17 +1,24 @@
 /**
- * Storefront-wide copy and settings.
+ * Storefront-wide settings and business contact details.
  *
  * Anything in here that is a business decision rather than a design decision is
  * marked PLACEHOLDER and listed in PROTOTYPE_NOTES.md. Nothing here invents a
  * price, a delivery fee or a free-delivery threshold.
+ *
+ * Customer-facing wording lives in `src/lib/i18n/dictionaries`, not here, so it
+ * exists in both English and Kiswahili.
  */
 
 export const site = {
   name: "Jojo Usafi",
-  tagline: "Household essentials, delivered in Dar",
-  description:
-    "Cleaning and personal care essentials delivered across selected Dar es Salaam areas. Order online, pay when it arrives.",
   currency: "TSh",
+
+  /**
+   * Absolute base for canonical and hreflang URLs. No production domain has
+   * been chosen yet, so it is read from the environment and falls back to the
+   * dev server rather than inventing one.
+   */
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
 
   /** PLACEHOLDER — replace with the real Jojo Usafi business number. */
   whatsappNumber: "255700000000",
@@ -26,19 +33,6 @@ export const site = {
   serviceArea: "selected Dar es Salaam areas",
 } as const;
 
-export const announcements: string[] = [
-  "Delivery across selected Dar es Salaam areas",
-  "Lipa ukipokea — pay when your order arrives",
-  "Order online in about a minute",
-];
-
 export function whatsappLink(message: string): string {
   return `https://wa.me/${site.whatsappNumber}?text=${encodeURIComponent(message)}`;
 }
-
-export const nav = [
-  { label: "Home", href: "/" },
-  { label: "Shop All", href: "/shop" },
-  { label: "Track Order", href: "/track-order" },
-  { label: "Contact", href: "/contact" },
-] as const;

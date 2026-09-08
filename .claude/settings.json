@@ -1,38 +1,45 @@
 ﻿{
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-
   "permissions": {
     "ask": [
       "PowerShell(git push --force *)",
       "PowerShell(git push -f *)",
       "PowerShell(git reset --hard *)",
       "PowerShell(gh repo delete *)",
-      "PowerShell(firebase deploy *)",
-      "PowerShell(firebase firestore:delete *)",
-      "PowerShell(firebase projects:delete *)",
+      "PowerShell(supabase db reset *)",
+      "PowerShell(supabase db push *)",
+      "PowerShell(supabase db remote *)",
+      "PowerShell(supabase migration repair *)",
+      "PowerShell(supabase projects delete *)",
+      "PowerShell(supabase link *)",
+      "PowerShell(supabase secrets set *)",
+      "PowerShell(supabase branches delete *)",
       "PowerShell(vercel --prod *)",
       "PowerShell(vercel promote *)",
-
       "Bash(git push --force *)",
       "Bash(git push -f *)",
       "Bash(git reset --hard *)",
       "Bash(gh repo delete *)",
-      "Bash(firebase deploy *)",
-      "Bash(firebase firestore:delete *)",
-      "Bash(firebase projects:delete *)",
+      "Bash(supabase db reset *)",
+      "Bash(supabase db push *)",
+      "Bash(supabase db remote *)",
+      "Bash(supabase migration repair *)",
+      "Bash(supabase projects delete *)",
+      "Bash(supabase link *)",
+      "Bash(supabase secrets set *)",
+      "Bash(supabase branches delete *)",
       "Bash(vercel --prod *)",
       "Bash(vercel promote *)"
     ],
-
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(./secrets/**)",
       "Read(./credentials.json)",
-      "Read(./firebase-adminsdk*.json)"
+      "Read(./**/service-role*)",
+      "Read(./**/*service-account*.json)"
     ]
   },
-
   "hooks": {
     "PreToolUse": [
       {
@@ -41,7 +48,7 @@
           {
             "type": "prompt",
             "timeout": 30,
-            "prompt": "Decide whether Claude genuinely needs to interrupt the Jojo Usafi user with this question. Proposed question/tool input: $ARGUMENTS\n\nALLOW the question by returning {\"ok\": true} ONLY when at least one of the following applies:\n\n1. BUSINESS OR PRODUCT DECISION: pricing, discounts, delivery fees, payment methods, returns, refunds, cancellations, loyalty, tax policy, promotions, customer requirements, order workflow, WhatsApp workflow, or another choice that materially changes how Jojo Usafi operates or what customers experience.\n\n2. HIGH-IMPACT ARCHITECTURE: Claude proposes materially deviating from the agreed architecture or replacing a major system such as Next.js, Firestore, Firebase Auth, Firebase Storage, Google Sheets synchronization, or Vercel; or the decision creates significant provider lock-in, migration difficulty, recurring operational complexity, or cost.\n\n3. SECURITY / PRIVACY / AUTHORIZATION: the choice materially changes authentication, authorization, Firebase Security Rules, exposure of customer/admin data, handling of credentials, privacy, public access, or security boundaries.\n\n4. REAL DATA RISK: the action could delete, overwrite, bulk-replace, irreversibly migrate, or materially alter production Firestore data, production Google Sheet data, customer records, orders, inventory, or other business records.\n\n5. PRODUCTION / FINANCIAL ACTION: production deployment requiring approval, DNS/domain changes, enabling a paid service, creating material recurring cost, deleting cloud resources, or an irreversible production operation.\n\n6. HUMAN-ONLY EXTERNAL ACTION: login, OAuth authorization, payment, verification, secret/credential entry, or another action only the user can perform.\n\nBLOCK the question by returning {\"ok\": false, \"reason\": \"This is a routine technical implementation decision. Make the technically appropriate decision yourself, document it if important, and continue working without asking the user.\"} when it concerns ordinary implementation such as components, libraries, TypeScript, APIs, routing, state management, code organization, database query implementation, styling details, responsive behaviour, testing, refactoring, debugging, error fixes, performance work, accessibility, naming, or whether Claude should continue.\n\nWhen approval IS required for a high-impact technical matter, Claude should explain the recommended choice and its practical impact in plain language rather than asking the non-technical user to choose between unexplained engineering options."
+            "prompt": "Decide whether Claude genuinely needs to interrupt the Jojo Usafi user with this question. Proposed question/tool input: $ARGUMENTS\n\nALLOW the question by returning {\"ok\": true} ONLY when at least one of the following applies:\n\n1. BUSINESS OR PRODUCT DECISION: pricing, discounts, delivery fees, payment methods, returns, refunds, cancellations, loyalty, tax policy, promotions, customer requirements, order workflow, WhatsApp workflow, or another choice that materially changes how Jojo Usafi operates or what customers experience.\n\n2. HIGH-IMPACT ARCHITECTURE: Claude proposes materially deviating from the agreed architecture or replacing a major system such as Next.js, Supabase PostgreSQL, Supabase Auth, Supabase Storage, Supabase Row Level Security, Google Sheets synchronization, or Vercel; or the decision creates significant provider lock-in, migration difficulty, recurring operational complexity, or cost.\n\n3. SECURITY / PRIVACY / AUTHORIZATION: the choice materially changes authentication, authorization, Supabase Row Level Security policies, exposure of customer/admin data, handling of credentials, privacy, public access, or security boundaries.\n\n4. REAL DATA RISK: the action could delete, overwrite, bulk-replace, irreversibly migrate, or materially alter production Supabase data, production Google Sheet data, customer records, orders, inventory, or other business records.\n\n5. PRODUCTION / FINANCIAL ACTION: production deployment requiring approval, DNS/domain changes, enabling a paid service, creating material recurring cost, deleting cloud resources, or an irreversible production operation.\n\n6. HUMAN-ONLY EXTERNAL ACTION: login, OAuth authorization, payment, verification, secret/credential entry, or another action only the user can perform.\n\nBLOCK the question by returning {\"ok\": false, \"reason\": \"This is a routine technical implementation decision. Make the technically appropriate decision yourself, document it if important, and continue working without asking the user.\"} when it concerns ordinary implementation such as components, libraries, TypeScript, APIs, routing, state management, code organization, database query implementation, styling details, responsive behaviour, testing, refactoring, debugging, error fixes, performance work, accessibility, naming, or whether Claude should continue.\n\nWhen approval IS required for a high-impact technical matter, Claude should explain the recommended choice and its practical impact in plain language rather than asking the non-technical user to choose between unexplained engineering options."
           }
         ]
       }

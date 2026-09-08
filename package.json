@@ -8,7 +8,10 @@
     "start": "next start -p 3000",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "qa:screenshots": "node scripts/qa-screenshots.mjs"
+    "qa:screenshots": "node scripts/qa-screenshots.mjs",
+    "catalogue:build": "node scripts/build-catalogue.mjs",
+    "catalogue:check": "node scripts/build-catalogue.mjs --check",
+    "i18n:check": "node scripts/i18n-check.mjs"
   },
   "dependencies": {
     "next": "^15.5.25",
@@ -25,6 +28,7 @@
     "eslint-config-next": "^15.5.25",
     "playwright": "^1.63.0",
     "postcss": "^8.5.28",
+    "sharp": "^0.35.4",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"
   }

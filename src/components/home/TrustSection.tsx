@@ -1,34 +1,23 @@
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { getDictionary, type Locale } from "@/lib/i18n";
 
-const pillars: { icon: IconName; title: string; body: string }[] = [
-  {
-    icon: "wallet",
-    title: "Honest prices",
-    body: "We buy direct from the manufacturer, so you pay shop prices without the shop markup.",
-  },
-  {
-    icon: "leaf",
-    title: "Safe around the family",
-    body: "Strong on dirt, formulated for everyday household use around children and pets.",
-  },
-  {
-    icon: "truck",
-    title: "We carry the heavy ones",
-    body: "A 20 litre jerrycan is nobody's idea of a bus ride. We bring it to your door instead.",
-  },
-];
+export function TrustSection({ locale }: { locale: Locale }) {
+  const t = getDictionary(locale);
 
-export function TrustSection() {
+  const pillars: { icon: IconName; title: string; body: string }[] = [
+    { icon: "wallet", title: t.trust.pillarPriceTitle, body: t.trust.pillarPriceBody },
+    { icon: "leaf", title: t.trust.pillarSafeTitle, body: t.trust.pillarSafeBody },
+    { icon: "truck", title: t.trust.pillarHeavyTitle, body: t.trust.pillarHeavyBody },
+  ];
+
   return (
     <section className="bg-slate-50 py-14 md:py-20">
       <div className="shell">
         <div className="mx-auto mb-10 max-w-2xl text-center md:mb-14">
           <h2 className="font-display text-2xl font-bold tracking-tight text-slate-900 md:text-4xl">
-            The Jojo Usafi standard.
+            {t.trust.title}
           </h2>
-          <p className="mt-3 text-base font-medium text-slate-500 md:text-lg">
-            Why homes across Dar es Salaam restock with us.
-          </p>
+          <p className="mt-3 text-base font-medium text-slate-500 md:text-lg">{t.trust.subtitle}</p>
         </div>
 
         <ul className="grid gap-4 md:grid-cols-3 md:gap-6">
@@ -43,7 +32,9 @@ export function TrustSection() {
               <h3 className="mt-5 font-display text-lg font-bold text-slate-900 md:text-xl">
                 {pillar.title}
               </h3>
-              <p className="mt-2 text-sm leading-relaxed font-medium text-slate-500">{pillar.body}</p>
+              <p className="mt-2 text-sm leading-relaxed font-medium text-slate-500">
+                {pillar.body}
+              </p>
             </li>
           ))}
         </ul>

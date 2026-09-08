@@ -5,13 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 import { Icon } from "@/components/ui/Icon";
 import type { Category } from "@/lib/catalogue/types";
-
-const sortOptions = [
-  { value: "featured", label: "Featured first" },
-  { value: "price-asc", label: "Price: low to high" },
-  { value: "price-desc", label: "Price: high to low" },
-  { value: "name", label: "Alphabetical (A–Z)" },
-];
+import { useLocale } from "@/lib/i18n/client";
 
 interface ShopControlsProps {
   categories: Category[];
@@ -23,6 +17,14 @@ export function ShopControls({ categories, activeCategory, activeSort }: ShopCon
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const { t } = useLocale();
+
+  const sortOptions = [
+    { value: "featured", label: t.shop.sortFeatured },
+    { value: "price-asc", label: t.shop.sortPriceAsc },
+    { value: "price-desc", label: t.shop.sortPriceDesc },
+    { value: "name", label: t.shop.sortName },
+  ];
 
   const hrefWith = useCallback(
     (key: string, value?: string) => {
@@ -36,7 +38,7 @@ export function ShopControls({ categories, activeCategory, activeSort }: ShopCon
   );
 
   const chip = (active: boolean) =>
-    `whitespace-nowrap rounded-full border px-5 py-2.5 text-sm font-bold shadow-sm transition-all ${
+    `inline-flex min-h-11 items-center whitespace-nowrap rounded-full border px-5 text-sm font-bold shadow-sm transition-all ${
       active
         ? "border-brand-600 bg-brand-600 text-white"
         : "border-slate-200 bg-slate-50 text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
@@ -46,7 +48,7 @@ export function ShopControls({ categories, activeCategory, activeSort }: ShopCon
     <div className="mb-8 flex flex-col gap-4 border-y border-slate-100 py-5 md:flex-row md:items-center md:justify-between md:gap-6">
       <div className="no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0">
         <Link href={hrefWith("category")} className={chip(!activeCategory)}>
-          All products
+          {t.shop.filterAll}
         </Link>
         {categories.map((category) => (
           <Link
@@ -61,7 +63,7 @@ export function ShopControls({ categories, activeCategory, activeSort }: ShopCon
 
       <div className="relative shrink-0">
         <label htmlFor="sort" className="sr-only">
-          Sort products
+          {t.shop.sortLabel}
         </label>
         <select
           id="sort"

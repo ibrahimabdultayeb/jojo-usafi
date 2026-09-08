@@ -30,7 +30,7 @@ export function SectionHeading({ title, eyebrow, action, level = "rail" }: Secti
       {action && (
         <Link
           href={action.href}
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+          className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-slate-200 px-4 text-xs font-bold text-slate-600 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
         >
           {action.label}
           <Icon name="chevronRight" className="h-3.5 w-3.5" />

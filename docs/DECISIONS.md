@@ -112,3 +112,175 @@ Reproduce the fixed-plus-offset approach. Rejected: more moving parts for no vis
 
 Impact:
 None on appearance; less layout code to maintain.
+
+---
+
+## 2026-09-08 — Firebase is replaced by Supabase
+
+Decision:
+Firebase (Firestore, Firebase Auth, Firebase Storage) is permanently unapproved for Jojo
+Usafi. The approved backend direction is Supabase PostgreSQL, Supabase Auth, Supabase
+Storage, Supabase Row Level Security and Supabase migrations, with Next.js on Vercel and a
+validated two-way Google Sheet ↔ Supabase synchronization.
+
+Reason:
+Ibrahim's decision, given during the recovery of the project onto a replacement laptop.
+
+Alternatives:
+Stay on Firebase. Rejected by the project owner.
+
+Impact:
+Documentation-only during recovery. No Supabase work has started, no packages are
+installed, no cloud resources exist and nothing in the application connects to a backend.
+`docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, `docs/PROJECT_CONSTITUTION.md`,
+`docs/BUSINESS_RULES.md`, `docs/TESTING_REQUIREMENTS.md` and the Claude permission
+guardrails were rewritten to the Supabase direction. The catalogue query module stays the
+single seam a real backend will occupy.
+
+---
+
+## 2026-09-08 — The catalogue is generated from the Product Master, not hand-written
+
+Decision:
+`scripts/build-catalogue.mjs` builds `src/lib/catalogue/generated/catalogue.json`, the
+committed product photography in `public/products/`, and `docs/CATALOGUE_REPORT.md` from
+`imports/jojo-usafi-product-master.csv` and `imports/white-bg-products/`. `imports/` is
+source-only and git-ignored. The build is deterministic and `npm run catalogue:check`
+fails if the committed output drifts from the sources.
+
+Reason:
+The catalogue is business data. Hand-maintaining it in TypeScript invites silent drift
+from the master and makes the eventual Supabase seeding a rewrite rather than a port.
+
+Alternatives:
+Keep the hand-written prototype module. Rejected: its SKUs were synthetic (`EP-0001`),
+which made exact SKU↔photo matching impossible.
+
+Impact:
+SKU is now the real identity key throughout. Editing the catalogue means editing the
+master and rerunning the build, which is the same shape as the future Sheet → Supabase sync.
+
+---
+
+## 2026-09-08 — Withheld products stay in the data and out of the shop
+
+Decision:
+All 201 master rows are kept in the generated catalogue, each carrying `flags` and a
+`publishable` boolean. `src/lib/catalogue/queries.ts` exposes only publishable rows to the
+UI; `getAllProductRecords()` exposes the full set for validation only.
+
+Reason:
+Two different needs. Validation and future sync work need every row; a customer must never
+see a product with no approved photograph or an implausible price.
+
+Alternatives:
+Drop non-publishable rows at build time. Rejected: it destroys the audit trail and hides
+exactly the rows that need Ibrahim's attention.
+
+Impact:
+95 of 201 products are on the shelf. 106 are withheld for having no approved photograph.
+`EP01-A01` is withheld for both a missing image and its TZS 128 price.
+
+---
+
+## 2026-09-08 — Flagged commercial data is reported, never corrected
+
+Decision:
+`EP01-A01` (Multix Multipurpose Detergent Lemon Fresh 20LT) is listed at TZS 128. It is
+flagged `PRICE_IMPLAUSIBLE`, withheld from the storefront, and recorded in
+`docs/CATALOGUE_REPORT.md`. The price has **not** been changed, and no correction has been
+inferred from its sibling pack sizes.
+
+Reason:
+Selling prices are a business decision. Ibrahim explicitly instructed that inferring
+128 → 128,000 would be guessing commercial data.
+
+Alternatives:
+Infer the intended price from the 5LT and 750ML rows. Explicitly rejected by Ibrahim.
+
+Impact:
+One bad row withholds one product and does not block the other 200. The detection rule is
+generic — any price below TZS 1,000 is flagged — rather than a hard-coded SKU.
+
+---
+
+## 2026-09-08 — Approved images with no master row are reported, not invented
+
+Decision:
+`EP23-A02` (Spirix Methylated Spirit 5L) has an approved photograph and no row in the
+Product Master. It is listed in `docs/CATALOGUE_REPORT.md` as an orphan image, no product
+is created for it, and no asset is written for it.
+
+Reason:
+Creating a product would mean inventing its price, stock, category and identity.
+
+Alternatives:
+Create a placeholder product. Rejected: it would put invented commercial data in front of
+customers.
+
+Impact:
+The Product Master needs a row for `EP23-A02` before it can sell.
+
+---
+
+## 2026-09-08 — English is unprefixed, Kiswahili is prefixed, each with its own root layout
+
+Decision:
+English lives at `/` and Kiswahili at `/sw/`. `src/app/(en)` and `src/app/(sw)` are
+separate Next.js root layouts, both rendering the shared `StorefrontLayout`; every route
+file is a thin wrapper around a shared view in `src/views/`.
+
+Reason:
+`<html lang>` has to be correct in the static HTML for screen readers and search engines.
+Reading the locale from a request header would make every page dynamic and lose the static
+prerendering of 95 products per language; correcting `lang` after hydration would ship the
+wrong value in the HTML.
+
+Alternatives:
+A `[locale]` segment (would prefix English too), or middleware plus `headers()` (kills
+static rendering). Both rejected.
+
+Impact:
+205 pages prerender. Crossing between languages is a full page load, which is the accepted
+trade-off for multiple root layouts; the cart survives it because it lives in
+`localStorage` keyed by SKU.
+
+---
+
+## 2026-09-08 — Catalogue content is not translated
+
+Decision:
+Interface copy is translated into Kiswahili. Product names, brand names, pack sizes,
+category names and product descriptions stay in English on both sides of the site.
+
+Reason:
+That content is owned by the Product Master, which holds English only. Translating it in
+the front end would be inventing catalogue data — and 200 of 201 rows have no description
+to translate in the first place.
+
+Alternatives:
+Machine-translate product copy. Rejected: it fabricates catalogue content.
+
+Impact:
+Kiswahili pages read as Kiswahili UI over an English catalogue, which is the honest state
+until the database carries Kiswahili product content.
+
+---
+
+## 2026-09-08 — Product images are pre-processed and served unoptimised
+
+Decision:
+`build-catalogue.mjs` writes 800px white-flattened WebP files to `public/products/`, and
+`next.config.ts` sets `images.unoptimized`.
+
+Reason:
+The assets are already square, right-sized and deterministic, so the built-in optimiser
+would re-encode them at request time for no gain and add a runtime dependency. 95 photos
+total 2.6 MB, which matters on Tanzanian mobile data.
+
+Alternatives:
+Ship the 26.6 MB source PNGs, or optimise at request time. Both rejected.
+
+Impact:
+Committed, reproducible assets. `ProductPhoto` still supplies width, height and `sizes`,
+so there is no layout shift and images below the fold stay lazy.

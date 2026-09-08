@@ -1,20 +1,42 @@
-import { brands, categories, products, suppliers } from "./mock-data";
-import type { Brand, Category, Product } from "./types";
+import generated from "./generated/catalogue.json";
+import type { Brand, Catalogue, Category, Product, Supplier } from "./types";
 
 /**
  * The only module the UI reads the catalogue through.
  *
- * Every function here is synchronous today because it reads local prototype data.
- * When Firestore is wired up these become async reads and the components change
- * from `const x = getX()` to `const x = await getX()` — nothing else moves.
+ * It is backed by `generated/catalogue.json`, which `scripts/build-catalogue.mjs`
+ * builds from the Product Master CSV and the approved photography. The generated
+ * file holds ALL master rows; everything exported here exposes only the rows that
+ * are safe to show a customer.
+ *
+ * Every function is synchronous today because it reads a committed file. When
+ * Supabase is wired up these become async reads and components change from
+ * `const x = getX()` to `const x = await getX()` — nothing else moves.
  */
+
+const catalogue = generated as unknown as Catalogue;
+
+/** Every master row, including the ones withheld from customers. Validation only. */
+export function getAllProductRecords(): Product[] {
+  return catalogue.products;
+}
+
+/** The publishable shelf: an approved photo, a plausible price, active status. */
+const products: Product[] = catalogue.products.filter((p) => p.publishable);
+
+const publishableBrandIds = new Set(products.map((p) => p.brandId));
+const publishableCategoryIds = new Set(products.map((p) => p.categoryId));
+
+/** Brands with at least one publishable product — never a link into an empty shelf. */
+const brands: Brand[] = catalogue.brands.filter((b) => publishableBrandIds.has(b.id));
+const categories: Category[] = catalogue.categories.filter((c) => publishableCategoryIds.has(c.id));
 
 export function getBrands(): Brand[] {
   return brands;
 }
 
 export function getBrand(id: string): Brand | undefined {
-  return brands.find((b) => b.id === id);
+  return catalogue.brands.find((b) => b.id === id);
 }
 
 export function getCategories(): Category[] {
@@ -25,8 +47,12 @@ export function getCategory(slug: string): Category | undefined {
   return categories.find((c) => c.slug === slug);
 }
 
+export function getSuppliers(): Supplier[] {
+  return catalogue.suppliers;
+}
+
 export function getSupplierName(id: string): string | undefined {
-  return suppliers.find((s) => s.id === id)?.name;
+  return catalogue.suppliers.find((s) => s.id === id)?.name;
 }
 
 export function getProducts(): Product[] {
@@ -45,9 +71,9 @@ export function getProductsByCategory(categoryId: string): Product[] {
   return products.filter((p) => p.categoryId === categoryId);
 }
 
-/** All pack sizes of one product, smallest listed first, for the size chooser. */
+/** All pack sizes of one product, smallest pack first, for the size chooser. */
 export function getFamilySizes(familyId: string): Product[] {
-  return products.filter((p) => p.familyId === familyId).sort((a, b) => a.price - b.price);
+  return products.filter((p) => p.familyId === familyId).sort((a, b) => a.sizeRank - b.sizeRank);
 }
 
 /** Other products a shopper is likely to add alongside this one. */
@@ -64,8 +90,17 @@ export function getRelatedProducts(product: Product, limit = 4): Product[] {
   return unique.slice(0, limit);
 }
 
+/** The master's BEST SELLER column, one pack size per family so the row varies. */
 export function getBestSellers(limit = 8): Product[] {
-  return products.filter((p) => p.featured).slice(0, limit);
+  const seenFamilies = new Set<string>();
+  const picked: Product[] = [];
+  for (const product of products.filter((p) => p.bestSeller)) {
+    if (seenFamilies.has(product.familyId)) continue;
+    seenFamilies.add(product.familyId);
+    picked.push(product);
+    if (picked.length === limit) break;
+  }
+  return picked;
 }
 
 /**
@@ -76,7 +111,7 @@ export function getBestSellers(limit = 8): Product[] {
  */
 export function getCategoryRail(categoryId: string, limit = 8): Product[] {
   const ranked = [...getProductsByCategory(categoryId)].sort(
-    (a, b) => Number(b.featured) - Number(a.featured),
+    (a, b) => Number(b.bestSeller) - Number(a.bestSeller),
   );
 
   const seenFamilies = new Set<string>();
@@ -106,7 +141,7 @@ export function sortProducts(list: Product[], sort: SortKey): Product[] {
     case "name":
       return sorted.sort((a, b) => productName(a).localeCompare(productName(b)));
     default:
-      return sorted.sort((a, b) => Number(b.featured) - Number(a.featured));
+      return sorted.sort((a, b) => Number(b.bestSeller) - Number(a.bestSeller));
   }
 }
 
@@ -119,7 +154,7 @@ export function searchProducts(list: Product[], term: string): Product[] {
   });
 }
 
-/** "Shower Gel Limette & Aloevera" — brand and pack size are shown separately. */
+/** "Multipurpose Detergent Lemon Fresh" — brand and pack size are shown separately. */
 export function productName(product: Product): string {
   return `${product.family} ${product.variant}`.trim();
 }
