@@ -303,6 +303,33 @@ Future completely unrelated brands must be possible.
 
 ---
 
+# LOCAL ENVIRONMENT
+
+Docker Desktop does not work on this laptop.
+
+WSL returns:
+
+Wsl/CallMsi/E_ACCESSDENIED
+
+Therefore:
+
+- `npx supabase start` is unavailable
+- `npx supabase db reset` is unavailable
+- there is no local PostgreSQL
+
+Do NOT spend build time troubleshooting Docker or WSL.
+
+Do NOT block development on local containers.
+
+Supabase remains the approved backend. Work against a hosted FREE development project
+instead, and until one exists, author and verify everything that does not need a running
+database.
+
+Never claim that migrations applied, constraints executed, triggers fired or Row Level
+Security was enforced unless a real database actually did it. Mark anything else PENDING.
+
+---
+
 # PREFERRED STACK
 
 Use:

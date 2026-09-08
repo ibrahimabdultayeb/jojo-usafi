@@ -1,0 +1,35 @@
+-- =============================================================================
+-- Jojo Usafi — development seed
+--
+-- Run by `supabase db reset` AFTER every migration. Local development only.
+--
+-- THIS FILE INTENTIONALLY INSERTS NO BUSINESS DATA.
+--
+-- Reference data that is part of the schema itself — locales, pack types and
+-- the starting option axes — is inserted by the migrations, because it is true
+-- of every environment including production.
+--
+-- Everything else is deliberately absent:
+--
+--   delivery zones   Zone names and fees are Ibrahim's business decisions. The
+--                    prototype's Upanga / Mikocheni / Masaki / Kariakoo rows are
+--                    illustrative and must never be seeded as if they were real.
+--
+--   brands, products The real catalogue lives in the Product Master and is
+--                    already built into src/lib/catalogue/generated. Build 06
+--                    adds a generator that turns that same committed artifact
+--                    into seed statements, so there is one source of truth for
+--                    the 201 rows rather than a hand-typed copy that drifts.
+--
+--   customers,       Inventing people and orders would put unreal figures on the
+--   orders           admin dashboard's revenue tiles. If demonstration data is
+--                    ever wanted it belongs in a clearly separate
+--                    `seeds/demo.sql`, never in the default reset path.
+--
+--   staff accounts   Created through Supabase Auth in Build 06, never by SQL.
+--
+-- Applying the schema to an empty database and getting an empty, valid store is
+-- the correct outcome.
+-- =============================================================================
+
+-- (no statements)

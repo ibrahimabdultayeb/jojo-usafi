@@ -7,11 +7,66 @@ Every one of these must pass before a commit:
 ```bash
 npm run typecheck        # TypeScript, no emit
 npm run lint             # ESLint
+npm run test             # domain unit tests (vitest) — no database needed
+npm run schema:check     # SQL is internally consistent and agrees with the domain layer
 npm run i18n:check       # en + sw key, placeholder and array parity
 npm run catalogue:check   # committed catalogue still matches imports/
 npm run build            # production build
 npm run qa:screenshots    # needs a running server (npm run start)
 ```
+
+`npm run db:*` does not exist and `supabase db reset` is not part of the gate: there is no
+local PostgreSQL on this machine — see **What is NOT verified** below.
+
+## Domain unit tests
+
+`npm run test` — 156 tests over `src/lib/domain/`, which is pure TypeScript with no I/O:
+
+| Area | Covers |
+| --- | --- |
+| `sku` | pattern, normalisation, duplicates, length, multi-brand codes |
+| `money` | integer shillings, typed input, line totals, order totals, offer prices |
+| `phone` | eleven input shapes normalising to one E.164 value; landlines and other countries refused; idempotence |
+| `delivery` | zone validation, free-delivery consistency, the TSh 4,000 default |
+| `inventory` | available = on_hand − reserved, all eight movement kinds, over-reservation and negative stock refused, ledger replay |
+| `orders` | the whole transition table, payment consistency, completion requires payment, totals recomputed rather than trusted |
+| `sync` | fingerprint stability, echo detection, stale writes, conflicts, retry backoff, record validation |
+| `content` | locale fallback to English, missing-translation reporting |
+
+They exist because the rules had to be provable before the database was available. Each one
+has a CHECK constraint or trigger as its counterpart in `supabase/migrations/`.
+
+## Offline schema check
+
+`npm run schema:check` reads `supabase/migrations/` and asserts, **statically**:
+
+- every statement is closed — balanced quotes, parentheses and `$$` bodies
+- no money column is anything but `integer`, and every one is constrained non-negative
+- every referenced table, enum and view resolves, and is created before it is used
+- Row Level Security is enabled on every table, and no table is missed
+- every append-only ledger carries its `jojo_forbid_mutation` trigger
+- every view is `security_invoker = on`
+- the SQL and the TypeScript agree — enum members, the SKU pattern, the phone pattern, the
+  order-number pattern, the default delivery fee
+- `src/lib/supabase/types.ts` lists exactly the tables the migrations create
+
+It contacts no database and proves nothing about execution.
+
+## What is NOT verified — Build 06
+
+Docker Desktop cannot start on this laptop (WSL returns `Wsl/CallMsi/E_ACCESSDENIED`) and no
+Supabase project exists, so none of the following has happened and none may be claimed:
+
+- **migrations applied** — the SQL has never been executed by PostgreSQL
+- **constraints enforced** — every CHECK, unique index and foreign key is unexercised
+- **triggers fired** — `updated_at`, append-only protection and SKU immutability are unrun
+- **generated column correct** — `inventory.available` has never been computed
+- **RLS enforced** — policies do not exist yet, let alone hold
+- **Supabase Auth** — no user, staff account or session has ever been created
+- **concurrent stock reservation** — no transaction, no concurrency test
+- **`src/lib/supabase/types.ts`** — hand-authored, never compared to a real database
+- **the three Supabase clients** — written, typechecked, never connected to anything
+- **Google Sheet sync** — the rules are tested; nothing has ever talked to Google
 
 ## What the QA gate checks
 
@@ -59,12 +114,13 @@ nothing at all: the reserved widths and this comparison both read `locales`.
 
 ## Production readiness — still required
 
-- unit tests
-- integration tests
+- ~~unit tests~~ — done for the domain layer; still needed for components
+- integration tests **against a real database**
 - Playwright user-journey tests (only the QA gate exists today)
 - **Supabase Row Level Security policies tested** — the authorization boundary
-- Google Sheet ↔ Supabase synchronization tested, including loop, stale-write, duplicate
-  SKU, invalid value and partial failure handling
+- Google Sheet ↔ Supabase synchronization tested end to end. The rules are unit-tested
+  (loop, echo, stale write, conflict, retry, duplicate SKU, invalid value); what remains is
+  the same handling against a live Sheet and a live database, including partial failures
 - order workflow verified end to end
 - cart and checkout verified against a real backend
 - loading, empty and error states verified

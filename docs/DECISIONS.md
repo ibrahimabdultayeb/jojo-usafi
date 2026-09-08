@@ -412,3 +412,153 @@ Impact:
 Removing the entry makes the wrong thing unreachable rather than merely discouraged. Admin
 action buttons now carry the mark at 20px; icon-only controls keep their 44px target and
 their `aria-label`.
+
+---
+
+## 2026-09-09 — Docker is off the critical path; Supabase is unchanged
+
+Decision:
+Build 05 authored the entire Supabase schema, domain layer and client boundary **without a
+running database**. Docker Desktop cannot start on this laptop — WSL returns
+`Wsl/CallMsi/E_ACCESSDENIED` — so `supabase start` and `supabase db reset` are unavailable.
+No time was spent repairing Docker or WSL. Supabase remains the approved and only backend.
+
+Reason:
+There is a five-day delivery target. Local containers are a convenience for running
+PostgreSQL on this machine; they are not the architecture. Everything that does not need a
+live server — migrations, constraints, domain rules, validation, types, tests — is the
+larger part of the work and none of it was blocked.
+
+Alternatives:
+Fix WSL first. Rejected: an open-ended Windows problem in front of a fixed deadline.
+Install PostgreSQL natively on Windows. Rejected: it would verify the SQL but not Supabase
+Auth, Storage, RLS or the CLI workflow, so Build 06 would have to repeat the verification
+against a real project anyway. Switch backend. Rejected outright — Supabase is approved and
+nothing about it caused this.
+
+Impact:
+Build 06 must create a **free** Supabase development project and be the first build that can
+honestly say the migrations apply, the constraints fire and the policies hold. Until then,
+`docs/DATA_MODEL.md` and `docs/TESTING_REQUIREMENTS.md` mark every such claim PENDING. Local
+Docker may be revisited later purely for convenience.
+
+---
+
+## 2026-09-09 — Migrations are the single source of truth, not `supabase/schemas/`
+
+Decision:
+The schema lives in `supabase/migrations/` as ordered, hand-written SQL. The CLI's
+declarative `supabase/schemas/` directory is deliberately not used, and `schema_paths` in
+`config.toml` is left empty.
+
+Reason:
+Declarative schemas generate migrations by diffing. Keeping both would mean two files
+describing the same table and a build that has to decide which one is real. One ordered
+sequence of migrations is also the only form that can express the things this schema
+actually needs — a foreign key added after both tables exist, a trigger, a backfill.
+
+Alternatives:
+Declarative-only. Rejected: it cannot express the ordering above without escape hatches.
+Both. Rejected: that is the drift.
+
+Impact:
+Every change is a new migration file. `npm run schema:check` reads the migration directory
+directly, so nothing else needs to know.
+
+---
+
+## 2026-09-09 — Row Level Security on, with no policies at all
+
+Decision:
+Migration `20260909090700` enables RLS on all 30 tables and writes **no policies**. The
+`anon` and `authenticated` roles can therefore read and write nothing.
+
+Reason:
+A table with RLS switched off is readable by anyone holding the anon key, which is public by
+design. Nothing in the application reads Supabase yet, so a closed door costs nothing today
+and is the only safe default for the moment a project is created. Enabling RLS later, table
+by table, is exactly how a table gets missed.
+
+Alternatives:
+Write the policies now. Rejected: an untested policy is worse than an absent one, because it
+looks like protection. Policies need a running database to test against, which Build 06 has
+and this build does not. Leave RLS off until Build 06. Rejected: that is a hole with a date
+on it.
+
+Impact:
+Build 06 opens specific doors and tests each one: public read of `product_shelf`, customers
+limited to their own orders and addresses, staff scoped by role, and a dedicated audited
+role for the sync worker. The two views are `security_invoker = on` so they enforce the
+caller's policies rather than the view owner's.
+
+---
+
+## 2026-09-09 — Every amount is an integer number of shillings
+
+Decision:
+All money is a PostgreSQL `integer` column named `*_tzs`, constrained `>= 0`. No `numeric`,
+`decimal`, `real`, `double precision` or `money` type appears anywhere in the schema, and
+`npm run schema:check` fails the build if one does.
+
+Reason:
+TZS retail prices are whole shillings. Floating point eventually puts
+"TSh 33,999.999999" on an order, and `numeric` invites a `.toFixed()` somewhere in the UI
+that rounds a total the customer already agreed to.
+
+Alternatives:
+`numeric(12,2)`. Rejected: it models cents that do not exist here and still needs the same
+non-negative constraints. Storing money as text. Rejected: unsortable, unsummable.
+
+Impact:
+`total_tzs = subtotal_tzs - discount_tzs + delivery_fee_tzs` and
+`line_total_tzs = unit_price_tzs * quantity` are CHECK constraints. `src/lib/domain/money.ts`
+refuses a decimal on input rather than rounding it, so a mistyped price is a message rather
+than a silently wrong figure. The ceiling is 2,147,483,647 — the column's own limit.
+
+---
+
+## 2026-09-09 — Variants are option axes, not a size column
+
+Decision:
+`product_families` declare which axes they vary by (`product_family_axes`), axes and their
+values are rows (`product_option_axes`, `product_option_values`), and each SKU records one
+value per axis (`product_option_assignments`). "Size" and "Scent" are seeded rows, not
+schema.
+
+Reason:
+EcoPlus varies by size and scent. The next brand may vary by colour, grit, voltage or
+nothing at all. A `size` column plus a `scent` column would make that brand a migration —
+which is precisely what the project constitution forbids.
+
+Alternatives:
+Two columns on `products`. Rejected: single-brand thinking. A JSONB attribute bag. Rejected:
+unconstrainable and unjoinable, so the size chooser could never be sorted correctly.
+
+Impact:
+`is_ordinal` on an axis and `numeric_rank` on a value are what make "500ML" sort before
+"5LT" instead of alphabetically. A family with no axis rows has exactly one SKU, which is
+legitimate and needs no special case.
+
+---
+
+## 2026-09-09 — A hand-authored schema contract, clearly labelled unverified
+
+Decision:
+`src/lib/supabase/types.ts` is written by hand from the migrations, with a header stating in
+full that it has never been checked against a running PostgreSQL. Build 06 replaces it with
+`supabase gen types typescript` output.
+
+Reason:
+Without it every future query is `any`. With it, but presented as if generated, a wrong
+column name would look like verified truth. Labelling it is the difference between a useful
+placeholder and a lie.
+
+Alternatives:
+`any` until Build 06. Rejected: the client modules could not be written at all. Generating
+types from the SQL with a parser. Rejected: a second implementation of PostgreSQL's own
+understanding of the schema, which would be wrong in different ways.
+
+Impact:
+`npm run schema:check` compares the contract's table list and every enum against the SQL, so
+those two cannot drift silently. Individual column types are the part still awaiting
+generation, and Build 06 treats any difference as a bug in this file.

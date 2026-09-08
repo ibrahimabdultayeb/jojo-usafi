@@ -3,7 +3,9 @@
 ## Current stage
 
 Storefront prototype on the **real catalogue**, in **English and Kiswahili**, with real
-product photography. Frontend only — no backend, no cloud services connected.
+product photography. The Supabase schema and the domain layer are authored and unit-tested,
+but no database has ever executed them — no cloud services are connected and nothing is
+provisioned.
 
 ## Completed
 
@@ -155,13 +157,68 @@ approved storefront and admin; nothing was redesigned.
 `qa:screenshots` — 120 screenshots, all 15 locale-stability comparisons stable, no
 overflow, console errors, broken images, small touch targets or floating-layer collisions.
 
+### Build 05 — Supabase domain contracts, without a database runtime — 2026-09-09
+
+**Environment**
+- Docker Desktop is unusable on this laptop: WSL returns `Wsl/CallMsi/E_ACCESSDENIED`. No
+  time was spent repairing it. The local Supabase stack is unavailable and is no longer on
+  the critical path.
+- Supabase remains the approved backend, unchanged. **No hosted project was created, no
+  account linked, no billing attached, no paid feature enabled. Cost: TZS 0 / USD 0.**
+
+**Supabase project structure**
+- `supabase` CLI 2.117.0 installed as a dev dependency; `npx supabase init` run
+- `supabase/config.toml`, `supabase/migrations/`, `supabase/seed.sql`
+- `supabase start` was **not** run; `supabase db reset` was **not** run
+
+**Schema — authored, never applied**
+- 8 migrations: 30 tables, 2 views, 16 enum types, 4 functions, 176 statements
+- Catalogue: suppliers, brands, categories, media, families, **option axes** — size and
+  scent are rows, not columns — sellable SKUs, product media, localized content, locales
+- Inventory: running totals with `available` as a stored generated column, plus an
+  append-only ledger covering all eight movement kinds
+- Customers, addresses and delivery zones; guest checkout stays the default
+- Orders, order items and an append-only order-event history, with everything
+  customer-visible snapshotted onto the order
+- Admin profiles and roles; `audit_events`; sync jobs, events, state and conflicts;
+  `analytics_events`
+- Row Level Security **enabled on all 30 tables with no policies** — deny by default until
+  Build 06 writes and tests them
+- `supabase/seed.sql` deliberately inserts no business data: no invented zones, prices,
+  customers or orders
+
+**Domain layer and client boundary**
+- `src/lib/domain/` — money, SKU, Tanzanian phone, delivery zones, inventory, orders and
+  payment, customers, localized content, Sheet sync. Pure TypeScript, no I/O, Zod validation
+- `src/lib/supabase/` — environment validation with no defaults, a browser client, a server
+  client, and a `server-only` service-role client whose file states in full what it bypasses
+- `src/lib/supabase/types.ts` — hand-authored schema contract, labelled unverified, to be
+  replaced by generated types in Build 06
+- `.env.example` — variable names only, never a value
+- `scripts/schema-check.mjs` — static check that the SQL is internally consistent and agrees
+  with the TypeScript; it catches a drifting enum, pattern or default fee
+
+**Verified offline**
+`typecheck` · `lint` · `test` (**156 domain tests**) · `schema:check` · `i18n:check` ·
+`catalogue:check` · `build` (325 pages) · `qa:screenshots` (120 screenshots, all 15
+locale-stability comparisons stable). The approved storefront and admin UI are untouched.
+
+**Not verified — needs a real database**
+Migrations applying, constraints firing, triggers running, the generated column computing,
+RLS enforcing, Supabase Auth, concurrent stock reservation, and the generated database
+types. Listed in full in `docs/TESTING_REQUIREMENTS.md`.
+
 ## Next
 
 - Confirm the open business rules (delivery fee, free-delivery threshold, served areas,
   retail prices, cut-off time)
 - Confirm the `EP01-A01` price and add a master row for `EP23-A02`
 - Provide the real Jojo Usafi WhatsApp number, phone, email and logo
-- Then: Supabase schema, RLS, migrations, the order backend, and the validated two-way
-  Google Sheet ↔ Supabase synchronisation
+- **Build 06:** create a **free** Supabase development project, apply these migrations for
+  real, generate the database types, write and test the Row Level Security policies, set up
+  Supabase Auth and the first staff account, and add the transactional stock reservation
+  functions with genuine concurrency tests
+- Then: the order backend on real data, and the validated two-way Google Sheet ↔ Supabase
+  synchronisation
 
 Claude must update this file after meaningful milestones.

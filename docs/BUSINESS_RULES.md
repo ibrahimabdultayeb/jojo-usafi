@@ -27,7 +27,7 @@ Mobile phone.
 
 Backend:
 Supabase PostgreSQL, Auth, Storage and Row Level Security. Firebase is permanently
-unapproved. No backend work has started.
+unapproved. The schema is authored (Build 05) but has not been applied to a database.
 
 Catalogue:
 Editable through both Google Sheets and the Jojo Usafi admin, synchronized both ways.
@@ -44,6 +44,42 @@ Communication channel, not the system of record.
 - A product with no approved photograph is not shown to customers.
 - Prices, stock, descriptions, categories and product identity are never invented.
 - Data that looks wrong is flagged and withheld, never silently corrected.
+
+## Order rules — implemented in Build 05
+
+Approved states:
+`new` · `awaiting_confirmation` · `confirmed` · `preparing` · `out_for_delivery` ·
+`completed` · `cancelled` · `delivery_failed`. Staff never see these names; the dashboard
+shows plain-language labels and one obvious next action.
+
+Payment:
+The customer chooses **Cash on delivery** or **Pay digitally on delivery**. What actually
+happened is recorded separately, as **Cash** or **Digital**, because a customer may say one
+and do the other. A digital payment requires its transaction reference. **An order cannot be
+completed until the payment has been recorded** — enforced both in the application and as a
+database constraint.
+
+Delivery fee:
+A newly created delivery area starts at **TSh 4,000**. This is a starting value for a new
+area, not a fixed price; each area is edited in the admin dashboard. An area marked "free
+delivery" must have a fee of 0, so a free area can never leak a charge onto a total.
+
+Money:
+Every amount is a whole number of shillings. `total = subtotal − discount + delivery fee`.
+
+Stock:
+Available stock is `on hand − reserved` and can never go negative. Stock cannot be promised
+to two orders at once.
+
+### Two judgement calls awaiting confirmation
+
+Both are implemented as described and are cheap to change:
+
+1. **A failed delivery is not the end of the order.** `delivery_failed` can go back to
+   `out_for_delivery` (try again) or to `cancelled`. The alternative — a failed delivery
+   ending the order outright — would force staff to re-key the whole order to retry.
+2. **An order can be cancelled at any point before it is dispatched**, and after a failed
+   delivery, but not once it is out for delivery or completed.
 
 ## Open decisions — Ibrahim
 
