@@ -1,0 +1,6 @@
+# Generated build artifacts are compared byte-for-byte by the catalogue and
+# i18n checks, and those scripts write LF. Without this, a Windows checkout
+# with core.autocrlf=true rewrites them to CRLF and `npm run catalogue:check`
+# reports the committed output as stale when the content is in fact identical.
+src/lib/catalogue/generated/*.json  text eol=lf
+docs/CATALOGUE_REPORT.md            text eol=lf

@@ -36,6 +36,10 @@
 
    Within z-50 the dock owns the bottom edge: the support button lifts clear of
    it whenever the cart has something in it (see SupportButton.tsx).
+
+   The admin dashboard reuses the same layers rather than inventing its own:
+   its sticky top bar is z-40, its mobile bottom navigation is z-50, and its
+   sheets and toasts are z-60.
    --------------------------------------------------------------------------- */
 
 @layer base {

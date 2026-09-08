@@ -69,6 +69,23 @@ const pages = [
   { name: "contact", path: "/contact", full: true },
 ];
 
+/**
+ * The admin dashboard. English-only and outside the localized route tree, so it
+ * is audited once per width rather than once per locale.
+ */
+const adminPages = [
+  { name: "admin-home", path: "/admin", full: true },
+  { name: "admin-orders", path: "/admin/orders", full: true },
+  { name: "admin-order", path: "/admin/orders/2", full: true },
+  { name: "admin-products", path: "/admin/products", full: true },
+  { name: "admin-product", path: `/admin/products/${sampleProduct.sku}`, full: true },
+  { name: "admin-customers", path: "/admin/customers", full: true },
+  { name: "admin-customer", path: "/admin/customers/c1", full: true },
+  { name: "admin-more", path: "/admin/more", full: true },
+  { name: "admin-zones", path: "/admin/more/delivery-zones", full: true },
+  { name: "admin-website", path: "/admin/more/website", full: true },
+];
+
 const problems = [];
 const fail = (message) => problems.push(message);
 
@@ -285,6 +302,45 @@ async function screenshotPass(browser) {
   }
 }
 
+/**
+ * The admin dashboard, held to the same bar as the storefront: no overflow, no
+ * console errors, no broken images, no small touch targets, no floating-layer
+ * collisions. It is mock-data only, so there is nothing else to assert yet.
+ */
+async function adminPass(browser) {
+  for (const viewport of widths) {
+    for (const page of adminPages) {
+      const label = `${page.name} @ ${viewport.width}px`;
+      const context = await browser.newContext({
+        viewport: { width: viewport.width, height: viewport.height },
+        deviceScaleFactor: Number(process.env.DSF ?? 1),
+        isMobile: viewport.mobile,
+        hasTouch: viewport.mobile,
+        userAgent: viewport.mobile ? devices["iPhone 14 Pro"].userAgent : undefined,
+      });
+
+      const tab = await context.newPage();
+      watchConsole(tab, label);
+      await tab.goto(`${BASE_URL}${page.path}`, { waitUntil: "networkidle" });
+      await tab.waitForTimeout(300);
+
+      await loadEverything(tab);
+
+      await checkOverflow(tab, label);
+      await checkImages(tab, label);
+      if (viewport.mobile) await checkTouchTargets(tab, label);
+      await checkFloatingCollisions(tab, label);
+
+      const file = path.join(OUT_DIR, `${page.name}-${viewport.name}.png`);
+      await tab.screenshot({ path: file, fullPage: page.full });
+      console.log(`saved ${path.relative(process.cwd(), file)}`);
+
+      await tab.close();
+      await context.close();
+    }
+  }
+}
+
 /** Behaviour that a screenshot cannot prove. */
 async function behaviourPass(browser) {
   // --- hero down control actually scrolls -----------------------------------
@@ -445,13 +501,17 @@ async function run() {
   console.log(`sample product: ${sampleProduct.sku} (${sampleProduct.slug})\n`);
 
   await screenshotPass(browser);
+  console.log("\n--- admin ---");
+  await adminPass(browser);
   console.log("\n--- behaviour checks ---");
   await behaviourPass(browser);
 
   await browser.close();
 
   console.log("\n--- QA summary ---");
-  console.log(`${widths.length * locales.length * pages.length} screenshots captured.`);
+  console.log(
+    `${widths.length * (locales.length * pages.length + adminPages.length)} screenshots captured.`,
+  );
   if (problems.length === 0) {
     console.log("PASS — no overflow, console errors, broken images, small targets or collisions.");
   } else {

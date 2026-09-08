@@ -247,9 +247,24 @@ function truthy(value) {
   return String(value).trim().toLowerCase() === "true";
 }
 
+/**
+ * Numbers out of the Product Master.
+ *
+ * The master is a spreadsheet export, so a figure may arrive formatted —
+ * "34,000" rather than 34000. Bare `Number()` turns that into NaN, which
+ * flags the row PRICE_MISSING and silently withholds the product. Strip the
+ * grouping characters before converting; anything still unparseable stays NaN
+ * and is flagged, which is the behaviour we want.
+ */
+function toNumber(value) {
+  if (value === undefined || value === null) return NaN;
+  const cleaned = String(value).replace(/[s,]/g, "");
+  return cleaned === "" ? NaN : Number(cleaned);
+}
+
 const products = records.map((row) => {
-  const price = Number(row["PRICE TZS"]);
-  const stock = Number(row["STOCK QTY"]);
+  const price = toNumber(row["PRICE TZS"]);
+  const stock = toNumber(row["STOCK QTY"]);
   const brand = brandByName.get(row["PRODUCT BRAND"]);
   const category = categoryByName.get(row.CATEGORY);
   const supplier = supplierByName.get(row.SUPPLIER);
