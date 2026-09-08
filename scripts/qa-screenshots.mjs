@@ -69,6 +69,36 @@ const pages = [
   { name: "contact", path: "/contact", full: true },
 ];
 
+/** Admin screens. English only in V1, so there is no locale dimension here. */
+const adminPages = [
+  { name: "admin-home", path: "/admin" },
+  { name: "admin-orders", path: "/admin/orders" },
+  // An order that is out for delivery, so the payment gate is one tap away.
+  { name: "admin-order", path: "/admin/orders/JU-000141" },
+  { name: "admin-products", path: "/admin/products" },
+  { name: "admin-product", path: `/admin/products/${sampleProduct.sku}` },
+  { name: "admin-customers", path: "/admin/customers" },
+  { name: "admin-customer", path: "/admin/customers/cus_hassan_ali" },
+  { name: "admin-more", path: "/admin/more" },
+  { name: "admin-zones", path: "/admin/delivery-zones" },
+  { name: "admin-website", path: "/admin/website" },
+  { name: "admin-settings", path: "/admin/settings" },
+];
+
+/**
+ * Internal vocabulary that must never reach a member of staff. If any of these
+ * appear as visible text, the "no raw status values" rule has been broken.
+ */
+const RAW_VALUES = [
+  "awaiting_confirmation",
+  "out_for_delivery",
+  "delivery_failed",
+  "order_staff",
+  "MISSING_APPROVED_IMAGE",
+  "PRICE_IMPLAUSIBLE",
+  "PRICE_INVERSION",
+];
+
 const problems = [];
 const fail = (message) => problems.push(message);
 
@@ -140,10 +170,13 @@ async function checkImages(tab, label) {
       .filter((img) => {
         if (!img.src.includes("/products/")) return false;
         if (img.closest("[aria-hidden='true']")) return false;
-        // alt="" is a deliberate "decorative" marker and is only correct when
-        // something else names the control the image sits inside.
+        // alt="" is a deliberate "decorative" marker. It is correct when the
+        // thing the image depicts is already named next to it — by an explicit
+        // label, or by visible text in the row or card the image sits in.
         if (img.hasAttribute("alt") && img.alt === "") {
-          return !img.closest("[aria-label], [aria-labelledby]");
+          if (img.closest("[aria-label], [aria-labelledby]")) return false;
+          const named = img.closest("li, a, section, article");
+          return !(named && named.textContent && named.textContent.trim().length > 2);
         }
         return !img.hasAttribute("alt");
       })
@@ -242,6 +275,60 @@ async function checkProductPhotoMatchesSku(tab, label, sku) {
   if (!src) return fail(`NO PRODUCT PHOTO — ${label}`);
   const shown = src.split("/").pop().replace(".webp", "");
   if (shown !== sku) fail(`WRONG PHOTO — ${label}: showing ${shown} on ${sku}`);
+}
+
+async function adminScreenshotPass(browser) {
+  for (const viewport of widths) {
+    for (const page of adminPages) {
+      const label = `${page.name} @ ${viewport.width}px`;
+      const context = await browser.newContext({
+        viewport: { width: viewport.width, height: viewport.height },
+        deviceScaleFactor: Number(process.env.DSF ?? 1),
+        isMobile: viewport.mobile,
+        hasTouch: viewport.mobile,
+        userAgent: viewport.mobile ? devices["iPhone 14 Pro"].userAgent : undefined,
+      });
+
+      const tab = await context.newPage();
+      watchConsole(tab, label);
+      await tab.goto(`${BASE_URL}${page.path}`, { waitUntil: "networkidle" });
+      await loadEverything(tab);
+
+      await checkOverflow(tab, label);
+      await checkImages(tab, label);
+      if (viewport.mobile) await checkTouchTargets(tab, label);
+      await checkFloatingCollisions(tab, label);
+      await checkNoRawValues(tab, label);
+      await checkNoDeleteControls(tab, label);
+
+      const file = path.join(OUT_DIR, `${page.name}-${viewport.name}.png`);
+      await tab.screenshot({ path: file, fullPage: true });
+      console.log(`saved ${path.relative(process.cwd(), file)}`);
+
+      await tab.close();
+      await context.close();
+    }
+  }
+}
+
+/** Staff must never be shown an internal status value or a validation flag. */
+async function checkNoRawValues(tab, label) {
+  const found = await tab.evaluate((values) => {
+    const text = document.body.innerText;
+    return values.filter((value) => text.includes(value));
+  }, RAW_VALUES);
+  for (const value of found) fail(`RAW VALUE ON SCREEN — ${label}: "${value}"`);
+}
+
+/** The admin has no destructive delete. Products are archived, never removed. */
+async function checkNoDeleteControls(tab, label) {
+  const found = await tab.evaluate(() =>
+    [...document.querySelectorAll('button, a, [role="button"]')]
+      .map((el) => `${el.getAttribute("aria-label") ?? ""} ${el.textContent ?? ""}`.trim())
+      .filter((text) => /\bdelete\b|\bdestroy\b|\bremove product\b/i.test(text))
+      .slice(0, 3),
+  );
+  for (const text of found) fail(`DELETE CONTROL FOUND — ${label}: "${text}"`);
 }
 
 async function screenshotPass(browser) {
@@ -437,6 +524,137 @@ async function behaviourPass(browser) {
   }
 }
 
+async function adminBehaviourPass(browser) {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    userAgent: devices["iPhone 14 Pro"].userAgent,
+  });
+  const tab = await context.newPage();
+  watchConsole(tab, "admin-behaviour");
+
+  // --- bottom navigation actually navigates -------------------------------
+  await tab.goto(`${BASE_URL}/admin`, { waitUntil: "networkidle" });
+  const navLinks = tab.locator('[data-qa="admin-bottom-nav"] a');
+  const navCount = await navLinks.count();
+  if (navCount !== 5) fail(`ADMIN NAV — expected 5 destinations, found ${navCount}`);
+
+  await navLinks.nth(1).click();
+  await tab.waitForURL(/\/admin\/orders$/, { timeout: 5000 }).catch(() => {
+    fail("ADMIN NAV — tapping Orders did not open the orders list");
+  });
+
+  // --- exactly one primary next action on an order -------------------------
+  await tab.goto(`${BASE_URL}/admin/orders/JU-000141`, { waitUntil: "networkidle" });
+  if ((await tab.locator("select").count()) > 0) {
+    fail("ORDER DETAIL — a status dropdown is on screen");
+  }
+
+  const complete = tab.getByRole("button", { name: "Complete Order" });
+  if ((await complete.count()) !== 1) {
+    fail("ORDER DETAIL — expected exactly one 'Complete Order' next action");
+  } else {
+    await complete.click();
+    const dialog = tab.locator('[role="dialog"]');
+    await dialog.waitFor({ timeout: 5000 }).catch(() => fail("PAYMENT GATE — dialog did not open"));
+
+    const confirm = dialog.getByRole("button", { name: "Complete Order" });
+    if (await confirm.isEnabled()) {
+      fail("PAYMENT GATE — completing was possible before a payment method was chosen");
+    }
+
+    await dialog.getByRole("button", { name: "Digital" }).click();
+    if (await confirm.isEnabled()) {
+      fail("PAYMENT GATE — digital payment accepted with no transaction reference");
+    }
+
+    await dialog.locator("#payment-reference").fill("MPESA-TEST-0001");
+    if (!(await confirm.isEnabled())) {
+      fail("PAYMENT GATE — still blocked after a reference was entered");
+    }
+    await tab.keyboard.press("Escape");
+  }
+
+  // --- returned-items question has no default ------------------------------
+  const markFailed = tab.getByRole("button", { name: "Mark Delivery Failed" });
+  if ((await markFailed.count()) === 0) {
+    fail("ORDER DETAIL — no 'Mark Delivery Failed' action on an out-for-delivery order");
+  } else {
+    await markFailed.click();
+    const dialog = tab.locator('[role="dialog"]');
+    await dialog.waitFor({ timeout: 5000 });
+
+    const yes = dialog.getByRole("button", { name: "Yes", exact: true });
+    const no = dialog.getByRole("button", { name: "No", exact: true });
+    const yesPressed = await yes.getAttribute("aria-pressed");
+    const noPressed = await no.getAttribute("aria-pressed");
+    if (yesPressed !== "false" || noPressed !== "false") {
+      fail(`RETURNED ITEMS — an answer is preselected (Yes=${yesPressed}, No=${noPressed})`);
+    }
+
+    const [yesClass, noClass] = await Promise.all([
+      yes.getAttribute("class"),
+      no.getAttribute("class"),
+    ]);
+    if (yesClass !== noClass) fail("RETURNED ITEMS — the two answers are styled differently");
+
+    const save = dialog.getByRole("button", { name: "Save" });
+    if (await save.isEnabled()) fail("RETURNED ITEMS — saving was possible with no answer");
+    await tab.keyboard.press("Escape");
+  }
+
+  // --- cancellation needs a reason -----------------------------------------
+  const cancel = tab.getByRole("button", { name: "Cancel Order" }).first();
+  if ((await cancel.count()) === 0) {
+    fail("ORDER DETAIL — no 'Cancel Order' action");
+  } else {
+    await cancel.click();
+    const dialog = tab.locator('[role="dialog"]');
+    await dialog.waitFor({ timeout: 5000 });
+    if (await dialog.getByRole("button", { name: "Cancel Order" }).isEnabled()) {
+      fail("CANCELLATION — cancelling was possible with no reason given");
+    }
+    await tab.keyboard.press("Escape");
+  }
+
+  // --- the item code is locked --------------------------------------------
+  await tab.goto(`${BASE_URL}/admin/products/${sampleProduct.sku}`, { waitUntil: "networkidle" });
+  const skuEditable = await tab.evaluate((sku) => {
+    const fields = [...document.querySelectorAll("input, textarea, select")];
+    return fields.some((f) => f.value === sku && !f.disabled && !f.readOnly);
+  }, sampleProduct.sku);
+  if (skuEditable) fail("PRODUCT EDITOR — the item code is editable");
+
+  if (!(await tab.evaluate(() => document.body.innerText.includes("Locked")))) {
+    fail("PRODUCT EDITOR — the item code is not visibly marked as locked");
+  }
+
+  for (const name of ["Add Stock", "Count Stock"]) {
+    if ((await tab.getByRole("button", { name }).count()) === 0) {
+      fail(`PRODUCT EDITOR — no "${name}" action`);
+    }
+  }
+
+  // --- free delivery disables the fee box ----------------------------------
+  await tab.goto(`${BASE_URL}/admin/delivery-zones`, { waitUntil: "networkidle" });
+  const editButtons = tab.getByRole("button", { name: "Edit" });
+  if ((await editButtons.count()) === 0) {
+    fail("DELIVERY ZONES — no zone can be edited");
+  } else {
+    // Mikocheni is the free-delivery zone in the sample data.
+    await editButtons.nth(2).click();
+    const dialog = tab.locator('[role="dialog"]');
+    await dialog.waitFor({ timeout: 5000 });
+    if (await dialog.locator("#zone-fee").isEnabled()) {
+      fail("DELIVERY ZONES — the fee box is still active while free delivery is on");
+    }
+    await tab.keyboard.press("Escape");
+  }
+
+  await context.close();
+}
+
 async function run() {
   await mkdir(OUT_DIR, { recursive: true });
   const browser = await chromium.launch();
@@ -445,13 +663,17 @@ async function run() {
   console.log(`sample product: ${sampleProduct.sku} (${sampleProduct.slug})\n`);
 
   await screenshotPass(browser);
+  await adminScreenshotPass(browser);
   console.log("\n--- behaviour checks ---");
   await behaviourPass(browser);
+  await adminBehaviourPass(browser);
 
   await browser.close();
 
   console.log("\n--- QA summary ---");
-  console.log(`${widths.length * locales.length * pages.length} screenshots captured.`);
+  console.log(
+    `${widths.length * (locales.length * pages.length + adminPages.length)} screenshots captured.`,
+  );
   if (problems.length === 0) {
     console.log("PASS — no overflow, console errors, broken images, small targets or collisions.");
   } else {

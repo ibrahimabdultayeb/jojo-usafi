@@ -448,6 +448,7 @@ docs/UI_REFERENCE.md
 docs/CATALOGUE.md
 docs/CATALOGUE_REPORT.md (generated — never edit by hand)
 docs/I18N.md
+docs/ADMIN_UX.md
 docs/TESTING_REQUIREMENTS.md
 docs/DECISIONS.md
 docs/PROGRESS.md

@@ -3,10 +3,11 @@
 Jojo Usafi is a scalable ecommerce retail store for Dar es Salaam. EcoPlus is the
 first brand catalogue it sells — not the whole store.
 
-**This repository currently contains a frontend-only storefront prototype**, in English
-and Kiswahili, built on the real Product Master and the approved product photography.
-There is no backend, no Google Sheet connection, no order backend and no payments. See
-[`PROTOTYPE_NOTES.md`](./PROTOTYPE_NOTES.md) for exactly what is real and what is mocked.
+**This repository currently contains a frontend-only prototype**: a storefront in English
+and Kiswahili built on the real Product Master and the approved product photography, plus
+a mobile-first admin at `/admin`. There is no backend, no Google Sheet connection, no
+order backend and no payments. See [`PROTOTYPE_NOTES.md`](./PROTOTYPE_NOTES.md) for
+exactly what is real and what is mocked.
 
 ## Run it locally
 
@@ -70,6 +71,18 @@ ran a build and then went back to `npm run dev`, delete `.next` and start again:
 rm -rf .next && npm run dev
 ```
 
+## The admin
+
+A mobile-first admin prototype lives at **http://localhost:3000/admin**. It is
+frontend only: products, prices, item codes and photos are real, while orders,
+customers, delivery zones and website content are samples, and nothing is saved.
+
+Home · Orders · Products · Customers · More (Delivery Zones, Website, Reports,
+Staff, Settings). Orders show one obvious next action rather than a status
+dropdown, an order cannot be completed without a recorded payment, and the item
+code is locked. Full detail in [`docs/ADMIN_UX.md`](./docs/ADMIN_UX.md), which
+also lists the backend constraints this UX implies.
+
 ## The catalogue
 
 The shelf is generated, not hand-written. `scripts/build-catalogue.mjs` reads the Product
@@ -86,14 +99,17 @@ approved photograph. Full detail, including the two items needing Ibrahim's inpu
 ## Project layout
 
 ```
-src/app/(en)/             English routes
-src/app/(sw)/sw/          Kiswahili routes
-src/views/                one shared implementation per page
+src/app/(en)/             English storefront routes
+src/app/(sw)/sw/          Kiswahili storefront routes
+src/app/(admin)/admin/    admin routes
+src/views/                one shared implementation per storefront page
 src/components/layout/    header, footer, menu, cart dock, language controls
 src/components/home/      homepage sections
 src/components/product/   product card, product photo, add-to-cart controls
 src/components/cart/      cart drawer
+src/components/admin/     admin shell, order and product screens, dialogs
 src/lib/catalogue/        catalogue types, generated data and the query layer
+src/lib/admin/            admin types, workflow, permissions and mock data
 src/lib/i18n/             locale config, dictionaries, client hook
 src/lib/                  cart state, formatting, site settings, colour tones
 scripts/                  catalogue build, i18n check, QA gate

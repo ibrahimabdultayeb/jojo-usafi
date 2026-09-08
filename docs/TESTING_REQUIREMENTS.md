@@ -31,7 +31,22 @@ npm run qa:screenshots    # needs a running server (npm run start)
 - a withheld product (`EP01-A01`) being reachable
 - an orphan image (`EP23-A02`) or any unapproved photo reaching the shelf
 
-70 screenshots land in `preview/screenshots/`, named `page-locale-width.png`.
+It then walks all 11 admin screens at the same widths and additionally fails on:
+
+- an internal status value or validation flag appearing as visible text
+- any control labelled delete or destroy
+- the bottom navigation not having five destinations, or not navigating
+- a status dropdown existing on an order
+- completing an order before a payment method is chosen
+- a digital payment being accepted with no transaction reference
+- the returned-items question having a preselected or differently styled answer
+- cancelling with no reason given
+- the item code being editable, or not visibly marked as locked
+- the stock actions being missing
+- the zone fee box staying active while free delivery is on
+
+125 screenshots land in `preview/screenshots/`, named `page-locale-width.png` for
+the storefront and `admin-screen-width.png` for the admin.
 
 ## Production readiness — still required
 

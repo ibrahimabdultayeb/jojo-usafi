@@ -2,84 +2,101 @@
 
 ## Current stage
 
-Storefront prototype on the **real catalogue**, in **English and Kiswahili**, with real
-product photography. Frontend only — no backend, no cloud services connected.
+Storefront prototype on the **real catalogue**, in **English and Kiswahili**, with
+real product photography — plus a **mobile-first admin prototype** at `/admin`.
+Frontend only: no backend, no cloud services connected.
 
 ## Completed
 
 ### Environment and foundation
 - Next.js 15 (App Router) + React 19 + TypeScript + Tailwind CSS v4
-- Design system aligned to the EcoPlus reference (Inter + Space Grotesk, brand green scale,
-  rounded-3xl cards, pill navigation, blurred sticky header)
+- Design system aligned to the EcoPlus reference (Inter + Space Grotesk, brand
+  green scale, rounded-3xl cards, pill navigation, blurred sticky header)
 - Git, GitHub, Vercel CLI, Playwright, UI UX Pro Max, Claude project rules
 
 ### Storefront visual prototype — 2026-09-07
-The original approved prototype: homepage, catalogue, product detail, cart drawer and cart
-page, checkout and track-order shells, contact, 404, and the Playwright QA script.
+The original approved prototype: homepage, catalogue, product detail, cart drawer
+and cart page, checkout and track-order shells, contact, 404, and the Playwright
+QA script.
 
 ### Recovery Build A — 2026-09-08
-Rebuilt on a replacement laptop. Builds 01–04 were committed only on the previous machine
-and were not recoverable from Git, so Builds 01–03 were rebuilt against the real catalogue.
+Rebuilt on a replacement laptop after Builds 01–04 were lost with the previous
+machine.
 
-**Catalogue foundation**
-- `scripts/build-catalogue.mjs` builds the shelf from the restored Product Master CSV and
-  the approved white-background photography — deterministically, with no timestamps
-- 201 master rows processed, 96 approved images, **95 exact SKU matches**
-- 95 publishable products; 106 withheld for having no approved photograph
-- `EP01-A01` (TZS 128) flagged `PRICE_IMPLAUSIBLE` and withheld — **not corrected**
-- `EP23-A02` Spirix reported as an approved image with no master row — **not invented**
-- All 201 rows preserved in the generated catalogue; only publishable rows reach the UI
-- `docs/CATALOGUE_REPORT.md` regenerated on every build; `catalogue:check` guards drift
-- The prototype's synthetic `EP-0001` SKUs are gone; SKU is now the real identity key
+- `scripts/build-catalogue.mjs` builds the shelf deterministically from the
+  restored Product Master CSV and the approved photography
+- 201 master rows, 96 approved images, **95 exact SKU matches**, 95 publishable
+- 106 products withheld for having no approved photograph
+- `EP01-A01` (TZS 128) flagged and withheld — **not corrected**
+- `EP23-A02` Spirix reported as an orphan image — **not invented**
+- Build 01: working hero control, repaired WhatsApp button, z-index contract
+- Build 02: English at `/`, Kiswahili at `/sw/`, 211 keys, chooser, switcher,
+  canonical + hreflang
+- Build 03: approved photography throughout, no distortion or layout shift
 
-**Build 01 — interaction and QA**
-- The hero down control is a real `<button>`: tab-reachable, Enter/Space operable,
-  reduced-motion aware, and it moves focus to the shelf it scrolls to
-- WhatsApp support button rebuilt on the real brand glyph, with a documented floating-layer
-  contract so it and the mobile cart dock can never overlap
-- Z-index contract written into `globals.css` — every fixed surface sits on a named layer
-- QA gate extended to overflow, console errors, broken images, wrong SKU↔photo pairing,
-  44px touch targets and floating-layer collisions
+### Recovery Build B — 2026-09-08
+The admin prototype, rebuilt on top of the recovered catalogue. See
+`docs/ADMIN_UX.md`.
 
-**Build 02 — English and Kiswahili**
-- English at `/`, Kiswahili at `/sw/`, each with its own root layout and correct `<html lang>`
-- 211 translated keys, first-visit chooser, remembered preference, EN/SW switcher
-- Switching keeps the page, the query string and the cart
-- Locale-aware canonical and hreflang (`en`, `sw-TZ`, `x-default`) on every page
-- `npm run i18n:check` enforces key, placeholder and array parity
+**Shell and navigation**
+- Its own root layout at `/admin`, `noindex`, carrying none of the shop chrome
+- Bottom navigation on phones (Home · Orders · Products · Customers · More),
+  the same destinations as a sidebar on desktop
+- One search box in the header, shaped for the future global search
 
-**Build 03 — real photography**
-- Approved photographs throughout: homepage, best sellers, category rails, Shop All,
-  product detail, size chooser, cart drawer, cart page and related products
-- Square `object-contain` presentation with fixed dimensions — no distortion, no cropping,
-  no layout shift
-- The fake bottle/jerrycan SVG illustrations are deleted
+**Orders**
+- Card list with filters (All · New · Confirm · Preparing · Delivery · Completed ·
+  Issues) and search by order number, customer or phone
+- Detail screen: customer with WhatsApp and Call, delivery, items, totals,
+  payment and a stage timeline
+- **One obvious next action** — never a status dropdown, and no raw status value
+  is rendered anywhere
+- **Payment gate**: an order cannot be completed until a payment is recorded, and
+  a digital payment needs a transaction reference
+- Cancellation requires a reason and stays visually secondary
+- **Delivery failed** asks "Were the items returned?" with **no default** and two
+  identically styled answers
+
+**Products**
+- All 201 master rows, using the real photos, prices, item codes and barcodes
+- Surfaced states: low stock, out of stock, not on the website, no photo, sync issue
+- Editor with everyday controls first; **item code shown and locked**
+- Stock recorded through **Add Stock** and **Count Stock**, never overwritten
+- Lifecycle Active / Hidden / Archived — **no delete anywhere**
+
+**Customers, zones, website**
+- Customer list and detail with totals derived from the orders, plus WhatsApp/Call
+- Delivery zones with a free-delivery switch that disables the fee box
+- Website screen editing announcements, hero, banner, featured, best sellers,
+  category order and section visibility — in both languages, never HTML
+
+**Structure for later**
+- `can(role, capability)` with Owner / Manager / Order Staff, asked by every
+  screen; no authentication, and the role switch is a labelled prototype control
+- Sync states (Saved / Syncing / Pending / Issue) shown as UI states only
 
 **Verified**
-`typecheck` · `lint` · `i18n:check` · `catalogue:check` · `build` (205 pages) ·
-`qa:screenshots` — 70 screenshots at 390 / 430 / 768 / 1024 / 1440 in both languages, all
-behavioural checks passing.
+`typecheck` · `lint` · `i18n:check` · `catalogue:check` · `build` (440 pages) ·
+`qa:screenshots` — **125 screenshots** at 390 / 430 / 768 / 1024 / 1440, storefront
+in both languages plus 11 admin screens, all behavioural checks passing.
 
 ## Deliberately not done
 
-Supabase (not started — no resources, no connection), the order backend, payments,
-customer accounts, the admin dashboard, the analytics pipeline, Google Sheet
-synchronisation and any Vercel deployment.
-
-**Build 04 (admin prototype) was explicitly deferred to Recovery Build B.**
+Supabase (not started — no packages, no resources, no connection), the order
+backend, payments, customer accounts, real inventory, Google Sheet
+synchronisation, the analytics pipeline and any Vercel deployment.
 
 ## Next
 
-- **Recovery Build B** — the mobile-first admin prototype: Home attention dashboard,
-  Orders list/detail with one obvious NEXT ACTION, simplified Products editor, Customers,
-  Delivery Zones, Website/Content; mock data only, locked SKU, no delete controls, payment
-  completion gate, no default on the returned-items question, and Owner / Manager / Order
-  Staff permission-aware structure
-- Confirm the open business rules in `PROTOTYPE_NOTES.md` §3 (delivery fee, free-delivery
-  threshold, served areas, retail prices, cut-off time)
-- Confirm the `EP01-A01` price and add a master row for `EP23-A02`
+- **The Supabase architecture pivot / Build 05.** `docs/ADMIN_UX.md` ends with the
+  backend constraints the admin UX implies — typed inventory movements, a payment
+  constraint on completion, three-valued returned-items, immutable SKUs, order
+  events rather than mutated fields, and RLS matching the capability list.
+- Confirm the open business rules in `PROTOTYPE_NOTES.md` §3 (delivery fee,
+  free-delivery threshold, served areas, retail prices, cut-off time)
+- Confirm the `EP01-A01` price and add a Product Master row for `EP23-A02`
+- Provide the real delivery zones and their fees
 - Provide the real Jojo Usafi WhatsApp number, phone, email and logo
-- Then: Supabase schema, RLS, migrations, the order backend, and the validated two-way
-  Google Sheet ↔ Supabase synchronisation
+- Photography for the 106 products that have none
 
 Claude must update this file after meaningful milestones.

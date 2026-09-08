@@ -96,6 +96,12 @@ export interface Product {
   /** Millilitres or grams, so pack sizes sort smallest-first rather than by price. */
   sizeRank: number;
   price: number;
+  /** The master's STOCK QTY. Read-only here — the admin prototype never writes it. */
+  stockQty: number;
+  /** The master's LOW STOCK THRESHOLD. */
+  lowStockThreshold: number;
+  /** EAN from the master, so admin search can match a scanned barcode. */
+  barcode: string;
   /** Blank for 200 of 201 master rows. Never invented. */
   description: string;
   badges: ProductBadge[];

@@ -250,6 +250,7 @@ function truthy(value) {
 const products = records.map((row) => {
   const price = Number(row["PRICE TZS"]);
   const stock = Number(row["STOCK QTY"]);
+  const threshold = Number(row["LOW STOCK THRESHOLD"]);
   const brand = brandByName.get(row["PRODUCT BRAND"]);
   const category = categoryByName.get(row.CATEGORY);
   const supplier = supplierByName.get(row.SUPPLIER);
@@ -284,6 +285,11 @@ const products = records.map((row) => {
     packType: packTypeFor(row.SIZE),
     sizeRank: sizeRank(row.SIZE),
     price: Number.isFinite(price) ? price : 0,
+    /** The master's STOCK QTY. Admin shows this; nothing here writes it back. */
+    stockQty: Number.isFinite(stock) ? stock : 0,
+    lowStockThreshold: Number.isFinite(threshold) ? threshold : 0,
+    /** EAN from the master, so admin search can match a scanned barcode. */
+    barcode: row.EAN,
     // 200 of 201 master rows carry no description. Blank stays blank.
     description: row.DESCRIPTION,
     badges,

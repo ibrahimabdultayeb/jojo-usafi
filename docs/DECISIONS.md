@@ -284,3 +284,196 @@ Ship the 26.6 MB source PNGs, or optimise at request time. Both rejected.
 Impact:
 Committed, reproducible assets. `ProductPhoto` still supplies width, height and `sizes`,
 so there is no layout shift and images below the fold stay lazy.
+
+---
+
+## 2026-09-08 — The admin is its own root layout at /admin
+
+Decision:
+The admin lives under `src/app/(admin)/admin/…` with its own Next.js root layout,
+alongside the two storefront root layouts. It is English-first, marked
+`noindex, nofollow`, and carries none of the shop chrome.
+
+Reason:
+The admin shares nothing with the storefront frame — no announcement bar, no
+cart, no language chooser, no WhatsApp support button. Sharing a layout would
+mean stripping those out by condition on every render, and one missed condition
+would put a customer control in front of staff.
+
+Alternatives:
+Put the admin inside the English storefront layout and hide the chrome. Rejected:
+the hiding logic is the bug surface.
+
+Impact:
+Three root layouts. Crossing from the shop to the admin is a full page load,
+which is correct for what is really a different application.
+
+---
+
+## 2026-09-08 — Staff never see an order status; they see one next action
+
+Decision:
+There is no status dropdown anywhere in the admin, and no raw status value is
+ever rendered. `src/lib/admin/orders.ts` maps each status to plain language and
+to exactly one next action, and every screen reads from it.
+
+Reason:
+A dropdown asks a member of staff to know the workflow. A single button named
+for what it does asks them only to know what just happened in the real world.
+
+Alternatives:
+A status select, as most admin templates ship. Rejected by the project owner and
+by the design principle.
+
+Impact:
+The QA gate fails the build if an internal value such as `out_for_delivery`
+appears as visible text. The database must own the legal transitions, because the
+UI no longer offers a way to express an illegal one.
+
+---
+
+## 2026-09-08 — Completing an order requires a recorded payment
+
+Decision:
+*Complete Order* opens a payment dialog. Cash is enough on its own; digital
+requires a transaction reference before the confirm button enables. The customer's
+stated preference and the payment actually recorded are separate fields.
+
+Reason:
+An order marked delivered with no money recorded is the single most expensive
+mistake a small shop can make, and the hardest to reconstruct later.
+
+Alternatives:
+Record payment separately, after completion. Rejected: it makes the gap possible.
+
+Impact:
+`completed` must be unreachable in the database without a payment row, and a
+digital payment unreachable without a reference. The UI is the convenience; the
+constraint has to be in Postgres.
+
+---
+
+## 2026-09-08 — "Were the items returned?" has no default
+
+Decision:
+After marking a delivery failed, the returned-items question offers Yes and No
+with neither preselected and both styled identically. Nothing can be saved until
+one is chosen. The stored value is three-valued: yes, no, or not yet answered.
+
+Reason:
+The future backend uses this answer to decide whether stock returns to the shelf.
+A default would be answered by accident and would silently corrupt inventory.
+
+Alternatives:
+Default to "Yes", which is the common case. Explicitly rejected.
+
+Impact:
+Inventory must not move on a failed delivery until the question is answered, and
+"not answered" must be representable in the schema.
+
+---
+
+## 2026-09-08 — Stock is recorded as events, never overwritten
+
+Decision:
+The product editor has no editable stock box. It has *Add Stock* (what arrived)
+and *Count Stock* (what was on the shelf), which are different facts.
+
+Reason:
+Overwriting a single number destroys the difference between a delivery arriving
+and a count correcting an error, and makes shrinkage impossible to see.
+
+Alternatives:
+A plain number input. Rejected: it is the reason small-shop inventory data is
+usually worthless.
+
+Impact:
+Supabase needs typed inventory movements — receipt, count correction, sale,
+reservation, restoration, manual adjustment — with available stock derived from
+them, not stored as a mutable column.
+
+---
+
+## 2026-09-08 — No delete in the admin; SKU is immutable
+
+Decision:
+There is no delete control anywhere. Products are Active, Hidden or Archived. The
+item code is displayed prominently and is never an editable field.
+
+Reason:
+Order lines reference products by SKU. Deleting a product or rewriting a code
+would rewrite history that customers and accounts depend on.
+
+Alternatives:
+A delete with a confirmation dialog. Rejected: confirmation does not make data
+loss recoverable.
+
+Impact:
+The QA gate fails on any control labelled delete or destroy, and asserts that no
+editable field holds the SKU.
+
+---
+
+## 2026-09-08 — Permission structure now, authentication later
+
+Decision:
+`can(role, capability)` and a `RoleProvider` exist and every screen already asks
+before offering an action. There is no authentication, and the role switch in
+Settings is a labelled prototype control.
+
+Reason:
+Retrofitting permission checks across finished screens is where permission bugs
+come from. The shape is cheap now and the answer changes in one place later.
+
+Alternatives:
+Add permissions when Supabase Auth lands. Rejected.
+
+Impact:
+These checks protect nothing today and the code says so. Row Level Security will
+be the real boundary; the capability list is the specification for those policies.
+
+---
+
+## 2026-09-08 — Admin mock data is invented; admin product data is real
+
+Decision:
+Orders, customers, delivery zones and website content are invented mock modules.
+Products, prices, item codes, barcodes and photos come from the real recovered
+catalogue. Stock for six named SKUs is overridden by a clearly isolated demo
+overlay so low and out-of-stock states are reachable.
+
+Reason:
+The admin has to be judged against the real shelf, and the real master has healthy
+stock almost everywhere, so those states would otherwise be invisible. Mixing the
+override into the catalogue would corrupt the one source of truth.
+
+Alternatives:
+Edit stock values in the Product Master. Explicitly forbidden — the CSV is
+source-only and read-only.
+
+Impact:
+`src/lib/admin/mock/inventory.ts` is one small module that is deleted outright
+when real inventory lands. Every screen showing invented data carries a visible
+notice.
+
+---
+
+## 2026-09-08 — Admin copy is English-first with a localisation seam
+
+Decision:
+The admin ships English only. `src/lib/admin/copy.ts` holds the repeated
+vocabulary — navigation, actions, shared labels — behind `getAdminCopy(locale)`,
+typed so a second dictionary is additive. Longer screen prose is still inline.
+
+Reason:
+Staff are a small known group and the storefront was the bilingual requirement.
+Fully externalising every admin sentence now would double the work of a prototype
+whose wording will change once it is used.
+
+Alternatives:
+Translate the admin now. Not requested. Or hard-code English with no seam.
+Rejected: it is the version that makes localisation expensive later.
+
+Impact:
+`npm run i18n:check` covers the storefront dictionaries only; the admin is
+deliberately outside it until a Kiswahili admin dictionary exists.
