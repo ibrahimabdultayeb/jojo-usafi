@@ -7,11 +7,15 @@ The **Supabase PostgreSQL** schema, authored as version-controlled migrations in
 > **Status: applied and verified.** All 15 migrations have been executed against the hosted
 > development project (*Jojo Usafi Dev*, `dyjhacbbedytcstxxjzl`, free tier). Everything below
 > is checked statically by `npm run schema:check` and — since Build 06 — proved at runtime by
-> `npm run test:db`, 110 tests against the real database, Supabase Auth and Supabase Storage.
+> `npm run test:db`, 112 tests against the real database, Supabase Auth and Supabase Storage.
 >
 > The database holds **no business data**: no products, no customers, no orders, no delivery
-> zones, no staff. Only the reference rows the migrations themselves insert — 2 locales,
-> 6 pack types, 2 option axes — because those are true of every environment.
+> zones. Only the reference rows the migrations themselves insert — 2 locales, 6 pack types,
+> 2 option axes — because those are true of every environment.
+>
+> The one exception is **staff**: since 2026-09-09 there is a single `admin_profiles` row, the
+> real Owner, created by the first-Owner bootstrap rather than by a seed. See *Authorization →
+> Supabase Auth* below.
 
 ## Design rules
 
@@ -266,6 +270,20 @@ Guest checkout stays the default and creates no login, so in practice the only
 active Owner exists — under an advisory lock, writing an `audit_events` row, and raising for
 every caller afterwards. `jojo_owner_exists()` is readable before sign-in so the setup screen
 can choose which form to show. No password is ever typed into a file or a migration.
+
+EXECUTE on it is granted to `authenticated` and to nobody else — not `anon`, not
+`service_role`, not PUBLIC — and the seat goes to `auth.uid()`. It therefore **cannot** be
+invoked on somebody's behalf with a privileged key; it happens inside the session of the
+account being made Owner, or not at all.
+
+> **Done on this database, 2026-09-09.** Ibrahim Abdul Tayeb (the Owner’s own email address) holds
+> the Owner seat, linked by foreign key to a real `auth.users` row, with the claim in
+> `audit_events`. `/admin/setup` has disabled itself accordingly.
+>
+> Neither the screen nor the grant was removed, deliberately: a migration applies to **every**
+> environment, and a fresh production project will have no Owner and will need exactly this
+> function on its first day. The gate is a question about state, asked where it matters — see
+> `docs/DECISIONS.md`, 2026-09-09.
 
 A trigger then refuses to demote, deactivate or delete the last active Owner, including with
 the service-role key.

@@ -7,13 +7,16 @@ product photography — and, since Build 06, a **real Supabase database behind i
 
 All 15 migrations are applied to a free hosted development project. The constraints fire,
 the triggers refuse, Row Level Security holds for each of the three staff roles, Supabase
-Auth works and the Storage buckets are secured — all proved by 110 tests against the actual
+Auth works and the Storage buckets are secured — all proved by 112 tests against the actual
 database rather than asserted in a document.
 
-What is not yet true: **the application still does not read Supabase.** The storefront reads
-the committed catalogue artifact, the admin dashboard runs on mock data, the database holds
-no business rows, the Storage buckets are empty, and no real staff account exists. Wiring
-those together is Build 07.
+Jojo Usafi has a real Owner — **Ibrahim Abdul Tayeb** — who signs in at `/admin/sign-in`.
+The first-Owner bootstrap is done and has disabled itself.
+
+What is not yet true: **the application still does not read Supabase for its data.** The
+storefront reads the committed catalogue artifact, the ten admin screens run on mock data and
+are deliberately not yet behind the sign-in guard, the database holds no business rows, and
+the Storage buckets are empty. Wiring those together is Build 07.
 
 ## Completed
 
@@ -162,7 +165,7 @@ approved storefront and admin; nothing was redesigned.
 
 **Verified**
 `typecheck` · `lint` · `i18n:check` · `catalogue:check` · `build` (325 pages) ·
-`qa:screenshots` — 120 screenshots, all 15 locale-stability comparisons stable, no
+`qa:screenshots` — 125 screenshots, all 15 locale-stability comparisons stable, no
 overflow, console errors, broken images, small touch targets or floating-layer collisions.
 
 ### Build 05 — Supabase domain contracts, without a database runtime — 2026-09-09
@@ -208,7 +211,7 @@ overflow, console errors, broken images, small touch targets or floating-layer c
 
 **Verified offline**
 `typecheck` · `lint` · `test` (**156 domain tests**) · `schema:check` · `i18n:check` ·
-`catalogue:check` · `build` (325 pages) · `qa:screenshots` (120 screenshots, all 15
+`catalogue:check` · `build` (325 pages) · `qa:screenshots` (125 screenshots, all 15
 locale-stability comparisons stable). The approved storefront and admin UI are untouched.
 
 **Not verified — needs a real database**
@@ -313,6 +316,9 @@ active one, including with the service-role key.
 
 #### The first Owner — prepared, not created
 
+> Accurate as of Build 06. The seat was claimed later the same day — see **Owner bootstrap
+> completed** below.
+
 Only an Owner may create staff, and there is no Owner. `jojo_claim_first_owner(text)` gives
 the seat to the signed-in account if and only if no active Owner exists — under an advisory
 lock, writing an `audit_events` row, and raising for every caller afterwards.
@@ -361,7 +367,7 @@ column as read-only, so `inventory.available` appears in the generated Insert an
 types and assigning to it compiles. The database refuses it with `428C9`, and a test asserts
 that it does.
 
-#### 110 tests against the real database
+#### 112 tests against the real database
 
 `npm run test:db` — a second Vitest project, separate on purpose so `npm run test` keeps
 working with no network, no Docker and no Supabase project.
@@ -424,11 +430,11 @@ Run before and after. 19 findings remain, all `WARN`, all deliberate:
 
 Offline: `typecheck` · `lint` · `test` (156 domain tests) · `schema:check` (15 migrations,
 377 statements) · `i18n:check` (211 keys) · `catalogue:check` (95 publishable) · `build`
-(325 pages) · `qa:screenshots` (120 screenshots, all 15 locale-stability comparisons stable,
+(325 pages) · `qa:screenshots` (125 screenshots, all 15 locale-stability comparisons stable,
 no overflow, console errors, broken images, small touch targets, floating-layer collisions
 or wrong shelf columns).
 
-Against the real database: `db:types:check` · `test:db` (110 tests).
+Against the real database: `db:types:check` · `test:db` (112 tests).
 
 The approved storefront and admin UI are untouched. Not one component changed in this build.
 
@@ -450,6 +456,133 @@ the practical risk is low — but it does bypass Row Level Security, so the tidy
 disable the legacy JWT keys for this project in the Supabase dashboard
 (*Settings → API Keys → Legacy keys*). Nothing in this repository uses them.
 
+
+### Owner bootstrap completed — 2026-09-09
+
+Jojo Usafi has an Owner. **Ibrahim Abdul Tayeb**, linked by foreign
+key to a real `auth.users` row, with the claim recorded in `audit_events`. Between Build 06
+and Build 07, and scoped to authentication only — no page was wired to Supabase.
+
+#### What the function actually requires
+
+Inspected before anything was invoked, from `pg_proc` rather than from the migration file:
+
+```
+public.jojo_claim_first_owner(p_full_name text) returns admin_profiles
+  SECURITY DEFINER · owner postgres · search_path = public, pg_temp
+  ACL: {postgres=X/postgres, authenticated=X/postgres}
+```
+
+EXECUTE is granted to `authenticated` **and to nobody else** — not `anon`, not
+`service_role`, not PUBLIC. The body gives the seat to `auth.uid()`. So the claim can only
+happen inside the session of the very account being made Owner: it cannot be performed on
+somebody's behalf with a privileged key, and there is no argument for "which user" to get
+wrong.
+
+#### The authentication infrastructure did not exist, so it was built
+
+The instruction said to use the existing admin sign-in. There was none: no sign-in page, no
+session handling, no middleware — and the layout carried a comment referring to a
+`src/middleware.ts` that had never existed. The admin ran on a hard-coded `currentUser` mock.
+
+Added, and no more than this:
+
+- `src/middleware.ts` — refreshes Supabase session cookies, matching `/admin` only, so a
+  signed-in staff member is not quietly logged out mid-shift. It is **not** the authorization
+  boundary; Row Level Security is.
+- `src/lib/admin/session.ts` — who is signed in and what may they do, read through the
+  caller's **own** session so RLS answers. The service-role client is deliberately not
+  imported. It distinguishes three states that must not be confused: nobody signed in,
+  signed in but not staff, and signed-in staff.
+- `/admin/sign-in` — real email-and-password sign-in as a server action, so the session
+  cookie is written `HttpOnly` and no access token is handed to page JavaScript. Supabase's
+  developer wording is replaced with plain language, and a wrong email and a wrong password
+  give the *same* message so the page cannot be used to discover which addresses have
+  accounts.
+- `/admin/setup` — the one-time claim screen.
+- `AdminShell` renders both without dashboard chrome: offering a nav bar to somebody who is
+  not signed in advertises destinations they cannot reach, and the bottom navigation would
+  cover a password field on a phone.
+
+**The ten dashboard screens are deliberately still unguarded.** They show mock data; there is
+nothing behind them to protect, and the guard belongs with the build that gives them real
+data. That is Build 07, and this was not it.
+
+#### How the claim was made without a password
+
+The account holder was not at the terminal and the password must not be handled. The claim
+was therefore made the passwordless way Supabase already supports, which
+`scripts/claim-first-owner.mjs` performs:
+
+1. mint a single-use magic-link token for the account — service role
+2. exchange it for a real session — **anon key**, an ordinary sign-in
+3. call `jojo_claim_first_owner` with that session — anon key, RLS in force
+4. sign out
+
+Step 3 is exactly what the web form does. RLS is never bypassed, no password is read, typed,
+stored or printed, and the service-role key is used only to issue the link — which is what
+"email me a sign-in link" does every day.
+
+**No account is hard-coded.** The script discovers the one confirmed login that is not a
+`@jojo-usafi.test` fixture, and refuses — listing what it found — if that is ambiguous. It
+also refuses outright once a seat is taken, so it cannot be used a second time.
+
+#### Verified from the database, not from the script's output
+
+| | |
+| --- | --- |
+| `jojo_owner_exists()` | true |
+| Profile | Ibrahim Abdul Tayeb · role **owner** · active |
+| Link | `auth_user_id` joins `auth.users`; emails match; 0 orphan profiles |
+| Audit | one `admin_profile.first_owner_claimed` row, actor `staff`, source `admin` |
+| Second claim | refused — "Jojo Usafi already has an Owner" |
+| Anonymous claim | refused with `42501`, before the function body runs |
+| Non-staff self-promotion | `INSERT` into `admin_profiles` refused `42501`; `UPDATE` of the Owner's row changes 0 rows |
+| RLS still sane | that same non-staff account still reads the public shelf — RLS denies staff data, not everything |
+| Boundary intact | 95 policies, RLS on all 30 tables, unchanged |
+
+#### The bootstrap is disabled by state, not by deletion
+
+`/admin/setup` now renders "Already set up" and no form; the "set up the Owner account" link
+is gone from the sign-in page. The function raises for every caller.
+
+Neither was removed, and that is deliberate. **A migration applies to every environment**,
+including a fresh production project on its first day, which will have no Owner and will need
+exactly this screen and exactly this function. Revoking the bootstrap because this development
+database had finished with it would arrive in production having already disabled the thing
+production depends on. The right gate for a capability whose availability differs per
+environment is a question about that environment's state — which is what both layers ask.
+
+#### A bug this found, in Build 06's own test teardown
+
+`tests/db/teardown.sql` deleted `audit_events where action =
+'admin_profile.first_owner_claimed'` — written when the only such row could have been a
+fixture's. The first test run after the real bootstrap deleted **Jojo Usafi's own audit row**
+as tidy-up.
+
+Caught immediately by the test asserting that row exists. The clause is removed — teardown now
+matches fixtures by what they *are*, never by what *happened*, and the clause was redundant
+anyway since a fixture claim's `entity_key` already matches `zztest%`. The row was
+reconstructed from `admin_profiles.invited_at` and carries
+`request_id = 'reconstructed-2026-09-09-after-test-teardown-deleted-it'`, so the trail is
+honest about its own repair.
+
+The last-Owner guard tests were reworked as part of the same fix: they now run against the
+real Owner row with the fixture Owner stood down, and every attempt is wrapped in a restore
+that puts the row back — re-inserting it from a snapshot if necessary. A test that discovers a
+broken guard must not also be the thing that leaves the shop without an Owner. That safety net
+earned its place on the very first run, when the guard tests failed for an unrelated reason
+and the deletion actually went through.
+
+#### Verified
+
+`typecheck` · `lint` · `test` (156) · `schema:check` · `i18n:check` · `catalogue:check` ·
+`db:types:check` · `build` (325 static pages, unchanged; the two new routes are dynamic) ·
+`qa:screenshots` (**125** screenshots — the sign-in page joins the gate at all five widths) ·
+`test:db` (**112** tests).
+
+No migration was added. The database schema is byte-for-byte what Build 06 left.
+
 ## Next
 
 - Confirm the open business rules (delivery fee, free-delivery threshold, served areas,
@@ -459,8 +592,8 @@ disable the legacy JWT keys for this project in the Supabase dashboard
 - ~~**Build 06:** create a free Supabase development project, apply the migrations for real,
   generate the database types, write and test the Row Level Security policies, set up
   Supabase Auth~~ — **done, 2026-09-09**
-- **Ibrahim, when convenient:** claim the Owner account — the two steps are under *Build 06 →
-  The first Owner* above. Nothing else can create staff until then.
+- ~~**Ibrahim:** claim the Owner account~~ — **done, 2026-09-09.** Ibrahim Abdul Tayeb is the
+  Owner; sign in at `/admin/sign-in`. Further staff are added by the Owner.
 - **Ibrahim, tidy-up:** disable the legacy JWT API keys for the development project in the
   Supabase dashboard (*Settings → API Keys → Legacy keys*). Nothing in this repository uses
   them; the reason is under *Build 06 → One thing to be aware of*.

@@ -7,9 +7,17 @@ import { AdminShell } from "@/components/admin/AdminShell";
  * The admin dashboard's own root layout.
  *
  * Admin sits outside the localized route tree — it is English-first in V1 (see
- * docs/DECISIONS.md) — so `src/middleware.ts` skips `/admin` and it never
- * becomes `/en/admin`. It shares the storefront's fonts and design tokens, but
- * not its header, footer or WhatsApp button.
+ * docs/DECISIONS.md) — so it never becomes `/en/admin`. It shares the
+ * storefront's fonts and design tokens, but not its header, footer or WhatsApp
+ * button.
+ *
+ * `src/middleware.ts` matches `/admin` only, and does one thing: refresh the
+ * Supabase session cookies so a signed-in staff member is not quietly logged
+ * out mid-shift. It is not the authorization boundary — Row Level Security is.
+ *
+ * The ten dashboard screens still run on mock data and are therefore NOT yet
+ * behind a sign-in guard; there is nothing behind them to protect. The guard
+ * belongs with the build that gives them real data to show.
  */
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });

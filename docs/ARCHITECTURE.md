@@ -28,10 +28,12 @@ What is real and what is not:
 | | |
 | --- | --- |
 | Schema applied, constraints and triggers firing | **yes**, proved by `npm run test:db` |
-| Row Level Security enforcing, per role | **yes**, 110 tests against real sessions |
+| Row Level Security enforcing, per role | **yes**, 112 tests against real sessions |
 | Supabase Auth, staff roles, first-Owner bootstrap | **yes**, mechanism built and tested |
 | Storage buckets and their security | **yes** — and deliberately **empty** |
-| The real Owner account | **not created** — two steps, in `docs/PROGRESS.md` |
+| The real Owner account | **yes** — Ibrahim Abdul Tayeb, claimed 2026-09-09 |
+| Admin sign-in and session | **yes** — `/admin/sign-in`, `/admin/setup`, session middleware |
+| A sign-in guard on the ten dashboard screens | **not yet** — they show mock data; the guard lands with the data |
 | The 95 product photographs in Storage | **not uploaded** — still `public/products/` |
 | The catalogue in the database | **not imported** — still a committed build artifact |
 | The application reading Supabase | **not wired** — the storefront still reads the file |
@@ -78,7 +80,7 @@ src/lib/supabase/database.types.ts GENERATED from the real database — never ha
 src/lib/supabase/types.ts          friendly aliases into the generated types
 scripts/schema-check.mjs           offline: the SQL and the domain layer agree
 scripts/gen-types.mjs              generate / drift-check the types against the database
-tests/db/                          110 tests against the real database, Auth and Storage
+tests/db/                          112 tests against the real database, Auth and Storage
 ```
 
 ## Authorization: two locks, with different jobs

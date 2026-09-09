@@ -478,21 +478,42 @@ export async function loginIds(db: Service = serviceClient()): Promise<Record<st
 }
 
 /**
- * Make sure an active Owner profile exists, whatever order the test files ran
- * in. `02-auth.test.ts` creates it the honest way, by claiming the seat; this
- * exists so that running a later file on its own still has an Owner to sign in
- * as. It is a no-op once the seat is taken.
+ * Give the FIXTURE owner login an active Owner profile.
+ *
+ * Note what this deliberately does not do: check whether *some* Owner exists.
+ * Since the first-Owner bootstrap was completed on 2026-09-09 there is always a
+ * real Owner on this database — Jojo Usafi's own — and an `ensureOwnerProfile`
+ * that stopped there would leave `zztest-owner@jojo-usafi.test` with no profile,
+ * so every "as the Owner" test would silently be running as a stranger and
+ * passing for the wrong reason.
+ *
+ * A second Owner is legitimate: the last-Owner trigger protects the last one,
+ * not the only one. The fixture Owner is removed by teardown; the real one is
+ * matched by no teardown pattern and is never touched.
  */
 export async function ensureOwnerProfile(): Promise<void> {
   const db = serviceClient();
+
   const { data: existing } = await db
     .from("admin_profiles")
-    .select("id")
-    .eq("role", "owner")
-    .eq("active", true)
-    .limit(1);
+    .select("id, role, active")
+    .eq("email", EMAIL.owner)
+    .maybeSingle();
 
-  if (existing && existing.length > 0) return;
+  if (existing) {
+    if (existing.role !== "owner" || !existing.active) {
+      ok(
+        "owner profile restore",
+        (
+          await db
+            .from("admin_profiles")
+            .update({ role: "owner", active: true })
+            .eq("id", existing.id)
+        ).error,
+      );
+    }
+    return;
+  }
 
   const ids = await loginIds(db);
   ok(

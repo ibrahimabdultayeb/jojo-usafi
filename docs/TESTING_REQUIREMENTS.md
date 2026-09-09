@@ -19,7 +19,7 @@ and, since Build 06, the half that needs a real database:
 
 ```bash
 npm run db:types:check   # the generated types still match the live schema
-npm run test:db          # 110 tests against PostgreSQL, Supabase Auth and Storage
+npm run test:db          # 112 tests against PostgreSQL, Supabase Auth and Storage
 ```
 
 The two halves are deliberately separate. `npm run test` must keep working on a laptop with
@@ -71,13 +71,13 @@ types disagreeing with the live schema.
 
 ## Database, Auth, RLS and Storage tests
 
-`npm run test:db` — 110 tests against the hosted development project. Four files, run in
+`npm run test:db` — 112 tests against the hosted development project. Four files, run in
 name order by a custom sequencer, sharing one database with `fileParallelism` off.
 
 | File | Tests | Proves |
 | --- | --- | --- |
 | `01-schema.test.ts` | 43 | CHECK constraints refuse; the append-only triggers refuse; `updated_at` moves; SKU immutability; `inventory.available` is computed by the database; `product_shelf` and `inventory_ledger_check` mean what they say |
-| `02-auth.test.ts` | 18 | the three roles resolve from `admin_profiles`; the first-Owner bootstrap works once and never again; the last Owner cannot be demoted, deactivated or deleted; deleting a login leaves the staff record behind |
+| `02-auth.test.ts` | 20 | the three roles resolve from `admin_profiles`; the Owner seat is taken and cannot be taken again by anyone; a signed-in non-staff account cannot promote itself; the last Owner cannot be demoted, deactivated or deleted; deleting a login leaves the staff record behind |
 | `03-rls.test.ts` | 39 | five callers — anonymous, signed-in stranger, Order staff, Manager, Owner — against every policy |
 | `04-storage.test.ts` | 10 | bucket configuration; who may upload, replace and delete |
 
@@ -108,15 +108,17 @@ Asserting an error where the answer is an empty result tests nothing.
 - **concurrent stock reservation** — the transactional reserve/release functions are not
   built. They belong with the checkout that calls them; see `docs/DATA_MODEL.md`.
 - **the storefront and admin against Supabase** — the three clients are written,
-  typechecked and now pointed at a real project, but no page reads the database yet. The
-  storefront still reads the committed catalogue artifact.
+  typechecked and now pointed at a real project, and `/admin/sign-in` and `/admin/setup` do
+  use them for real. No page reads the database for its **data** yet; the storefront still
+  reads the committed catalogue artifact and the ten dashboard screens still show mock rows.
+- **a sign-in guard on the ten dashboard screens** — deliberately absent. They show mock data,
+  so there is nothing behind them to protect; the guard belongs with the build that gives
+  them real data. Sign-in itself works and is covered by the QA gate.
 - **the catalogue in the database** — 95 products exist as a build artifact, not as rows.
 - **product photography in Storage** — the buckets and their policies are proved; they are
   empty.
 - **the order workflow end to end** — no order has been placed through the application.
 - **Google Sheet sync** — the rules are unit-tested; nothing has ever talked to Google.
-- **the real Owner account** — the bootstrap is built and tested with fixture logins. No
-  real staff account exists.
 
 ## What the QA gate checks
 
@@ -140,7 +142,7 @@ Asserting an error where the answer is an empty result tests nothing.
 - a fixed-length shelf ending in a part-full row
 - **locale layout stability** — see below
 
-120 screenshots land in `preview/screenshots/`, named `page-locale-width.png` for the
+125 screenshots land in `preview/screenshots/`, named `page-locale-width.png` for the
 storefront and `page-width.png` for the English-only admin.
 
 ## Locale layout stability

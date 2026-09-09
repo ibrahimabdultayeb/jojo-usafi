@@ -10,68 +10,86 @@
  * with `fileParallelism: false`.
  */
 
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { AdminProfileRow } from "@/lib/supabase/types";
 import { anonClient, errorOf, isRefusedByTrigger, PG, serviceClient, signIn } from "./support";
 import { EMAIL, ID, ensureOwnerProfile, loginIds } from "./fixtures";
 
 const db = serviceClient();
 
-describe("the shop starts with no Owner", () => {
-  it("reports that nobody has taken the seat", async () => {
+/**
+ * The seat is taken.
+ *
+ * Until 2026-09-09 this file proved the happy path: an empty shop, one account
+ * claiming the Owner seat, and every later attempt refused. That was a
+ * ONE-TIME, IRREVERSIBLE event and it has now happened on this database — the
+ * real Owner exists, and the last-Owner trigger means the shop can never return
+ * to having none. The happy path is therefore no longer re-runnable here, and a
+ * test that pretended otherwise would be lying about what it checked.
+ *
+ * What is permanently true, and is what these tests hold to, is the harder and
+ * more useful half: the seat cannot be taken twice, cannot be taken by a
+ * stranger, and cannot be taken by a signed-in account that simply fancies it.
+ *
+ * The real Owner is found by asking the database rather than by naming anybody:
+ * the active Owner whose email is not a `zztest-` fixture.
+ */
+describe("the Owner seat is taken, and cannot be taken again", () => {
+  it("reports that the shop has an Owner", async () => {
     const { data, error } = await anonClient().rpc("jojo_owner_exists");
     expect(error).toBeNull();
-    expect(data).toBe(false);
-  });
-
-  it("refuses to let a stranger who has not signed in claim it", async () => {
-    const error = errorOf(
-      await anonClient().rpc("jojo_claim_first_owner", { p_full_name: "Impostor" }),
-    );
-    // The grant is revoked from anon, so this never reaches the function body.
-    expect(error.code).toBe(PG.insufficientPrivilege);
-  });
-});
-
-describe("the first Owner claims the seat, exactly once", () => {
-  it("gives the seat to the signed-in account", async () => {
-    const owner = await signIn(EMAIL.owner);
-    const { data, error } = await owner.rpc("jojo_claim_first_owner", {
-      p_full_name: "ZZTEST Owner",
-    });
-
-    expect(error).toBeNull();
-    expect(data).toMatchObject({
-      full_name: "ZZTEST Owner",
-      email: EMAIL.owner,
-      role: "owner",
-      active: true,
-    });
-  });
-
-  it("records the claim in the audit trail", async () => {
-    const { data, error } = await db
-      .from("audit_events")
-      .select("action, entity_table, entity_key, actor_type")
-      .eq("action", "admin_profile.first_owner_claimed")
-      .eq("entity_key", EMAIL.owner);
-
-    expect(error).toBeNull();
-    expect(data).toHaveLength(1);
-    expect(data![0]).toMatchObject({ entity_table: "admin_profiles", actor_type: "staff" });
-  });
-
-  it("now reports that the seat is taken", async () => {
-    const { data } = await anonClient().rpc("jojo_owner_exists");
     expect(data).toBe(true);
   });
 
-  it("refuses a second claim from the same account", async () => {
-    const owner = await signIn(EMAIL.owner);
-    const error = errorOf(await owner.rpc("jojo_claim_first_owner", { p_full_name: "Again" }));
-    expect(error.message).toContain("already has an Owner");
+  it("has exactly one real Owner, linked to a real login", async () => {
+    const { data, error } = await db
+      .from("admin_profiles")
+      .select("id, full_name, email, role, active, auth_user_id")
+      .eq("role", "owner")
+      .eq("active", true)
+      .not("email", "like", "zztest-%");
+
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+
+    const owner = data![0];
+    expect(owner.active).toBe(true);
+    expect(owner.auth_user_id, "the Owner must be linked to an auth.users row").toMatch(
+      /^[0-9a-f-]{36}$/,
+    );
+    expect(owner.full_name.trim().length).toBeGreaterThan(0);
+
+    // The link is a real foreign key, so the login it points at must exist.
+    const { data: login, error: loginError } = await db.auth.admin.getUserById(owner.auth_user_id!);
+    expect(loginError).toBeNull();
+    expect(login.user?.email).toBe(owner.email);
   });
 
-  it("refuses a claim from anybody else, signed in or not", async () => {
+  it("recorded the claim in the audit trail, once", async () => {
+    const { data, error } = await db
+      .from("audit_events")
+      .select("action, entity_table, entity_key, actor_type, source")
+      .eq("action", "admin_profile.first_owner_claimed");
+
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+    expect(data![0]).toMatchObject({
+      entity_table: "admin_profiles",
+      actor_type: "staff",
+      source: "admin",
+    });
+  });
+
+  it("refuses a stranger who has not signed in — before the function body runs", async () => {
+    const error = errorOf(
+      await anonClient().rpc("jojo_claim_first_owner", { p_full_name: "Impostor" }),
+    );
+    // EXECUTE is granted to `authenticated` only, so anon never reaches the
+    // existence check at all.
+    expect(error.code).toBe(PG.insufficientPrivilege);
+  });
+
+  it("refuses a signed-in account that is not staff", async () => {
     const stranger = await signIn(EMAIL.nobody);
     const error = errorOf(
       await stranger.rpc("jojo_claim_first_owner", { p_full_name: "Opportunist" }),
@@ -79,7 +97,75 @@ describe("the first Owner claims the seat, exactly once", () => {
     expect(error.message).toContain("already has an Owner");
 
     const { data } = await db.from("admin_profiles").select("id").eq("email", EMAIL.nobody);
-    expect(data).toEqual([]);
+    expect(data, "no profile may be created by a refused claim").toEqual([]);
+  });
+
+  it("refuses the Owner a second time", async () => {
+    await ensureOwnerProfile();
+    const owner = await signIn(EMAIL.owner);
+    const error = errorOf(await owner.rpc("jojo_claim_first_owner", { p_full_name: "Again" }));
+    expect(error.message).toContain("already has an Owner");
+  });
+});
+
+describe("a signed-in account cannot promote itself", () => {
+  it("cannot insert a staff profile for itself", async () => {
+    const stranger = await signIn(EMAIL.nobody);
+    const ids = await loginIds(db);
+
+    const error = errorOf(
+      await stranger.from("admin_profiles").insert({
+        auth_user_id: ids[EMAIL.nobody],
+        full_name: "ZZTEST Self Promoted",
+        email: EMAIL.nobody,
+        role: "owner",
+        active: true,
+      }),
+    );
+    expect(error.code).toBe(PG.insufficientPrivilege);
+  });
+
+  it("cannot edit the Owner's profile", async () => {
+    const stranger = await signIn(EMAIL.nobody);
+
+    const { data: owners } = await db
+      .from("admin_profiles")
+      .select("id")
+      .eq("role", "owner")
+      .eq("active", true)
+      .not("email", "like", "zztest-%");
+
+    const realOwnerId = owners![0].id;
+
+    // The policy matches no row for this caller, so the update changes nothing
+    // rather than raising — and the Owner is still the Owner afterwards.
+    const attempt = await stranger
+      .from("admin_profiles")
+      .update({ role: "order_staff" })
+      .eq("id", realOwnerId)
+      .select("id");
+
+    expect(attempt.error).toBeNull();
+    expect(attempt.data).toEqual([]);
+
+    const { data: after } = await db
+      .from("admin_profiles")
+      .select("role, active")
+      .eq("id", realOwnerId)
+      .single();
+    expect(after).toMatchObject({ role: "owner", active: true });
+  });
+
+  it("still sees the public shelf — RLS denies staff data, not everything", async () => {
+    const stranger = await signIn(EMAIL.nobody);
+
+    const shelf = await stranger.from("product_shelf").select("sku").like("sku", "ZZTEST%");
+    expect(shelf.error).toBeNull();
+    expect(shelf.data!.length).toBeGreaterThan(0);
+
+    const staffOnly = await stranger.from("orders").select("id").limit(1);
+    expect(staffOnly.error).toBeNull();
+    expect(staffOnly.data).toEqual([]);
   });
 });
 
@@ -135,40 +221,101 @@ describe("a caller's role is whatever admin_profiles says it is", () => {
 });
 
 describe("there must always be an Owner", () => {
-  beforeAll(ensureOwnerProfile);
-
-  async function soleOwnerId(): Promise<string> {
-    const { data } = await db
+  /**
+   * The guard fires for the LAST active Owner, so there has to be exactly one.
+   * Earlier tests give the fixture login an Owner profile, which would be a
+   * second one and would make every assertion below pass for the wrong reason —
+   * demoting one of two Owners is supposed to be allowed. It is stood down for
+   * the length of this section and put back afterwards.
+   *
+   * Standing it down is itself legitimate: the real Owner remains, so the guard
+   * has no reason to object.
+   */
+  beforeAll(async () => {
+    await db
       .from("admin_profiles")
-      .select("id")
+      .update({ active: false })
       .eq("role", "owner")
-      .eq("active", true);
-    expect(data).toHaveLength(1);
-    return data![0].id;
+      .like("email", "zztest-%");
+  });
+
+  afterAll(ensureOwnerProfile);
+
+  /**
+   * The Owner this shop actually belongs to — found by asking, never named.
+   *
+   * Every mutation below is expected to be REFUSED, so in the correct case this
+   * row is never touched. `restoring()` exists for the incorrect case: if the
+   * guard were broken, the test that discovered it must not also be the thing
+   * that leaves Jojo Usafi without an Owner.
+   */
+  async function realOwner() {
+    const { data, error } = await db
+      .from("admin_profiles")
+      .select("*")
+      .eq("role", "owner")
+      .eq("active", true)
+      .not("email", "like", "zztest-%");
+
+    expect(error).toBeNull();
+    expect(data, "the real Owner must exist for these tests to mean anything").toHaveLength(1);
+    return data![0];
+  }
+
+  /** Run an attempt that must fail, and undo it if it somehow did not. */
+  async function restoring<T>(snapshot: AdminProfileRow, run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } finally {
+      const still = await db
+        .from("admin_profiles")
+        .select("id, role, active")
+        .eq("id", snapshot.id)
+        .maybeSingle();
+
+      if (!still.data) {
+        await db.from("admin_profiles").insert(snapshot);
+      } else if (still.data.role !== "owner" || !still.data.active) {
+        await db
+          .from("admin_profiles")
+          .update({ role: "owner", active: true })
+          .eq("id", snapshot.id);
+      }
+    }
   }
 
   it("refuses to demote the last Owner", async () => {
-    const id = await soleOwnerId();
-    const error = errorOf(await db.from("admin_profiles").update({ role: "manager" }).eq("id", id));
-    expect(isRefusedByTrigger(error)).toBe(true);
-    expect(error.message).toContain("must always have one active Owner");
+    const owner = await realOwner();
+    await restoring(owner, async () => {
+      const error = errorOf(
+        await db.from("admin_profiles").update({ role: "manager" }).eq("id", owner.id),
+      );
+      expect(isRefusedByTrigger(error)).toBe(true);
+      expect(error.message).toContain("must always have one active Owner");
+    });
   });
 
   it("refuses to deactivate the last Owner", async () => {
-    const id = await soleOwnerId();
-    const error = errorOf(await db.from("admin_profiles").update({ active: false }).eq("id", id));
-    expect(isRefusedByTrigger(error)).toBe(true);
+    const owner = await realOwner();
+    await restoring(owner, async () => {
+      const error = errorOf(
+        await db.from("admin_profiles").update({ active: false }).eq("id", owner.id),
+      );
+      expect(isRefusedByTrigger(error)).toBe(true);
+    });
   });
 
   it("refuses to delete the last Owner, even with the service-role key", async () => {
-    const id = await soleOwnerId();
-    const error = errorOf(await db.from("admin_profiles").delete().eq("id", id));
-    expect(isRefusedByTrigger(error)).toBe(true);
+    const owner = await realOwner();
+    await restoring(owner, async () => {
+      const error = errorOf(await db.from("admin_profiles").delete().eq("id", owner.id));
+      expect(isRefusedByTrigger(error)).toBe(true);
+    });
   });
 
   it("allows an Owner to step down once somebody else is one", async () => {
-    const first = await soleOwnerId();
-
+    // A second Owner, so the guard has no reason to fire. The real Owner is
+    // never the one demoted — that is the whole point of the guard.
     const second = await db
       .from("admin_profiles")
       .insert({
@@ -184,16 +331,17 @@ describe("there must always be an Owner", () => {
     const demoted = await db
       .from("admin_profiles")
       .update({ role: "manager" })
-      .eq("id", first)
+      .eq("id", second.data!.id)
       .select("role")
       .single();
     expect(demoted.error).toBeNull();
     expect(demoted.data?.role).toBe("manager");
 
-    // Put the shop back the way it was.
-    await db.from("admin_profiles").update({ role: "owner" }).eq("id", first);
     const removed = await db.from("admin_profiles").delete().eq("id", second.data!.id);
     expect(removed.error).toBeNull();
+
+    // And the shop still has its Owner.
+    await realOwner();
   });
 
   it("allows an ordinary staff member to be deactivated", async () => {

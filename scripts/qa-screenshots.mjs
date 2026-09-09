@@ -97,6 +97,10 @@ const adminPages = [
   { name: "admin-more", path: "/admin/more", full: true },
   { name: "admin-zones", path: "/admin/more/delivery-zones", full: true },
   { name: "admin-website", path: "/admin/more/website", full: true },
+  // The one admin screen a person meets before they are anybody: two fields and
+  // a button, on a phone, in a shop. Held to the same touch-target bar as the
+  // rest even though it wears none of the dashboard's chrome.
+  { name: "admin-sign-in", path: "/admin/sign-in", full: true },
 ];
 
 const problems = [];

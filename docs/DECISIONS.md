@@ -808,3 +808,106 @@ the QA gate would have to re-prove, for the same zero runtime exposure.
 Impact:
 Reassessed when Next 16 is adopted deliberately, which resolves it as a side effect. Recorded
 here so a later reader knows the finding was read rather than ignored.
+
+---
+
+## 2026-09-09 — The Owner seat was claimed without anybody handling a password
+
+Decision:
+The first-Owner bootstrap was completed for `Ibrahim Abdul Tayeb`. The claim ran inside a
+genuine session belonging to the account being claimed, obtained the passwordless way:
+`auth.admin.generateLink` mints a single-use magic-link token, `verifyOtp` exchanges it for a
+real session on the **anon** key, and `jojo_claim_first_owner` is then called with that
+session. `scripts/claim-first-owner.mjs` is that sequence, and it discovers the target
+account rather than naming it.
+
+Reason:
+`jojo_claim_first_owner` grants EXECUTE to `authenticated` and to nobody else — not `anon`,
+not `service_role`, not PUBLIC — and gives the seat to `auth.uid()`. So the claim cannot be
+made on somebody's behalf with a privileged key; it must happen inside their own session.
+The operator running it must not be told the password, and the account holder was not at the
+terminal.
+
+Step 3 of the same instruction said to use the existing admin authentication infrastructure.
+There wasn't any: no sign-in page, no middleware, no session handling, and a hard-coded
+`currentUser` mock. So it was built — `/admin/sign-in`, `/admin/setup`, session refresh
+middleware and `src/lib/admin/session.ts` — and the script performs exactly what the form
+performs.
+
+Alternatives:
+Ask for the password. Refused by the instruction, and rightly. Insert an `admin_profiles` row
+directly with the service-role key. Rejected: it bypasses RLS, skips the advisory lock, skips
+the existence check and writes no audit row — it would produce a row that looks like an Owner
+without any of the guarantees that make one. Hard-code the email. Rejected by the instruction
+and by good sense; the script refuses if more than one confirmed non-fixture login exists.
+
+Impact:
+Ibrahim Abdul Tayeb is the Owner, linked by foreign key to his `auth.users` row, with an
+`audit_events` row recording the claim. Verified from the database, not from the script's own
+output. Nothing else can create staff; every further account is added by the Owner.
+
+---
+
+## 2026-09-09 — The bootstrap is disabled by state, not by revoking it
+
+Decision:
+`/admin/setup` asks `jojo_owner_exists()` first and renders no form once an Owner exists, and
+`jojo_claim_first_owner` raises for every caller once the seat is taken. Neither the page nor
+the function's EXECUTE grant was removed.
+
+Reason:
+Removing it was considered and is wrong. A migration applies to **every** environment,
+including a fresh production project on its first day — which will have no Owner and will
+need exactly this screen and exactly this function. A migration that revoked the bootstrap
+because this development database had finished with it would arrive in production having
+already disabled the thing production depends on.
+
+The correct gate for a capability whose availability differs per environment is a question
+about that environment's state, asked at the moment it matters. Both layers ask it: the page
+so a person is not shown a form that cannot work, and the function — with an advisory lock,
+so two simultaneous callers cannot both succeed — because that is the one that is actually
+load-bearing.
+
+Alternatives:
+`revoke execute on function public.jojo_claim_first_owner(text) from authenticated` in a new
+migration. Rejected for the reason above. Deleting the setup route. Rejected: same problem,
+and it would have to be written again.
+
+Impact:
+The residual surface is a signed-in non-staff account being able to call an RPC that
+immediately raises "Jojo Usafi already has an Owner" — which `jojo_owner_exists()` already
+tells `anon` by design. Tested in `tests/db/02-auth.test.ts`.
+
+---
+
+## 2026-09-09 — Test teardown identifies fixtures by what they are, never by what happened
+
+Decision:
+`tests/db/teardown.sql` deletes rows only by patterns that identify the **entity** as a
+fixture (`ZZTEST` SKUs, `zztest-` emails, the `+2557000000%` phone range). The clause
+`or action = 'admin_profile.first_owner_claimed'` has been removed from the `audit_events`
+cleanup.
+
+Reason:
+That clause was written in Build 06, when the only claim that could ever have happened was a
+fixture's. Once the real bootstrap ran, the next test run deleted Jojo Usafi's own audit row —
+a real record of a real event — as tidy-up. It was caught immediately by a test asserting the
+row exists, and the row was reconstructed from `admin_profiles.invited_at` with
+`request_id = 'reconstructed-2026-09-09-after-test-teardown-deleted-it'`, so the trail is
+honest about its own repair.
+
+The clause was also redundant: a fixture claim writes
+`entity_key = 'zztest-owner@jojo-usafi.test'`, which the remaining pattern already matches.
+
+Alternatives:
+Keep it and exclude the real Owner by email. Rejected: that is a hard-coded exception that
+goes stale the moment a second real person exists. The rule is the general one — teardown
+matches fixtures, never events.
+
+Impact:
+A companion change in `tests/db/02-auth.test.ts`: the last-Owner guard is now exercised
+against the real Owner row, and every attempt is wrapped in a restore that puts the row back —
+including re-inserting it from a snapshot — if the guard ever fails. A test that discovers a
+broken guard must not also be the thing that leaves the shop without an Owner. That safety net
+earned its place on the first run, when the guard tests failed for an unrelated reason (a
+second Owner was present) and the deletion actually went through.

@@ -31,9 +31,19 @@ alter table public.admin_profiles      disable trigger admin_profiles_last_owner
 delete from public.analytics_events
  where session_id like 'zztest%' or sku like 'ZZTEST%';
 
+-- Fixture rows ONLY, matched on the entity they are about.
+--
+-- This used to also delete `where action = 'admin_profile.first_owner_claimed'`,
+-- written when that action could only ever have come from a fixture claim. Once
+-- the real first-Owner bootstrap ran on 2026-09-09 that clause deleted Jojo
+-- Usafi's own audit row — a real record of a real event — on the next test run.
+--
+-- The clause was redundant as well as wrong: a fixture claim writes
+-- `entity_key = 'zztest-owner@jojo-usafi.test'`, which the pattern below
+-- already matches. Teardown must never identify rows by what happened; only by
+-- whether the thing it happened to was a fixture.
 delete from public.audit_events
- where entity_key ilike 'zztest%'
-    or action = 'admin_profile.first_owner_claimed';
+ where entity_key ilike 'zztest%';
 
 -- ---- synchronisation --------------------------------------------------------
 delete from public.sync_conflicts where entity_key ilike 'zztest%';

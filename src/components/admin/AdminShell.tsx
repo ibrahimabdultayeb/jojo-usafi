@@ -32,9 +32,26 @@ function isActive(pathname: string, href: string) {
   return href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
 }
 
+/**
+ * The sign-in and first-Owner screens sit inside `/admin` so they share its root
+ * layout, fonts and design tokens — but they must not wear the dashboard's
+ * chrome. Offering a nav bar to somebody who is not signed in advertises
+ * destinations they cannot reach, and the bottom navigation would cover a
+ * password field on a phone.
+ */
+const BARE_ROUTES = ["/admin/sign-in", "/admin/setup"];
+
+function isBareRoute(pathname: string) {
+  return BARE_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
+
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
+
+  if (isBareRoute(pathname)) {
+    return <div className="min-h-svh bg-slate-50">{children}</div>;
+  }
 
   return (
     <div className="min-h-svh bg-slate-50 lg:flex">
