@@ -4,15 +4,17 @@ The **Supabase PostgreSQL** schema, authored as version-controlled migrations in
 `supabase/migrations/`. Firebase/Firestore is permanently unapproved — see `docs/DECISIONS.md`,
 2026-09-08.
 
-> **Status: applied and verified.** All 15 migrations have been executed against the hosted
+> **Status: applied and verified.** All 19 migrations have been executed against the hosted
 > development project (*Jojo Usafi Dev*, `dyjhacbbedytcstxxjzl`, free tier). Everything below
 > is checked statically by `npm run schema:check` and — since Build 06 — proved at runtime by
-> `npm run test:db`, 169 tests against the real database, Supabase Auth and Supabase Storage.
+> `npm run test:db`, 193 tests against the real database, Supabase Auth and Supabase Storage.
 >
 > Since Build 07 the database holds the **real catalogue**: 201 products from the Product
 > Master, 95 of them on the public shelf, 22 brands, 5 categories, 65 families, 201 inventory
-> rows and 95 photographs in Supabase Storage. There are still no customers and no orders —
-> nobody has bought anything yet.
+> rows and 95 photographs in Supabase Storage. Since Build 08C it also holds two clearly
+> marked **development orders** and their customers, placed through `jojo_place_order` so the
+> dashboard has real work to show — see `scripts/seed-dev-orders.mjs`. Nobody has bought
+> anything for real.
 >
 > The one exception is **staff**: since 2026-09-09 there is a single `admin_profiles` row, the
 > real Owner, created by the first-Owner bootstrap rather than by a seed. See *Authorization →
@@ -52,6 +54,9 @@ The **Supabase PostgreSQL** schema, authored as version-controlled migrations in
 | `20260909130400_grants.sql` | which verbs and columns each role holds |
 | `20260909130500_function_hardening.sql` | yes/no functions that never return null; `next_order_number()` closed |
 | `20260909130600_function_grants_explicit.sql` | EXECUTE taken from `PUBLIC` and granted by name |
+| `20260909140000_commerce.sql` | `shop_settings`, reservation columns, `jojo_quote_order`, `jojo_place_order`, `jojo_cancel_order`, `jojo_track_order`, `jojo_add_stock`, `jojo_count_stock` |
+| `20260909140100_cancel_actor_cast.sql` | fixes a `42804` in `jojo_cancel_order` — an enum literal decided as `text` inside a `CASE` |
+| `20260909150000_order_operations.sql` | `jojo_advance_order`, `jojo_fail_delivery` — the middle of an order's life |
 
 `supabase/seed.sql` deliberately inserts **no business data** — see the file for why.
 
@@ -129,15 +134,26 @@ only in the direction its name claims:
 `correction`, `stock_count` and `damage_loss` additionally require a reason; the four
 order-driven kinds require an `order_id`.
 
-**Still not built:** transactional reserve/release functions. Build 06 was scoped to the
-database, Auth, Row Level Security and Storage, and these belong with the checkout that
-calls them — a reservation is one statement inside the same transaction that writes the
-order, so building it before the order-writing path exists would be building it twice.
+**Built and proved since Build 08.** `jojo_place_order` reserves inside one transaction,
+taking row locks in product-id order so two shoppers taking the last jerrycan cannot both
+succeed — proved with 1-in-stock/2-orders and 3-in-stock/5-orders against the real database.
+`jojo_cancel_order` releases once and is idempotent, and `jojo_advance_order` converts the
+reservation into a `sale` only at completion.
+
+**The two ways a person changes stock**, both wired to the dashboard in Build 08C and both
+refused for anyone but an Owner or a Manager by the functions themselves:
+
+- `jojo_add_stock(product, quantity, reference)` — a `receipt`, optionally carrying a
+  delivery note or invoice number.
+- `jojo_count_stock(product, counted, reason)` — records the **difference** between the count
+  and the system, never the total, and refuses an empty reason. A count that matches writes
+  nothing and says so.
+
+Neither ever assigns `on_hand` from the application: the running total moves only as the
+ledger says it moved.
 
 `src/lib/domain/inventory.ts` computes what a movement *would* do and refuses the impossible;
-the CHECK constraints refuse it again. What is still missing is atomicity under concurrency:
-two shoppers taking the last jerrycan at the same moment. The database now exists to test
-that against, which is the part that was blocking it.
+the CHECK constraints refuse it again.
 
 ## Orders
 
@@ -326,7 +342,7 @@ Adding a language is a row in `locales`.
 
 ## TypeScript
 
-`src/lib/domain/` holds the same rules as pure functions with no I/O — 156 unit tests, no
+`src/lib/domain/` holds the same rules as pure functions with no I/O — 162 unit tests, no
 database required. `scripts/schema-check.mjs` compares the two sides (enum members, the SKU
 pattern, the phone pattern, the order-number pattern, the default delivery fee, the table
 list) and fails if they drift.

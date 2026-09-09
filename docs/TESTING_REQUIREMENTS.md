@@ -7,19 +7,20 @@ Every one of these must pass before a commit:
 ```bash
 npm run typecheck        # TypeScript, no emit
 npm run lint             # ESLint
-npm run test             # domain unit tests (vitest) — no database needed
+npm run test             # 162 unit tests (vitest) — no database needed
 npm run schema:check     # SQL is internally consistent and agrees with the domain layer
 npm run i18n:check       # en + sw key, placeholder and array parity
 npm run catalogue:check  # committed catalogue still matches imports/
 npm run build            # production build
 npm run qa:screenshots   # needs a running server (npm run start)
+npm run verify:cache     # a price saved in the editor reaches the shop immediately
 ```
 
 and, since Build 06, the half that needs a real database:
 
 ```bash
 npm run db:types:check   # the generated types still match the live schema
-npm run test:db          # 169 tests against PostgreSQL, Supabase Auth and Storage
+npm run test:db          # 193 tests against PostgreSQL, Supabase Auth and Storage
 ```
 
 The two halves are deliberately separate. `npm run test` must keep working on a laptop with
@@ -28,12 +29,18 @@ on its own. `npm run test:db` proves nothing about business rules and everything
 whether PostgreSQL, PostgREST, Supabase Auth and Supabase Storage behave the way those rules
 assume. It needs `.env.local` and the CLI linked to the development project.
 
+**Run the two database-touching gates one at a time.** `npm run test:db` and
+`npm run qa:screenshots` share the one development project, and running them together fails
+both for reasons that are not defects: the QA gate photographs the suite's fixture products
+and reports their torn-down images as broken, and the suite reads stock the browser has moved.
+
 `supabase db reset` is never part of the gate: it is not run against a hosted project. The
 migration path is `db push --dry-run`, read the plan, then `db push`.
 
 ## Domain unit tests
 
-`npm run test` — 156 tests over `src/lib/domain/`, which is pure TypeScript with no I/O:
+`npm run test` — 162 tests over `src/lib/domain/` and the admin capability matrix, all pure
+TypeScript with no I/O:
 
 | Area | Covers |
 | --- | --- |
@@ -45,6 +52,7 @@ migration path is `db push --dry-run`, read the plan, then `db push`.
 | `orders` | the whole transition table, payment consistency, completion requires payment, totals recomputed rather than trusted |
 | `sync` | fingerprint stability, echo detection, stale writes, conflicts, retry backoff, record validation |
 | `content` | locale fallback to English, missing-translation reporting |
+| `admin/permissions` | the capability matrix both the screens and `authorize()` read: every role works orders; only Owner and Manager touch pricing, stock and visibility; only the Owner manages staff and settings |
 
 They exist because the rules had to be provable before the database was available. Each one
 has a CHECK constraint or trigger as its counterpart in `supabase/migrations/`.
@@ -71,7 +79,7 @@ types disagreeing with the live schema.
 
 ## Database, Auth, RLS and Storage tests
 
-`npm run test:db` — 169 tests against the hosted development project. Eight files, run in
+`npm run test:db` — 193 tests against the hosted development project. Nine files, run in
 name order by a custom sequencer, sharing one database with `fileParallelism` off.
 
 | File | Tests | Proves |
@@ -84,6 +92,7 @@ name order by a custom sequencer, sharing one database with `fileParallelism` of
 | `08-order-lifecycle.test.ts` | 15 | the whole journey — place, confirm, prepare, dispatch, complete with payment — asserting that stock leaves only at completion; completion refuses without payment and digital without a reference; illegal transitions refused; both delivery-failure outcomes; every order function closed to the browser |
 | `07-commerce.test.ts` | 25 | quoting is the database answer and not the browser one; reservation is atomic; the last unit cannot be sold twice (1-in-stock/2-orders and 3-in-stock/5-orders); a refused order leaves nothing behind; customer matching on phone; cancellation releases once and is idempotent; tracking needs the number AND the phone; the commerce path is closed to the browser |
 | `06-catalogue.test.ts` | 14 | the real catalogue as an anonymous shopper receives it: 95 on the shelf, 201 kept, EP01-A01 blocked, EP23-A02 not invented, photographs filed and fetchable, nothing newly readable or writable |
+| `09-admin-operations.test.ts` | 24 | the dashboard's operations run as the people who use them: Order staff refused pricing, stock, zones and self-promotion; Manager allowed all four but refused Owner and refused to rewrite what an order sold for; stock moved only through the ledger, with an actor and a reason; the whole staff journey to Completed with cash and with a digital reference; cancellation and both delivery-failure answers; what each screen can read |
 
 ### Fixtures are scoped to one run
 
@@ -120,26 +129,53 @@ active Owner before it starts, nothing runs at all.
 
 Asserting an error where the answer is an empty result tests nothing.
 
+## Development QA staff — how the dashboard gets looked at
+
+The dashboard is behind the sign-in guard, so visual QA needs a session. It uses a
+**development-only** Manager and Order staff account, and never Ibrahim's real Owner:
+
+```bash
+npm run qa:staff create   # creates or refreshes them, prints one password, stores none
+npm run qa:staff status   # what exists on this machine
+npm run qa:staff remove   # deletes exactly what create made
+npm run dev:orders        # two development orders, so there is something to work on
+```
+
+Four rules hold it safe, and they are the same rules the test fixtures follow:
+
+1. **No password is ever stored.** `create` mints a random one and prints it once.
+   `qa:screenshots` mints its own and resets it on the exact recorded auth user id, so the
+   gate can sign in without anybody having written a password down.
+2. **Cleanup is by exact identity.** Every account is recorded — auth user id and
+   `admin_profiles` id — in `.qa-staff.local.json`, which is gitignored. `remove` deletes
+   those exact ids. It never searches by role, email domain, name or business state.
+3. **It fails closed.** No manifest means `remove` refuses rather than guessing. A recorded
+   row whose role has become `owner`, or whose email no longer matches, is left alone and
+   reported.
+4. **Development project only**, checked before anything is written.
+
+`npm run dev:orders` places its orders through `jojo_place_order` — the same function
+checkout calls — so the rows are shaped like real ones, with a real reservation and a real
+order number. Both carry a marker in the customer note saying what they are, and the script
+does nothing if they already exist.
+
 ## Known gaps
 
-- **The ten admin dashboard screens have no visual QA.** They are behind the sign-in guard
-  since Build 08, so the gate reaches only `/admin/sign-in` and `/admin/setup` and asserts
-  that the other seven redirect. Closing this needs a seeded QA staff account whose session
-  the gate can carry.
 - **Track Order has no rate limit.** Guessing a six-digit order number and a nine-digit phone
   together is not a realistic attack, but a determined script should still be slowed down.
   That needs a shared counter, so it belongs with deployment.
+- **The Website screen is still a prototype.** `shop_settings` exists; nothing writes it.
+  It is the last screen reading `src/mocks/admin/data.ts`, and says so on its face.
+- **Reports, Staff and Settings** are marked "Coming soon" and are empty.
 
 ## What is still NOT verified
 
-- **concurrent stock reservation** — the transactional reserve/release functions are not
-  built. They belong with the checkout that calls them; see `docs/DATA_MODEL.md`.
-- **admin writes** — the product screens read the real catalogue; nothing writes yet.
-- **a sign-in guard on the ten dashboard screens** — deliberately absent while they cannot
-  write. The one screen carrying real data reads under the caller's own RLS, so an
-  unauthenticated visitor sees only what is already public.
-- **the order workflow end to end** — no order has been placed through the application.
+- **an amended order** — changing an order's lines before dispatch is not built.
+- **reservation expiry** — `jojo_stale_reservations` exists and is tested; nothing schedules
+  it, because the durations are Ibrahim's decision.
 - **Google Sheet sync** — the rules are unit-tested; nothing has ever talked to Google.
+- **component unit tests** — the screens are covered by the QA gate and by the database
+  tests behind them, not by rendering assertions.
 
 ## What the QA gate checks
 
@@ -163,8 +199,38 @@ Asserting an error where the answer is an empty result tests nothing.
 - a fixed-length shelf ending in a part-full row
 - **locale layout stability** — see below
 
-80 screenshots land in `preview/screenshots/`, named `page-locale-width.png` for the
-storefront and `page-width.png` for the English-only admin.
+Screenshots land in `preview/screenshots/`, named `page-locale-width.png` for the storefront
+and `page-width.png` for the English-only admin.
+
+### The dashboard pass
+
+Since Build 08C the gate also signs in as the development QA Manager and audits the
+dashboard at all five widths: Home, Orders, an order, Products, the Product editor,
+Customers, More and Delivery Zones — plus the dialogs, which only exist after a click and
+are where a phone-sized dashboard usually goes wrong:
+
+- Add stock and Set counted stock, on the product editor
+- Cancel order and Delivery failed, behind "Something went wrong with this order"
+- Record the payment, behind Complete order
+- the delivery-zone editor
+
+Each is checked for horizontal overflow and 44px touch targets, and photographed. If no QA
+staff account exists on the machine the pass is skipped with a note rather than failing:
+that is a missing fixture, not a defect in the shop. If a signed-in staff member is bounced
+to `/admin/sign-in`, or an order does not open, that **is** a failure — and a dialog whose
+opener is not on the screen says so out loud, because a silent skip once let two of the four
+order dialogs go unaudited while the run reported success.
+
+It then signs in again as the development **Order staff** account and checks that the
+smaller role really does see less: no Delivery zones, Website, Reports, Staff or Settings in
+the More menu, no editable price field, and no stock buttons. That is a courtesy check on
+what is drawn, not the boundary — the boundary is in the database, and
+`tests/db/09-admin-operations.test.ts` proves an Order staff token is refused even when every
+check in this repository is bypassed.
+
+`QA_ONLY=admin npm run qa:screenshots` runs only the admin passes — about four minutes
+rather than twenty-five, which is what makes re-checking a dialog cheap enough to actually
+do.
 
 ## Locale layout stability
 

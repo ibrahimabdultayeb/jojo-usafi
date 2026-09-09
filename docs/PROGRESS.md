@@ -5,9 +5,9 @@
 Storefront prototype on the **real catalogue**, in **English and Kiswahili**, with real
 product photography — and, since Build 06, a **real Supabase database behind it**.
 
-All 15 migrations are applied to a free hosted development project. The constraints fire,
+All 19 migrations are applied to a free hosted development project. The constraints fire,
 the triggers refuse, Row Level Security holds for each of the three staff roles, Supabase
-Auth works and the Storage buckets are secured — all proved by 169 tests against the actual
+Auth works and the Storage buckets are secured — all proved by 193 tests against the actual
 database rather than asserted in a document.
 
 Jojo Usafi has a real Owner — **Ibrahim Abdul Tayeb** — who signs in at `/admin/sign-in`.
@@ -25,9 +25,15 @@ routes are behind the sign-in guard.
 **A shopper can buy.** Checkout, the confirmation screen and Track Order are real and
 bilingual; guest orders reserve stock atomically and appear with a JU number.
 
-What is still not true: **the admin screens do not write.** Orders, product edits, stock
-operations and delivery zones are still mock in the UI, though every server operation behind
-them exists and is tested. Nothing has talked to Google Sheets.
+**And the shop can be run.** Since Build 08C a staff member signs in on a phone and works the
+real orders — confirm, prepare, send out, complete with the payment that was actually
+collected, cancel, or mark a delivery failed — and changes prices, adds and counts stock, and
+edits delivery areas. Every write is refused if the person's role does not allow it, by the
+database rather than by the screen. The invented orders, customers, zones and sales figures
+are deleted, not kept as a fallback.
+
+What is still not true: the **Website** screen saves nothing and says so; Reports, Staff and
+Settings are empty; and **nothing has talked to Google Sheets** — that is Build 09.
 
 ## Completed
 
@@ -1025,6 +1031,180 @@ shipped works; what is missing is honestly missing.
 `qa:screenshots` (80 screenshots, both languages at all five widths, admin guard asserted) ·
 `test:db` (**169** tests).
 
+## Build 08C — live admin operations — 2026-09-09
+
+**The shop can now be run from a phone.** A staff member signs in, sees the real orders, opens
+one, moves it forward, records what was actually paid, cancels it or marks the delivery
+failed — and changes prices, adds stock, counts stock and edits delivery areas. Every one of
+those is a real write to the development database, and every one is refused if the person's
+role does not allow it.
+
+This build wired the approved Build 04 dashboard to the engine Build 08 proved. **No screen
+was redesigned.** Home / Orders / Products / Customers / More, mobile-first, plain language,
+one obvious next action, no raw state dropdown, no destructive delete, SKU locked — all of it
+is exactly as approved; only what is underneath changed.
+
+### The three files that made it work
+
+```
+src/lib/admin/model.ts        the vocabulary and the view-model
+src/lib/admin/orders.ts       the READS — under the caller's own Row Level Security
+src/lib/admin/authorize.ts    the GATE — signed in? active staff? does the role allow it?
+src/lib/admin/actions.ts      the WRITES — one server action per operation
+```
+
+`orders.ts` deliberately never imports the service-role client. Reads run on the signed-in
+staff member's session, so a policy mistake shows up as an empty screen rather than as a leak.
+The service role is used by exactly four writes — advance, complete, cancel, delivery-failed —
+because each is one transaction across `orders`, `inventory` and two append-only ledgers, and
+neither ledger has an INSERT policy for a browser token.
+
+Nothing in `actions.ts` does arithmetic. Reservation maths, transition legality, the payment
+rules and the delivery quote all stay in the SQL functions; the actions decide **who may ask**,
+and turn a refusal into a sentence.
+
+### What each screen does now
+
+| Screen | Before | Now |
+| --- | --- | --- |
+| Home | seven invented orders, TSh 186,400 | real counts, today's real sales, the five most recent orders, the real `order_events` feed |
+| Orders | mock list | every real order, searchable by number, name or phone, filtered by the five stages staff work through |
+| An order | mock detail, buttons that did nothing | real lines, real timeline, real WhatsApp and call links, and four working operations |
+| Products | real (Build 07) | unchanged, but counting **available** stock rather than what is in the store |
+| Product editor | `mockSave()` on a timer | real writes: price, offer, show on website, featured, best seller, archive |
+| Stock | a number the screen changed locally | **Add stock** and **Set counted stock**, both through the ledger |
+| Customers | seven invented people | real customers, their real spend, their real order history and the addresses their orders actually went to |
+| Delivery zones | five invented areas | the real zones checkout quotes from — development placeholders visibly marked "Example area — replace" |
+
+### The four dialogs
+
+- **Complete order** asks for the payment first, and completion + payment go in **one** call
+  because they are one transaction. Recording the payment and hoping completion follows would
+  leave a paid order that never completed.
+- **Cancel order** demands a reason, releases the reservation, and says how many items went
+  back on the shelf.
+- **Delivery failed** asks the one question that decides the stock — *were the items returned?*
+  — with no default answer, then either leaves the reservation held so the order can go out
+  again, or writes the goods off with a `damage_loss` movement.
+- **Add stock / Set counted stock** never overwrite a number. A count records the
+  **difference** and must say why; a count that matches writes nothing and says so.
+
+Every operation refreshes from the database rather than from a guess, so the screen cannot
+disagree with the shop about what happened.
+
+### Honest about the Sheet
+
+The editor says **"Saved"** and, separately, **"Product sheet sync: not connected yet."** There
+is no Google Sheet write-back, so a badge reading "Synced" would be the dashboard lying about
+where the truth is. Build 09 changes that sentence; nothing before then does.
+
+### The mock data is gone
+
+`src/mocks/admin/data.ts` used to export orders, customers, zones, today's figures, the
+attention counts and an activity feed. All deleted. The vocabulary that lived beside them —
+stage labels, next actions, cancellation reasons, `AdminOrder` — moved to
+`src/lib/admin/model.ts`, which is not a mock. What remains in the mocks file is the Website
+screen's draft content, because that screen genuinely is still a prototype and says so.
+
+A dashboard that can fall back to plausible fiction is a dashboard that can quietly show
+fiction. An empty database now produces an empty screen with a sentence explaining it.
+
+### Development QA staff — no password anywhere
+
+```bash
+npm run qa:staff create   # a Manager and an Order staff account, one password, printed once
+npm run qa:staff status
+npm run qa:staff remove   # deletes exactly what create made, by recorded id
+npm run dev:orders        # two orders, placed through jojo_place_order like a customer's
+```
+
+No password is stored. `create` mints a random one and prints it; `qa:screenshots` mints its
+own and resets it on the exact recorded auth user id before signing in through the real form.
+Cleanup is by exact identity — recorded auth user id and profile id in a gitignored manifest —
+never by role, email domain, name or business state, and it refuses rather than guessing when
+the manifest is missing. **Ibrahim's real Owner account is never touched**, and
+`05-real-data-untouched.test.ts` still proves that row is byte-for-byte unchanged.
+
+### The dashboard has its visual QA back
+
+The QA gate now signs in as the development QA Manager and audits Home, Orders, an order,
+Products, the Product editor, Customers, More and Delivery Zones at all five widths — plus the
+dialogs, which only exist after a click and are where a phone-sized dashboard usually goes
+wrong. Each is checked for horizontal overflow and 44px touch targets.
+
+### Proved against the real database
+
+`tests/db/09-admin-operations.test.ts` — 24 tests, signed in as real staff tokens:
+
+- **Order staff refused**: a price change (zero rows), taking a product off the website, adding
+  stock, recording a count, changing a delivery fee, promoting itself to Owner.
+- **Manager allowed**: price and offer (and the shelf shows it), stock through the ledger with
+  an actor and a reference, a count that records the difference and one that records nothing,
+  a delivery fee that checkout then quotes.
+- **Manager refused**: promoting itself to Owner, and rewriting what an order sold for — that
+  one dies on the column grant, before any policy is consulted.
+- **The whole staff journey**: confirm → prepare → out for delivery → complete with cash, and
+  again with a digital reference; stock leaves only at completion; cancellation puts it back;
+  both delivery-failure answers do the right thing.
+- **What each screen can read**: staff see orders, customers and the stock breakdown; a
+  stranger is refused all three on the grant; Order staff get no audit trail.
+
+Plus six offline tests pinning the capability matrix both the screens and `authorize()` read,
+so a control that is drawn and an operation that is permitted cannot drift apart.
+
+### Three corrections worth recording
+
+**A test that was wrong about the database.** The first version of the "items came back" test
+compared the reservation against the figure from *before* the order was placed, and read a
+correctly-held reservation as a leak. The database was right: an order whose goods came back
+keeps its reservation, because it can be sent out again, and releasing it would let the same
+units be sold twice.
+
+**Database jargon on the order screen — caught by the screenshots, not by review.** The
+timeline was showing the ledger's own summaries: `preparing → out_for_delivery`, `new →
+confirmed`, and `checkout` / `system` as the person who did it. That is exactly what
+`docs/ADMIN_UX.md` forbids, in the one place an operator looks to find out what happened.
+Each sentence is now composed from the event's kind and destination state — "Sent out for
+delivery", "Being prepared" — and the actor codes are translated. The ledger keeps its
+precise wording, because that is the ledger's job.
+
+**A QA pass that skipped quietly.** The dashboard pass waited 600ms after clicking into an
+order and then read the URL. Client-side navigation had not finished, so it captured the
+orders *list* as the order URL, and the delivery-failed and payment dialogs were audited
+against the wrong page and silently found nothing — the run passed with two of four dialogs
+never looked at. It now waits for the route, fails if the order does not open, and says so
+when a dialog's opener is absent. `QA_ONLY=admin` re-runs the dashboard pass in four minutes
+instead of twenty-five.
+
+### Verified
+
+`typecheck` · `lint` · `test` (**162**) · `schema:check` (19 migrations) · `i18n:check`
+(267 keys) · `catalogue:check` · `db:types:check` · `build` · `qa:screenshots` (**122**
+screenshots, PASS) · `test:db` (**193**) · `verify:cache` (a price saved in the editor is on
+the shop on the next request).
+
+One process at a time, and that turned out to matter: running `test:db` and `qa:screenshots
+together against the one development database failed both — the QA gate photographed the
+suite's fixture products and reported their torn-down images as broken, and the suite read
+stock the browser had moved. Neither was a defect. Both gates now run alone.
+
+### The cache is proved end to end
+
+`npm run verify:cache` changes a price in the real editor as the development QA Manager,
+then reads the product page as a signed-out shopper and requires the new price to be there —
+and puts the old price back. Both halves of the invalidation are one line each and both look
+obviously correct, which is exactly the wiring that is silently broken: nothing fails when it
+is, the price simply arrives up to five minutes late, in production, when nobody is looking.
+
+### Still not done
+
+- **The Website screen** still saves nothing, and says so on its face. It is the last screen
+  reading the mocks file.
+- **Reports, Staff and Settings** are marked "Coming soon".
+- **Order amendment** before dispatch, and the **reservation-expiry scheduler** — the function
+  exists and is tested; the durations are Ibrahim's decision.
+- **Google Sheets.** Nothing in this build touched Google, by instruction. That is Build 09.
+
 ## Next
 
 - Confirm the open business rules (delivery fee, free-delivery threshold, served areas,
@@ -1041,18 +1221,20 @@ shipped works; what is missing is honestly missing.
   them; the reason is under *Build 06 → One thing to be aware of*.
 - ~~**Build 07:** import the catalogue, move the photographs into Storage, wire the
   storefront to Supabase~~ — **done, 2026-09-09**
-- ~~**Build 08:** reservation engine, quotation, atomic orders~~ — **engine done, UI not**
+- ~~**Build 08:** reservation engine, quotation, atomic orders~~ — **done, 2026-09-09**
+- ~~**Build 08B:** the customer path — checkout, confirmation, Track Order~~ — **done,
+  2026-09-09**
+- ~~**Build 08C:** live admin operations — real orders, real writes, real stock, QA staff~~ —
+  **done, 2026-09-09**
+- **Ibrahim, to try it:** run `npm run qa:staff create` in the terminal to get a development
+  Manager and Order staff login (the password prints once and is stored nowhere), then sign
+  in at `/admin/sign-in` to see what each role can and cannot do. `npm run qa:staff remove`
+  deletes them again. Your own Owner account is untouched by any of it.
 - **Build 09**, in this order:
-  1. **Finish Build 08's customer path**: the checkout form (delivery zone, payment
-     preference, bilingual copy), the confirmation screen, and Track Order wired to
-     `trackOrderAction`
-  2. **Finish Build 08's admin path**: the Product editor and Delivery Zones screens calling
-     the writes that already exist, stock Add/Count calling `jojo_add_stock` /
-     `jojo_count_stock`, real orders in the admin list, and `revalidateCatalogue()` on save
-  3. A seeded QA staff account, to give the ten dashboard screens their visual QA back
-  4. Order amendment before dispatch, and the reservation-expiry scheduler once Ibrahim has
-     set the durations
-  5. **Then** the validated two-way Google Sheet ↔ Supabase synchronisation
-- Then: the validated two-way Google Sheet ↔ Supabase synchronisation
+  1. The **Website** screen wired to `shop_settings` — the last screen reading the mocks file
+  2. **Order amendment** before dispatch, and the **reservation-expiry scheduler** once
+     Ibrahim has set `reservation_warning_minutes` and `reservation_expiry_minutes`
+  3. **Staff management** for the Owner — invite, deactivate, change role
+  4. **Then** the validated two-way Google Sheet ↔ Supabase synchronisation
 
 Claude must update this file after meaningful milestones.

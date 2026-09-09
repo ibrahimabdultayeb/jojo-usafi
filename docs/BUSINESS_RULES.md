@@ -81,6 +81,63 @@ Both are implemented as described and are cheap to change:
 2. **An order can be cancelled at any point before it is dispatched**, and after a failed
    delivery, but not once it is out for delivery or completed.
 
+## Stock rules — as the dashboard applies them (Build 08C)
+
+**Stock is never typed over.** There are exactly two ways an operator changes it, and both
+write a movement to the append-only ledger with who, when, how many and why:
+
+| Control | Means | Ledger |
+| --- | --- | --- |
+| **Add stock** | *this many arrived* — added to what is there | a `receipt`, carrying the delivery note or invoice number if one was given |
+| **Set counted stock** | *this is what is actually on the shelf* | an `adjustment` for the **difference**, never the total |
+
+A count that matches the system writes nothing and says so. A count that differs **must say
+why** — the database refuses one without a reason — so a missing bottle and a mistyped
+number do not look identical a month later. The reasons are offered as four buttons, not a
+text box: an operator on a phone will tap, and free text cannot be counted.
+
+**The dashboard shows AVAILABLE stock**, not what is physically in the store. Ten bottles
+with ten promised to open orders cannot be sold, so the product list, the badges and the
+"out of stock" and "low stock" filters all count `available`. The breakdown — on the shelf
+versus set aside — is shown on the product only when something is actually reserved.
+
+**A failed delivery asks where the goods are.** Returned to the shop: nothing moves, and the
+order still holds its reservation so it can be sent out again. Not returned: `on_hand` falls
+by the quantity, a `damage_loss` movement records the write-off, and the reservation is
+released. There is no default answer, because guessing it invents or loses inventory.
+
+## Product rules — as the dashboard applies them
+
+- **The SKU never changes.** It is read-only in the editor, and the database refuses to
+  change one that has been ordered.
+- **There is no delete.** A product that is gone is **archived**, which also takes it off the
+  website — an archived product that is still buyable is a contradiction a customer would
+  find. Archiving is reversible.
+- **An offer price must be lower than the price.** Said in the editor as a sentence and
+  enforced as a database CHECK, so neither can be the only guard.
+- **A price change reaches the shop immediately.** The storefront shelf is cached for five
+  minutes, and saving a product invalidates that cache rather than waiting it out.
+- **Nothing claims to be synced.** There is no Google Sheet write-back yet, so the editor
+  says "Saved" and, separately, "Product sheet sync: not connected yet". A badge reading
+  "Synced" would be the dashboard lying about where the truth is.
+
+## Who may do what
+
+| | Owner | Manager | Order staff |
+| --- | :-: | :-: | :-: |
+| See and work on orders — confirm, prepare, dispatch, complete, cancel, delivery-failed | ● | ● | ● |
+| Record a payment | ● | ● | ● |
+| See customers | ● | ● | ● |
+| Prices, offers, stock, website visibility | ● | ● | |
+| Delivery zones, website content, reports | ● | ● | |
+| Add, remove or change staff | ● | | |
+| Shop settings | ● | | |
+
+**A Manager cannot promote themselves to Owner**, and neither can Order staff: the
+`admin_profiles` update policy admits only an Owner. **The last Owner cannot be demoted,
+deactivated or deleted.** Both are enforced in the database, not in the screens — the
+dashboard hides controls as a courtesy, and Row Level Security is what refuses.
+
 ## Open decisions — Ibrahim
 
 These change how the store operates, so nothing has been assumed:

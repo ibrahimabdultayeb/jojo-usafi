@@ -1,8 +1,10 @@
 # Jojo Usafi — Admin UX
 
-A working prototype on **mock data**. No backend of any kind: no Supabase, no Google Sheet, no
-writes. The point was to settle how the dashboard *works* before it is wired to anything, so
-the backend work has a fixed target.
+A working dashboard on the **real development database**. Since Build 08C every operational
+screen reads Supabase and every control writes it: orders are worked, prices change, stock
+moves through the ledger and delivery areas are edited. The design below was settled first,
+as a prototype on mock data, so the backend work had a fixed target — and **no screen was
+redesigned when the data became real**.
 
 Originally built on the previous laptop and recovered onto the Supabase baseline. The
 implementation is backend-agnostic — it always was — so the recovery was a port of the
@@ -83,9 +85,14 @@ completed without recording what was actually collected.
 ### Stock is an action, not a text box
 
 The product editor has **Add stock** and **Set counted stock**, never an editable stock
-number. Each becomes an entry in the stock ledger once that exists, which is what makes a
-mistyped count traceable. A free-text box has no intent attached to it — a number that changed
-from 40 to 4 could be a correction, a sale or a typo, and the ledger could not tell them apart.
+number. Each writes an entry to the stock ledger, which is what makes a mistyped count
+traceable. A free-text box has no intent attached to it — a number that changed from 40 to 4
+could be a correction, a sale or a typo, and the ledger could not tell them apart.
+
+Since Build 08C both are real. **Add stock** writes a `receipt` and takes an optional delivery
+note or invoice number. **Set counted stock** writes an `adjustment` for the **difference**,
+never the total, and must say why: four reasons offered as buttons, plus an optional note. A
+count that matches writes nothing and says so rather than pretending to have done work.
 
 ### No delete, anywhere
 
@@ -106,48 +113,64 @@ text is a note, a price, a stock count and a zone name.
 | **Home** | Attention cards first (counts, tappable straight to the filtered list), then today's sales/orders/average, then recent orders and activity. A single "All clear" line collapses everything at zero, so the screen shrinks on a good day. |
 | **Orders** | Cards on phones, never a table. Order number, customer, short phone, zone, total, item count, friendly status, Open order. Filters: All · New · Confirm · Preparing · Delivery · Completed · Problems, each with a live count. Search by order number, name or phone. |
 | **Order detail** | Next action at the top, then customer with WhatsApp and Call as full-width buttons, delivery, items, totals, payment (preference vs actually received), and a timeline of what has happened. |
-| **Products** | Rows with photo, name, brand, size, SKU, price and stock. Badges: Low stock · Out of stock · Hidden · Missing image · Sync issue. Filters include "Needs attention". Search covers name, SKU, barcode and brand. |
-| **Product editor** | Six everyday controls above the fold — price, offer price, stock, show on website, featured, best seller. Everything else is folded into "More product details". SKU is shown locked with the reason. |
+| **Products** | Rows with photo, name, brand, size, SKU, price and stock. Badges: Low stock · Out of stock · Hidden · Missing image. Stock is **available** stock — what can actually be sold — so the list agrees with the storefront and the home counts. Filters include "Needs attention". Search covers name, SKU, barcode and brand. |
+| **Product editor** | Six everyday controls above the fold — price, offer price, stock, show on website, featured, best seller. Everything else is folded into "More product details", read-only until the Sheet sync exists. SKU is shown locked with the reason. Archiving also takes the product off the website, and is reversible; there is no delete. |
 | **Customers** | List with name, phone, order count, total spend, last order. Detail adds addresses, order history and WhatsApp/Call. Deliberately not a CRM. |
-| **Delivery zones** | Zone cards with fee or Free delivery, active state and display order. New zones default to **TSh 4,000**. Turning on Free delivery **visibly disables** the fee field rather than hiding it, so it is obvious the fee is ignored rather than lost. |
+| **Delivery zones** | Zone cards with fee or Free delivery, active state and display order. New zones default to **TSh 4,000**. Development placeholders are badged "Example area — replace" rather than passed off as real. Turning on Free delivery **visibly disables** the fee field rather than hiding it, so it is obvious the fee is ignored rather than lost. |
 | **Website** | Named slots only, no page builder: announcement bar, homepage banner, promotion banner, and which homepage sections show and in what order. Every customer-facing field is bilingual with an EN/SW tab; an empty Kiswahili field is marked with a dot and says it will fall back to English. |
 
 ---
 
 ## 5. What is real and what is mock
 
-**Real**, straight from the generated catalogue: every product's SKU, name, brand, size,
-price and photograph, and the count of products the pipeline withheld for having no approved
-photograph.
+**Real, since Build 08C — everything operational.** Orders, the order timeline, customers and
+their history, delivery zones, today's sales, the attention counts, the activity feed, and
+every product's price, offer, stock, visibility and photograph. All of it comes from the
+development Supabase project, read under the caller's own Row Level Security, and every
+control writes it.
 
-**Mock**, and only in `src/mocks/admin/data.ts`: orders, customers, delivery zones, today's
-figures, activity, and each product's stock, visibility, offer price and sync state. The
-Product Master has no columns for those, and inventing them in the catalogue would be
-inventing business data.
+**Mock, and only `src/mocks/admin/data.ts`:** the Website screen's draft content. That screen
+genuinely does not save yet and says so on its face. It is the last thing in that file.
+
+The invented orders, customers, zones, sales figures and activity are **deleted**, not kept
+behind a flag. A dashboard that can fall back to plausible fiction is a dashboard that can
+quietly show fiction; an empty database now produces an empty screen with a sentence
+explaining it. The shared vocabulary that used to live beside them — stage labels, the next
+action per stage, the cancellation reasons, the `AdminOrder` shape — moved to
+`src/lib/admin/model.ts`, which was never mock.
 
 ---
 
-## 6. Roles, prepared but not enforced
+## 6. Roles — enforced
 
 `src/lib/admin/permissions.ts` holds the capability matrix for **Owner**, **Manager** and
-**Order staff**. The prototype signs in as Owner.
+**Order staff**, and it is now read by both halves of the dashboard:
 
-Screens already ask `can(role, capability)` before rendering an action, and the More menu
-filters its own entries. When real authentication arrives, an Order staff account sees a
-shorter menu and fewer buttons **without any screen being redesigned**.
+- the screens ask `can(role, capability)` before rendering an action, and the More menu
+  filters its own entries;
+- `src/lib/admin/authorize.ts` asks the *same* matrix before any server action runs.
 
-**The UI hiding a control is never the security boundary.** The real boundary will be
-Supabase Row Level Security plus a check in every server action, enforcing this same matrix.
+One table, so a button that is drawn and an operation that is permitted cannot drift apart.
+The role comes from the signed-in staff member's `admin_profiles` row, not from a constant.
+
+**The UI hiding a control is still never the security boundary.** Row Level Security is, and
+`tests/db/09-admin-operations.test.ts` proves it with real signed-in tokens: an Order staff
+member's price change updates zero rows, their stock call is refused by the function itself,
+and a Manager promoting themselves to Owner changes nothing. Neither can rewrite what an
+order sold for — that request dies on the column grant, before any policy is consulted.
 
 ---
 
-## 7. Mock save states
+## 7. Save states — honest
 
-Editors show **Saved → Sync pending** after a change, to establish the vocabulary before the
-real sync exists. A real save will be a server action that writes Supabase, queues the Sheet
-write-back, revalidates the storefront and records who changed what.
+Editors show **Saving… → Saved**, and **Not saved** with the database's own sentence when
+something is refused. There is no "Synced" badge and no "Sync pending": no Google Sheet
+write-back exists, so the product editor says, separately and in plain words, *"Saved
+straight to the shop, and the website updates immediately. Product sheet sync: not connected
+yet."*
 
-Nothing in this build writes anything, and every editor says so.
+Saving a product invalidates the storefront's five-minute catalogue cache, so a price change
+reaches a shopper immediately rather than waiting it out.
 
 ---
 
@@ -177,6 +200,22 @@ the sticky top bar on **z-40**, the bottom navigation on **z-50**, sheets and to
 
 ## 10. Verified
 
-`npm run qa:screenshots` audits all ten admin screens alongside the storefront at
+`npm run qa:screenshots` audits the admin alongside the storefront at
 390 / 430 / 768 / 1024 / 1440: no horizontal overflow, no console errors, no broken images, no
 touch target under 44 × 44 px on touch viewports, no floating-layer collisions.
+
+Since Build 08C it signs in as the development QA Manager (`npm run qa:staff create`) and
+audits the screens behind the guard — Home, Orders, an order, Products, the Product editor,
+Customers, More and Delivery Zones — plus the dialogs, which only exist after a click and are
+where a phone-sized dashboard usually goes wrong: Add stock, Set counted stock, Cancel order,
+Delivery failed, Record the payment and the zone editor. A signed-in staff member being
+bounced to `/admin/sign-in` fails the gate, and so does an order that will not open.
+
+It then signs in as the development **Order staff** account and checks that the smaller role
+really does see less: no Delivery zones, Website, Reports, Staff or Settings in the More
+menu, no editable price field, no stock buttons.
+
+The database side is proved separately by `tests/db/09-admin-operations.test.ts` — 24 tests
+run as real signed-in staff tokens — and the price-to-shop path by
+`npm run verify:cache`, which changes a price in the editor and reads the product page as a
+signed-out shopper to prove the storefront's five-minute cache was actually invalidated.

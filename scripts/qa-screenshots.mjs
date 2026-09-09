@@ -22,6 +22,7 @@
 
 import fs from "node:fs";
 import { mkdir } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { chromium, devices } from "playwright";
 
@@ -92,9 +93,8 @@ const pages = [
  * reach without an account are captured here; `guardedAdminRoutes` below is
  * asserted to redirect instead.
  *
- * KNOWN GAP: the ten dashboard screens no longer receive visual QA, because
- * that now needs a signed-in staff session. Closing it needs a seeded QA staff
- * account — recorded in docs/TESTING_REQUIREMENTS.md.
+ * The dashboard behind the guard is audited too, signed in as the development
+ * QA Manager — see `staffPass()` below.
  */
 const adminPages = [
   { name: "admin-sign-in", path: "/admin/sign-in", full: true },
@@ -458,6 +458,318 @@ async function adminPass(browser) {
   }
 }
 
+/* ------------------------------------------------- the dashboard, signed in */
+
+/**
+ * The dashboard as a staff member actually sees it.
+ *
+ * Every operational screen is now behind the Supabase Auth session, so QA has
+ * to sign in or it is photographing a redirect. It signs in as the DEVELOPMENT
+ * QA MANAGER created by `scripts/qa-staff.mjs` — never as Ibrahim's real Owner
+ * account, which no automated process may touch.
+ *
+ * HOW IT GETS IN WITHOUT A STORED PASSWORD. `qa-staff.mjs` prints a password
+ * once and stores nothing. So this pass mints a fresh random one, resets it on
+ * the exact auth user id recorded in `.qa-staff.local.json` — by id, never by a
+ * search over roles or email domains — and then types it into the real sign-in
+ * form. The password exists for the length of this run and is written nowhere.
+ * Signing in through the real form rather than by injecting a cookie is also
+ * better QA: it exercises the server action, the session cookie and the
+ * middleware exactly as a person would.
+ *
+ * If no QA staff account has been created on this machine, the pass is skipped
+ * with a loud note rather than failing the gate: it is a missing fixture, not a
+ * defect in the shop.
+ */
+const STAFF_MANIFEST = ".qa-staff.local.json";
+
+const staffPages = [
+  { name: "admin-home", path: "/admin", full: true },
+  { name: "admin-orders", path: "/admin/orders", full: true },
+  { name: "admin-products", path: "/admin/products", full: true },
+  { name: "admin-product-editor", path: `/admin/products/${sampleProduct.sku}`, full: true },
+  { name: "admin-customers", path: "/admin/customers", full: true },
+  { name: "admin-more", path: "/admin/more", full: true },
+  { name: "admin-zones", path: "/admin/more/delivery-zones", full: true },
+];
+
+/** Reset a QA account's password to a fresh one and hand it back. */
+async function qaStaffCredentials(accountKey = "manager") {
+  if (!fs.existsSync(STAFF_MANIFEST)) return null;
+
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(STAFF_MANIFEST, "utf8"));
+  } catch {
+    return null;
+  }
+
+  const manager = (manifest.accounts ?? []).find((account) => account.key === accountKey);
+  if (!manager) return null;
+
+  try {
+    process.loadEnvFile(".env.local");
+  } catch {
+    /* already loaded, or absent */
+  }
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key || !url.includes("dyjhacbbedytcstxxjzl")) return null;
+
+  const { createClient } = await import("@supabase/supabase-js");
+  const db = createClient(url, key, { auth: { persistSession: false } });
+
+  const password = `Qa!${randomBytes(18).toString("base64url")}`;
+  const { error } = await db.auth.admin.updateUserById(manager.authUserId, {
+    password,
+    email_confirm: true,
+  });
+  if (error) return null;
+
+  return { email: manager.email, password };
+}
+
+async function signInAsStaff(tab, credentials) {
+  await settle(tab, `${BASE_URL}/admin/sign-in`);
+
+  // Already signed in from an earlier page in this context.
+  if (await tab.getByText("You are signed in").count()) return true;
+
+  await tab.fill("#email", credentials.email);
+  await tab.fill("#password", credentials.password);
+  await Promise.all([
+    tab.waitForURL((url) => !url.pathname.startsWith("/admin/sign-in"), { timeout: 60_000 }),
+    tab.click('[data-qa-anchor="admin-sign-in-submit"]'),
+  ]).catch(() => {});
+
+  return !new URL(tab.url()).pathname.startsWith("/admin/sign-in");
+}
+
+/**
+ * The dialogs, which are where a phone-sized dashboard usually goes wrong: a
+ * bottom sheet that overflows, a confirm button under the safe area, a radio
+ * that is 20px across. They only exist after a click, so QA has to do the
+ * clicking.
+ */
+async function auditDialog(tab, label, opener, viewport, name) {
+  const control = tab.locator(opener).first();
+  if ((await control.count()) === 0) {
+    // Said out loud. A silent skip here is how a whole dialog went unaudited
+    // once already: the page underneath was the wrong one and nothing said so.
+    console.log(`  (${name}: opener not on this screen — not audited)`);
+    return;
+  }
+
+  await control.scrollIntoViewIfNeeded().catch(() => {});
+  await control.click().catch(() => {});
+  await tab.waitForTimeout(400);
+
+  // A sheet is fixed and already centred. The stock controls instead open a
+  // panel in the flow of the page, below the button that opened it — so without
+  // this the screenshot records the header rather than the thing that opened.
+  if ((await tab.locator('[role="dialog"]').count()) === 0) {
+    await control.evaluate((el) => {
+      const panel = el.closest("div.rounded-xl") ?? el;
+      panel.scrollIntoView({ block: "center" });
+    }).catch(() => {});
+    await tab.waitForTimeout(250);
+  }
+
+  await checkOverflow(tab, `${label} — ${name}`);
+  if (viewport.mobile) await checkTouchTargets(tab, `${label} — ${name}`);
+
+  const file = path.join(OUT_DIR, `${name}-${viewport.name}.png`);
+  await tab.screenshot({ path: file });
+  console.log(`saved ${path.relative(process.cwd(), file)}`);
+
+  // Escape closes both the Sheet component and a <details> is left open —
+  // either way the next audit starts from a known page.
+  await tab.keyboard.press("Escape");
+  await tab.waitForTimeout(250);
+}
+
+async function staffPass(browser, credentials) {
+  let captured = 0;
+
+  for (const viewport of widths) {
+    const context = await browser.newContext({
+      viewport: { width: viewport.width, height: viewport.height },
+      deviceScaleFactor: Number(process.env.DSF ?? 1),
+      isMobile: viewport.mobile,
+      hasTouch: viewport.mobile,
+      userAgent: viewport.mobile ? devices["iPhone 14 Pro"].userAgent : undefined,
+    });
+
+    const tab = await context.newPage();
+    watchConsole(tab, `signed-in admin @ ${viewport.width}px`);
+
+    if (!(await signInAsStaff(tab, credentials))) {
+      fail(`QA STAFF COULD NOT SIGN IN @ ${viewport.width}px`);
+      await context.close();
+      continue;
+    }
+
+    for (const page of staffPages) {
+      const label = `${page.name} @ ${viewport.width}px`;
+      await settle(tab, `${BASE_URL}${page.path}`);
+      await tab.waitForTimeout(300);
+      await loadEverything(tab);
+
+      const landed = new URL(tab.url()).pathname;
+      if (landed.startsWith("/admin/sign-in")) {
+        fail(`SIGNED-IN STAFF BOUNCED — ${page.path} redirected to ${landed}`);
+        continue;
+      }
+
+      await checkOverflow(tab, label);
+      await checkImages(tab, label);
+      if (viewport.mobile) await checkTouchTargets(tab, label);
+      await checkFloatingCollisions(tab, label);
+
+      const file = path.join(OUT_DIR, `${page.name}-${viewport.name}.png`);
+      await tab.screenshot({ path: file, fullPage: page.full });
+      console.log(`saved ${path.relative(process.cwd(), file)}`);
+      captured += 1;
+
+      // The stock dialogs live on the product editor and are the two controls
+      // an operator uses most often after a delivery arrives.
+      if (page.name === "admin-product-editor") {
+        await auditDialog(tab, label, 'button:has-text("Add stock")', viewport, "admin-add-stock");
+        await settle(tab, `${BASE_URL}${page.path}`);
+        await auditDialog(tab, label, 'button:has-text("Set counted stock")', viewport, "admin-count-stock");
+      }
+
+      if (page.name === "admin-zones") {
+        await auditDialog(tab, label, 'button:has-text("Add a zone")', viewport, "admin-zone-editor");
+      }
+    }
+
+    // The order dialogs need a real order. There may not be one on a fresh
+    // database, and that is not a failure — it is an empty shop.
+    await settle(tab, `${BASE_URL}/admin/orders`);
+    const firstOrder = tab.locator('a:has-text("Open order")').first();
+    if (await firstOrder.count()) {
+      await firstOrder.click();
+      // Wait for the ROUTE, not for a guessed number of milliseconds. Reading
+      // `tab.url()` too early returns the list, and every audit below would then
+      // run against the wrong page and quietly find nothing.
+      await tab.waitForURL(/\/admin\/orders\/[^/]+$/, { timeout: 60_000 }).catch(() => {});
+      await loadEverything(tab);
+
+      const label = `admin-order @ ${viewport.width}px`;
+      await checkOverflow(tab, label);
+      if (viewport.mobile) await checkTouchTargets(tab, label);
+
+      const file = path.join(OUT_DIR, `admin-order-${viewport.name}.png`);
+      await tab.screenshot({ path: file, fullPage: true });
+      console.log(`saved ${path.relative(process.cwd(), file)}`);
+      captured += 1;
+
+      const orderUrl = tab.url();
+      if (!/\/admin\/orders\/[^/]+$/.test(new URL(orderUrl).pathname)) {
+        fail(`ORDER DID NOT OPEN — landed on ${new URL(orderUrl).pathname} @ ${viewport.width}px`);
+        await tab.close();
+        await context.close();
+        continue;
+      }
+
+      // The two ways an order goes wrong are folded away behind a summary.
+      await tab.locator("summary:has-text('Something went wrong')").first().click().catch(() => {});
+      await tab.waitForTimeout(250);
+      await auditDialog(tab, label, 'button:has-text("Cancel order")', viewport, "admin-cancel-order");
+
+      await settle(tab, orderUrl);
+      await tab.locator("summary:has-text('Something went wrong')").first().click().catch(() => {});
+      await tab.waitForTimeout(250);
+      await auditDialog(tab, label, 'button:has-text("Delivery failed")', viewport, "admin-delivery-failed");
+
+      await settle(tab, orderUrl);
+      await auditDialog(tab, label, 'button:has-text("Complete order")', viewport, "admin-record-payment");
+    } else {
+      console.log(`  (no orders on the development database — order dialogs not audited)`);
+    }
+
+    await tab.close();
+    await context.close();
+  }
+
+  return captured;
+}
+
+/**
+ * The same dashboard, seen by an Order staff member.
+ *
+ * The screens are built to show fewer controls to a smaller role, and that
+ * claim is worth one look rather than only a unit test: a hidden button that
+ * silently reappears is exactly the kind of regression nobody notices. This is
+ * a courtesy check, not the boundary — the boundary is Row Level Security, and
+ * `tests/db/09-admin-operations.test.ts` proves an Order staff token is refused
+ * even when every check in this repository is bypassed.
+ */
+async function orderStaffPass(browser, credentials) {
+  const viewport = widths[0]; // 390px — where hiding a control matters most
+  const context = await browser.newContext({
+    viewport: { width: viewport.width, height: viewport.height },
+    deviceScaleFactor: Number(process.env.DSF ?? 1),
+    isMobile: true,
+    hasTouch: true,
+    userAgent: devices["iPhone 14 Pro"].userAgent,
+  });
+
+  const tab = await context.newPage();
+  watchConsole(tab, `order staff @ ${viewport.width}px`);
+
+  if (!(await signInAsStaff(tab, credentials))) {
+    fail("QA ORDER STAFF COULD NOT SIGN IN");
+    await context.close();
+    return 0;
+  }
+
+  // The More menu is filtered by capability: Order staff manage nothing.
+  //
+  // Asserted on the menu's LINKS, not on the page text. The first version read
+  // `document.body.innerText` and flagged "Staff" — which was the signed-in
+  // account's own name, "QA Order Staff (development)", further down the page.
+  // A check that can be tripped by a person's name is not checking the menu.
+  await settle(tab, `${BASE_URL}/admin/more`);
+  await loadEverything(tab);
+
+  const menuLinks = await tab.$$eval('a[href^="/admin/more/"]', (links) =>
+    links.map((link) => link.getAttribute("href")),
+  );
+  if (menuLinks.length > 0) {
+    fail(`ORDER STAFF SEES ${menuLinks.join(", ")} IN THE MORE MENU`);
+  }
+  if (!(await tab.evaluate(() => document.body.innerText)).includes("Order staff")) {
+    fail("ORDER STAFF IS NOT TOLD WHICH ROLE THEY ARE");
+  }
+
+  await checkOverflow(tab, `order-staff-more @ ${viewport.width}px`);
+  await checkTouchTargets(tab, `order-staff-more @ ${viewport.width}px`);
+  await tab.screenshot({ path: path.join(OUT_DIR, `admin-more-order-staff-${viewport.name}.png`), fullPage: true });
+  console.log(`saved preview/screenshots/admin-more-order-staff-${viewport.name}.png`);
+
+  // The product editor: readable, but nothing about money is editable.
+  await settle(tab, `${BASE_URL}/admin/products/${sampleProduct.sku}`);
+  await loadEverything(tab);
+
+  const priceEditable = await tab.locator('input[inputmode="numeric"]:not([disabled])').count();
+  if (priceEditable > 0) fail("ORDER STAFF CAN TYPE IN A PRICE FIELD");
+  for (const label of ["Add stock", "Set counted stock"]) {
+    if (await tab.locator(`button:has-text("${label}")`).count()) {
+      fail(`ORDER STAFF SEES THE "${label}" BUTTON`);
+    }
+  }
+
+  await checkOverflow(tab, `order-staff-product @ ${viewport.width}px`);
+  await tab.screenshot({ path: path.join(OUT_DIR, `admin-product-order-staff-${viewport.name}.png`), fullPage: true });
+  console.log(`saved preview/screenshots/admin-product-order-staff-${viewport.name}.png`);
+
+  await tab.close();
+  await context.close();
+  return 2;
+}
+
 /**
  * LOCALE LAYOUT STABILITY
  *
@@ -737,19 +1049,46 @@ async function run() {
   console.log(`QA against ${BASE_URL}`);
   console.log(`sample product: ${sampleProduct.sku} (${sampleProduct.slug})\n`);
 
-  await screenshotPass(browser);
+  // `QA_ONLY=admin` runs just the dashboard passes. The full gate is ~25 minutes
+  // because it walks 95 remote product photographs at five widths in two
+  // languages; iterating on an admin dialog should not cost that.
+  const only = process.env.QA_ONLY;
+
+  if (only !== "admin") {
+    await screenshotPass(browser);
+  }
   console.log("\n--- admin ---");
   await adminPass(browser);
-  console.log("\n--- locale layout stability ---");
-  await localeStabilityPass(browser);
-  console.log("\n--- behaviour checks ---");
-  await behaviourPass(browser);
+
+  console.log("\n--- admin, signed in as the development QA Manager ---");
+  const credentials = await qaStaffCredentials();
+  let staffShots = 0;
+  if (credentials) {
+    staffShots = await staffPass(browser, credentials);
+
+    console.log("\n--- the same dashboard, as Order staff ---");
+    const orderStaff = await qaStaffCredentials("order_staff");
+    if (orderStaff) staffShots += await orderStaffPass(browser, orderStaff);
+    else console.log("  SKIPPED — no development Order staff account on this machine.");
+  } else {
+    console.log(
+      "  SKIPPED — no development QA staff on this machine.\n" +
+        "  Run `npm run qa:staff create` to give the dashboard its visual QA back.",
+    );
+  }
+
+  if (only !== "admin") {
+    console.log("\n--- locale layout stability ---");
+    await localeStabilityPass(browser);
+    console.log("\n--- behaviour checks ---");
+    await behaviourPass(browser);
+  }
 
   await browser.close();
 
   console.log("\n--- QA summary ---");
   console.log(
-    `${widths.length * (locales.length * pages.length + adminPages.length)} screenshots captured.`,
+    `${widths.length * (locales.length * pages.length + adminPages.length) + staffShots} screenshots captured.`,
   );
   if (problems.length === 0) {
     console.log(

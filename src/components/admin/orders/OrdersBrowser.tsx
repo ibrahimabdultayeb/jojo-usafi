@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { Badge, Card, EmptyState, inputClass } from "@/components/admin/ui";
 import { formatTsh, shortPhone } from "@/lib/admin/format";
 import { Icon } from "@/components/ui/Icon";
-import { orderTotals, orders, STAGE_LABEL, STAGE_TONE, type OrderStage } from "@/mocks/admin/data";
+import { orderTotals, STAGE_LABEL, STAGE_TONE, type AdminOrder, type OrderStage } from "@/lib/admin/model";
 
 /**
  * The orders queue.
@@ -25,7 +25,13 @@ const FILTERS: { key: string; label: string; stages: OrderStage[] }[] = [
   { key: "problems", label: "Problems", stages: ["cancelled", "delivery_failed"] },
 ];
 
-export function OrdersBrowser({ initialStage }: { initialStage?: string }) {
+export function OrdersBrowser({
+  orders,
+  initialStage,
+}: {
+  orders: AdminOrder[];
+  initialStage?: string;
+}) {
   const [filter, setFilter] = useState(() => {
     const match = FILTERS.find((f) => f.stages.includes(initialStage as OrderStage));
     return match?.key ?? "all";
@@ -46,7 +52,7 @@ export function OrdersBrowser({ initialStage }: { initialStage?: string }) {
         field.toLowerCase().replace(/\s/g, "").includes(q),
       ),
     );
-  }, [filter, term]);
+  }, [orders, filter, term]);
 
   return (
     <>

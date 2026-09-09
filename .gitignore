@@ -59,3 +59,6 @@ tsconfig.tsbuildinfo
 
 # Per-run database test manifest — machine-generated, never committed
 tests/db/.run/
+
+# Development QA staff record — machine-generated, holds no passwords, never committed
+.qa-staff.local.json

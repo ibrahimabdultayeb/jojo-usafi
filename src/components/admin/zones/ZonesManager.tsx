@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Badge, Button, Card, Field, SaveState, Sheet, Toggle, inputClass } from "@/components/admin/ui";
 import { formatTsh } from "@/lib/admin/format";
 import { Icon } from "@/components/ui/Icon";
-import { DEFAULT_ZONE_FEE, zones as seedZones, type AdminZone } from "@/mocks/admin/data";
+import { can, type Role } from "@/lib/admin/permissions";
+import { saveZoneAction, type ZonePatch } from "@/lib/admin/actions";
+import type { AdminZoneRow } from "@/lib/admin/orders";
+import { DEFAULT_ZONE_FEE } from "@/lib/admin/model";
 
 /**
  * Delivery zones.
@@ -13,35 +17,66 @@ import { DEFAULT_ZONE_FEE, zones as seedZones, type AdminZone } from "@/mocks/ad
  * is four controls and nothing else. Turning on Free delivery visibly disables
  * the fee rather than hiding it, so it is obvious the fee is being ignored
  * rather than lost.
+ *
+ * These are the real zones checkout quotes from. A fee changed here is the fee
+ * the next customer is charged, which is why the list says so out loud.
  */
-export function ZonesManager() {
-  const [zones, setZones] = useState<AdminZone[]>(seedZones);
-  const [editing, setEditing] = useState<AdminZone | null>(null);
-  const [save, setSave] = useState<"idle" | "saving" | "saved" | "pending">("idle");
 
-  function mockSave() {
+/** A zone the editor has not saved yet. `id` is null until the database gives one. */
+type ZoneDraft = ZonePatch & { id: string | null; isDevelopmentFixture: boolean };
+
+const toDraft = (zone: AdminZoneRow): ZoneDraft => ({
+  id: zone.id,
+  name: zone.name,
+  feeTzs: zone.feeTzs,
+  freeDelivery: zone.freeDelivery,
+  active: zone.active,
+  sortPriority: zone.sortPriority,
+  isDevelopmentFixture: zone.isDevelopmentFixture,
+});
+
+export function ZonesManager({ zones, role }: { zones: AdminZoneRow[]; role: Role }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [editing, setEditing] = useState<ZoneDraft | null>(null);
+  const [save, setSave] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const mayEdit = can(role, "delivery.manage");
+
+  function upsert(draft: ZoneDraft) {
     setSave("saving");
-    window.setTimeout(() => setSave("saved"), 700);
-    window.setTimeout(() => setSave("idle"), 3400);
-  }
-
-  function upsert(zone: AdminZone) {
-    setZones((current) => {
-      const exists = current.some((z) => z.id === zone.id);
-      return exists ? current.map((z) => (z.id === zone.id ? zone : z)) : [...current, zone];
+    setProblem(null);
+    startTransition(async () => {
+      const patch: ZonePatch = {
+        name: draft.name,
+        feeTzs: draft.feeTzs,
+        freeDelivery: draft.freeDelivery,
+        active: draft.active,
+        sortPriority: draft.sortPriority,
+      };
+      const result = await saveZoneAction(draft.id, patch);
+      if (result.ok) {
+        setSave("saved");
+        setEditing(null);
+        router.refresh();
+        window.setTimeout(() => setSave("idle"), 3000);
+      } else {
+        setSave("failed");
+        setProblem(result.message);
+      }
     });
-    setEditing(null);
-    mockSave();
   }
 
-  function newZone(): AdminZone {
+  function newZone(): ZoneDraft {
     return {
-      id: `z${Date.now()}`,
+      id: null,
       name: "",
-      fee: DEFAULT_ZONE_FEE,
+      feeTzs: DEFAULT_ZONE_FEE,
       freeDelivery: false,
       active: true,
-      priority: zones.length + 1,
+      sortPriority: zones.length + 1,
+      isDevelopmentFixture: false,
     };
   }
 
@@ -49,42 +84,61 @@ export function ZonesManager() {
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <SaveState state={save} />
-        <Button variant="accent" icon="plus" onClick={() => setEditing(newZone())}>
-          Add a zone
-        </Button>
+        {mayEdit && (
+          <Button variant="accent" icon="plus" disabled={pending} onClick={() => setEditing(newZone())}>
+            Add a zone
+          </Button>
+        )}
       </div>
 
+      {problem && (
+        <p role="alert" className="mb-3 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-800">
+          {problem}
+        </p>
+      )}
+
       <ul className="grid gap-2.5">
-        {[...zones]
-          .sort((a, b) => a.priority - b.priority)
-          .map((zone) => (
-            <li key={zone.id}>
-              <Card className={`p-4 ${zone.active ? "" : "opacity-60"}`}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-display text-base font-bold text-slate-900">
-                      {zone.name || "Untitled zone"}
-                    </p>
-                    <p className="mt-1 flex flex-wrap items-center gap-1.5">
-                      {zone.freeDelivery ? (
-                        <Badge tone="good">Free delivery</Badge>
-                      ) : (
-                        <Badge tone="neutral">{formatTsh(zone.fee)}</Badge>
-                      )}
-                      {zone.active ? <Badge tone="info">Active</Badge> : <Badge tone="warn">Switched off</Badge>}
-                      <span className="text-xs font-medium text-slate-400">Shows {zone.priority}
-                        {zone.priority === 1 ? "st" : zone.priority === 2 ? "nd" : zone.priority === 3 ? "rd" : "th"}
-                      </span>
-                    </p>
-                  </div>
-                  <Button variant="secondary" onClick={() => setEditing(zone)}>
+        {zones.map((zone, index) => (
+          <li key={zone.id}>
+            <Card className={`p-4 ${zone.active ? "" : "opacity-60"}`}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-display text-base font-bold text-slate-900">
+                    {zone.name || "Untitled zone"}
+                  </p>
+                  <p className="mt-1 flex flex-wrap items-center gap-1.5">
+                    {zone.freeDelivery ? (
+                      <Badge tone="good">Free delivery</Badge>
+                    ) : (
+                      <Badge tone="neutral">{formatTsh(zone.feeTzs)}</Badge>
+                    )}
+                    {zone.active ? <Badge tone="info">Active</Badge> : <Badge tone="warn">Switched off</Badge>}
+                    {/* Placeholder areas are marked, never quietly passed off as real. */}
+                    {zone.isDevelopmentFixture && <Badge tone="warn">Example area — replace</Badge>}
+                    <span className="text-xs font-medium text-slate-400">Shows {index + 1}
+                      {index + 1 === 1 ? "st" : index + 1 === 2 ? "nd" : index + 1 === 3 ? "rd" : "th"}
+                    </span>
+                  </p>
+                </div>
+                {mayEdit && (
+                  <Button variant="secondary" disabled={pending} onClick={() => setEditing(toDraft(zone))}>
                     Edit
                   </Button>
-                </div>
-              </Card>
-            </li>
-          ))}
+                )}
+              </div>
+            </Card>
+          </li>
+        ))}
       </ul>
+
+      {zones.length === 0 && (
+        <Card className="p-6 text-center">
+          <p className="text-sm font-bold text-slate-900">No delivery areas yet</p>
+          <p className="mt-1 text-sm font-medium text-slate-500">
+            Add the first one and customers will be able to choose it at checkout.
+          </p>
+        </Card>
+      )}
 
       <p className="mt-4 flex items-start gap-2 rounded-xl bg-slate-100 p-3 text-xs font-medium text-slate-600">
         <Icon name="truck" className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
@@ -92,26 +146,37 @@ export function ZonesManager() {
         removes it from checkout but never changes orders already placed.
       </p>
 
-      {editing && <ZoneEditor zone={editing} onCancel={() => setEditing(null)} onSave={upsert} />}
+      {editing && (
+        <ZoneEditor zone={editing} pending={pending} onCancel={() => setEditing(null)} onSave={upsert} />
+      )}
     </>
   );
 }
 
 function ZoneEditor({
   zone,
+  pending,
   onCancel,
   onSave,
 }: {
-  zone: AdminZone;
+  zone: ZoneDraft;
+  pending: boolean;
   onCancel: () => void;
-  onSave: (zone: AdminZone) => void;
+  onSave: (zone: ZoneDraft) => void;
 }) {
   const [draft, setDraft] = useState(zone);
-  const isNew = zone.name === "";
+  const isNew = zone.id === null;
 
   return (
     <Sheet open onClose={onCancel} title={isNew ? "Add a delivery zone" : `Edit ${zone.name}`}>
       <div className="space-y-4">
+        {draft.isDevelopmentFixture && (
+          <p className="rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-900">
+            This is an example area added during development. Rename it to a real one, or switch it
+            off before the shop opens.
+          </p>
+        )}
+
         <Field label="Area name" hint="What customers will see at checkout.">
           <input
             autoFocus
@@ -135,8 +200,8 @@ function ZoneEditor({
               TSh
             </span>
             <input
-              value={draft.freeDelivery ? "" : String(draft.fee)}
-              onChange={(e) => setDraft({ ...draft, fee: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })}
+              value={draft.freeDelivery ? "" : String(draft.feeTzs)}
+              onChange={(e) => setDraft({ ...draft, feeTzs: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })}
               disabled={draft.freeDelivery}
               inputMode="numeric"
               placeholder={draft.freeDelivery ? "No charge" : undefined}
@@ -161,8 +226,10 @@ function ZoneEditor({
 
         <Field label="Where it appears in the list" hint="1 shows first.">
           <input
-            value={String(draft.priority)}
-            onChange={(e) => setDraft({ ...draft, priority: Number(e.target.value.replace(/[^0-9]/g, "")) || 1 })}
+            value={String(draft.sortPriority)}
+            onChange={(e) =>
+              setDraft({ ...draft, sortPriority: Number(e.target.value.replace(/[^0-9]/g, "")) || 1 })
+            }
             inputMode="numeric"
             className={`${inputClass} tabular-nums`}
           />
@@ -172,8 +239,13 @@ function ZoneEditor({
           <Button variant="secondary" onClick={onCancel} full>
             Cancel
           </Button>
-          <Button variant="accent" onClick={() => onSave(draft)} disabled={draft.name.trim() === ""} full>
-            {isNew ? "Add zone" : "Save changes"}
+          <Button
+            variant="accent"
+            onClick={() => onSave(draft)}
+            disabled={draft.name.trim() === "" || pending}
+            full
+          >
+            {pending ? "Saving…" : isNew ? "Add zone" : "Save changes"}
           </Button>
         </div>
       </div>

@@ -1,18 +1,12 @@
 import Link from "next/link";
 import { getAdminCatalogue } from "@/lib/catalogue/admin";
+import { getAdminSnapshot, getRecentActivity } from "@/lib/admin/orders";
+import { currentStaff } from "@/lib/admin/authorize";
 import { AdminPage } from "@/components/admin/AdminShell";
 import { Badge, Card, SectionTitle, StatTile } from "@/components/admin/ui";
-import { formatTsh } from "@/lib/admin/format";
+import { formatTsh, whenExactly, whenWords } from "@/lib/admin/format";
 import { Icon } from "@/components/ui/Icon";
-import {
-  activity,
-  attentionItems,
-  orderTotals,
-  orders,
-  STAGE_LABEL,
-  STAGE_TONE,
-  todayStats,
-} from "@/mocks/admin/data";
+import { orderTotals, STAGE_LABEL, STAGE_TONE } from "@/lib/admin/model";
 
 export const metadata = { title: "Home" };
 
@@ -30,14 +24,38 @@ const TONE_RING = {
  */
 export default async function AdminHomePage() {
   // The withheld-product count is real: it comes from the database.
-  const { totals } = await getAdminCatalogue();
-  const attention = attentionItems(totals.missingImage);
+  // Real counts, from the real orders and the real shelf. A zero here is an
+  // honest zero, not a placeholder.
+  const [{ totals }, snapshot, activity, staff] = await Promise.all([
+    getAdminCatalogue(),
+    getAdminSnapshot(),
+    getRecentActivity(),
+    currentStaff(),
+  ]);
+  // The greeting uses the signed-in staff member's own first name, and quietly
+  // drops the name rather than guessing when nobody is signed in.
+  const firstName = staff?.name.trim().split(/\s+/)[0];
+  const hour = new Date().getHours();
+  const partOfDay = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
+  const attention = [
+    ...snapshot.needsAttention,
+    {
+      label: "Missing image",
+      count: totals.missingImage,
+      href: "/admin/products?filter=missing-image",
+      tone: "warn" as const,
+      hint: "Held back from the website",
+    },
+  ];
   const needsAttention = attention.filter((item) => item.count > 0);
   const allClear = attention.filter((item) => item.count === 0);
-  const recent = orders.slice(0, 5);
+  const recent = snapshot.recent;
 
   return (
-    <AdminPage title="Good morning, Ibrahim" subtitle="Here is what needs you this morning.">
+    <AdminPage
+      title={`Good ${partOfDay}${firstName ? `, ${firstName}` : ""}`}
+      subtitle={`Here is what needs you this ${partOfDay}.`}
+    >
       {/* Attention first */}
       <SectionTitle>Needs attention</SectionTitle>
       <ul className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
@@ -74,11 +92,11 @@ export default async function AdminHomePage() {
       {/* Today */}
       <SectionTitle>Today</SectionTitle>
       <div className="mb-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-        <StatTile label="Sales" value={formatTsh(todayStats.sales)} sub="Completed orders" />
-        <StatTile label="Orders" value={String(todayStats.orders)} sub="Placed today" />
+        <StatTile label="Sales" value={formatTsh(snapshot.todaySalesTzs)} sub="Completed orders" />
+        <StatTile label="Orders" value={String(snapshot.todayOrders)} sub="Placed today" />
         <StatTile
           label="Average order"
-          value={formatTsh(todayStats.averageOrderValue)}
+          value={formatTsh(snapshot.todayOrders === 0 ? 0 : Math.round(snapshot.todaySalesTzs / snapshot.todayOrders))}
           sub="Per order today"
           />
       </div>
@@ -118,7 +136,7 @@ export default async function AdminHomePage() {
                 <span className="block text-sm font-black text-slate-900 tabular-nums">
                   {formatTsh(totals.total)}
                 </span>
-                <span className="block text-[11px] font-medium text-slate-400">{order.placed}</span>
+                <span className="block text-[11px] font-medium text-slate-400">{whenWords(order.placed)}</span>
               </span>
               <Icon name="chevronRight" className="h-4 w-4 shrink-0 text-slate-300" />
             </Link>
@@ -129,13 +147,33 @@ export default async function AdminHomePage() {
       {/* Activity */}
       <SectionTitle>Recent activity</SectionTitle>
       <Card className="divide-y divide-slate-100">
-        {activity.map((entry) => (
-          <div key={entry.text} className="flex gap-3 p-3.5">
-            <span className="w-12 shrink-0 text-xs font-bold text-slate-400 tabular-nums">{entry.at}</span>
-            <span className="min-w-0 flex-1 text-sm font-medium text-slate-700">{entry.text}</span>
-            <span className="shrink-0 text-xs font-semibold text-slate-400">{entry.by}</span>
-          </div>
-        ))}
+        {activity.length === 0 ? (
+          <p className="p-4 text-sm font-medium text-slate-500">
+            Nothing has happened yet today. Activity appears here as orders come in and staff work
+            on them.
+          </p>
+        ) : (
+          activity.map((entry) => (
+            <Link
+              key={entry.at + entry.text}
+              href={entry.href ?? "/admin/orders"}
+              className="flex min-h-14 gap-3 p-3.5 transition-colors hover:bg-slate-50"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-slate-700">{entry.text}</span>
+                {/*
+                  When and who, under the sentence rather than beside it. As
+                  columns they fought the sentence for width on a phone and left
+                  it wrapping one word per line.
+                */}
+                <span className="mt-0.5 block truncate text-xs font-semibold text-slate-400">
+                  {whenExactly(entry.at)} · {entry.by}
+                </span>
+              </span>
+              <Icon name="chevronRight" className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" />
+            </Link>
+          ))
+        )}
       </Card>
     </AdminPage>
   );

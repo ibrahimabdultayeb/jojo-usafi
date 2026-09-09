@@ -1,8 +1,10 @@
 # Jojo Usafi — Storefront Prototype
 
-A **bounded, frontend-only prototype**. The point is to let you open the site on a phone
-and a laptop, in English or Kiswahili, and get a realistic impression of what Jojo Usafi
-will look and feel like. Nothing here touches production infrastructure.
+A working shop on a **development** database. It began as a frontend-only prototype, and the
+point is unchanged: open the site on a phone and a laptop, in English or Kiswahili, and get a
+realistic impression of what Jojo Usafi will look and feel like. Since Build 08C a customer
+can place a real order and staff can work it from the dashboard — against the free Supabase
+*development* project. **Nothing here touches production infrastructure**, and no money moves.
 
 Run it with `npm install && npm run dev`, then open http://localhost:3000.
 Full instructions are in [`README.md`](./README.md).
@@ -60,10 +62,13 @@ on the reference green, exposed as Tailwind `brand-*` tokens, so a rebrand is on
 
 | Area | Prototype state |
 | --- | --- |
-| **Backend** | None. The catalogue is a committed file read through `src/lib/catalogue/queries.ts`, which is the single seam Supabase will replace. |
-| **Cart storage** | `localStorage` only. No server cart, no session. |
-| **Checkout** | Form renders and validates nothing; submitting shows a "not connected yet" notice. No order is created. |
-| **Track order** | Form renders; submitting shows a "not connected yet" notice. No lookup. |
+| **Backend** | **Real.** Supabase PostgreSQL, Auth, Storage and Row Level Security, on the hosted development project. |
+| **Cart storage** | `localStorage` only. No server cart, no session — deliberate for a guest shop. |
+| **Checkout** | **Real.** Guest checkout prices the basket on the server, reserves the stock and writes the order in one transaction. |
+| **Track order** | **Real.** Needs the order number *and* the phone; a wrong phone is answered exactly like a wrong number. |
+| **Online payment** | Not built. The customer chooses cash or digital **on delivery**, and staff record what was actually collected. |
+| **Admin dashboard** | **Real**, except the Website screen — Reports, Staff and Settings are marked "Coming soon". |
+| **Google Sheet sync** | Not connected. The product editor says so rather than showing a "Synced" badge. |
 | **WhatsApp number** | `255700000000` placeholder in `src/lib/site.ts`. |
 | **Phone / email / address** | Placeholders in `src/lib/site.ts`. |
 | **Logo** | Typographic lockup ("J" tile + JOJO USAFI wordmark) standing in for a real mark. |

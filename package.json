@@ -17,7 +17,11 @@
     "qa:screenshots": "node scripts/qa-screenshots.mjs",
     "catalogue:build": "node scripts/build-catalogue.mjs",
     "catalogue:check": "node scripts/build-catalogue.mjs --check",
-    "i18n:check": "node scripts/i18n-check.mjs"
+    "i18n:check": "node scripts/i18n-check.mjs",
+    "qa:staff": "node scripts/qa-staff.mjs",
+    "dev:orders": "node scripts/seed-dev-orders.mjs",
+    "dev:zones": "node scripts/seed-dev-zones.mjs",
+    "verify:cache": "node scripts/verify-cache-invalidation.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

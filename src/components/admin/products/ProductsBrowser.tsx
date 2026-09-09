@@ -7,7 +7,7 @@ import { Badge, Card, EmptyState, inputClass } from "@/components/admin/ui";
 import { formatTsh } from "@/lib/admin/format";
 import { Icon } from "@/components/ui/Icon";
 
-import type { AdminProduct } from "@/mocks/admin/data";
+import type { AdminProduct } from "@/lib/admin/model";
 
 /**
  * The product shelf.
@@ -29,10 +29,17 @@ const FILTERS = [
 
 type FilterKey = (typeof FILTERS)[number]["key"];
 
+/*
+ * Everything below counts AVAILABLE stock, not what is physically on the shelf.
+ * A product with ten bottles in the store and ten promised to open orders
+ * cannot be sold, so calling it "in stock" would send an operator to pick goods
+ * that are already spoken for. The `product_shelf` view — which the storefront
+ * and the home page's counts read — makes the same choice, so the two agree.
+ */
 function badgesFor(product: AdminProduct) {
   const out: { label: string; tone: "warn" | "bad" | "neutral" | "info" }[] = [];
-  if (product.stock === 0) out.push({ label: "Out of stock", tone: "bad" });
-  else if (product.stock <= product.lowStockThreshold) out.push({ label: "Low stock", tone: "warn" });
+  if (product.available === 0) out.push({ label: "Out of stock", tone: "bad" });
+  else if (product.available <= product.lowStockThreshold) out.push({ label: "Low stock", tone: "warn" });
   if (product.hidden) out.push({ label: "Hidden", tone: "neutral" });
   if (!product.image) out.push({ label: "Missing image", tone: "warn" });
   if (product.syncIssue) out.push({ label: "Sync issue", tone: "bad" });
@@ -42,9 +49,9 @@ function badgesFor(product: AdminProduct) {
 function matchesFilter(product: AdminProduct, filter: FilterKey) {
   switch (filter) {
     case "low-stock":
-      return product.stock > 0 && product.stock <= product.lowStockThreshold;
+      return product.available > 0 && product.available <= product.lowStockThreshold;
     case "out-of-stock":
-      return product.stock === 0;
+      return product.available === 0;
     case "hidden":
       return product.hidden;
     case "missing-image":
@@ -181,10 +188,10 @@ export function ProductsBrowser({
                   </span>
                   <span
                     className={`block text-xs font-bold tabular-nums ${
-                      product.stock === 0 ? "text-rose-600" : "text-slate-500"
+                      product.available === 0 ? "text-rose-600" : "text-slate-500"
                     }`}
                   >
-                    {product.stock} in stock
+                    {product.available} available
                   </span>
                 </span>
               </Link>

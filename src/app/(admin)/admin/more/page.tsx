@@ -2,9 +2,18 @@ import Link from "next/link";
 import { AdminPage } from "@/components/admin/AdminShell";
 import { Badge, Card } from "@/components/admin/ui";
 import { Icon, type IconName } from "@/components/ui/Icon";
-import { can, currentUser, ROLE_LABELS, type Capability } from "@/lib/admin/permissions";
+import { can, ROLE_LABELS, type Capability, type Role } from "@/lib/admin/permissions";
+import { currentStaff } from "@/lib/admin/authorize";
+import { signOutAction } from "../sign-in/actions";
 
 export const metadata = { title: "More" };
+
+/** What each role can do, said once, in the words an operator would use. */
+const ROLE_SUMMARY: Record<Role, string> = {
+  owner: "you can see and change everything.",
+  manager: "you can run the shop, but not add or remove staff.",
+  order_staff: "you can work on orders and see customers.",
+};
 
 const ITEMS: {
   href: string;
@@ -57,16 +66,41 @@ const ITEMS: {
 /**
  * The overflow menu.
  *
- * Entries are filtered by capability rather than hard-coded, so when Build 06
- * introduces real roles an Order staff account simply sees a shorter list —
- * no screen needs redesigning.
+ * Entries are filtered by the signed-in staff member's real capabilities, so an
+ * Order staff account simply sees a shorter list. Hiding an entry is a courtesy
+ * to the reader, not the boundary: the pages behind them are governed by Row
+ * Level Security, and every write additionally passes `authorize()`.
  */
-export default function AdminMorePage() {
-  const allowed = ITEMS.filter((item) => can(currentUser.role, item.capability));
+export default async function AdminMorePage() {
+  const staff = await currentStaff();
+  const role = staff?.role ?? "order_staff";
+  const allowed = ITEMS.filter((item) => can(role, item.capability));
 
   return (
-    <AdminPage title="More" subtitle="Everything else you can change.">
-      <Card className="mb-5 divide-y divide-slate-100">
+    <AdminPage
+      title="More"
+      subtitle={
+        allowed.length > 0
+          ? "Everything else you can change."
+          : "Your account is set up for orders and customers."
+      }
+    >
+      {/*
+        An Order staff account manages none of these, so the card would be an
+        empty box. Saying why is kinder than showing nothing, and it is the
+        truth: they are not missing anything, they simply do not do this part.
+      */}
+      {allowed.length === 0 && (
+        <Card className="mb-5 p-4">
+          <p className="text-sm font-bold text-slate-900">Nothing to change here</p>
+          <p className="mt-1 text-sm font-medium text-slate-500">
+            Prices, stock, delivery areas and the website are looked after by the Owner and
+            Managers. Your work is on the Orders and Customers screens.
+          </p>
+        </Card>
+      )}
+
+      <Card className={`mb-5 divide-y divide-slate-100 ${allowed.length === 0 ? "hidden" : ""}`}>
         {allowed.map((item) => (
           <Link
             key={item.href}
@@ -89,14 +123,22 @@ export default function AdminMorePage() {
       </Card>
 
       <Card className="p-4">
-        <p className="text-sm font-bold text-slate-900">Signed in as {currentUser.name}</p>
+        <p className="text-sm font-bold text-slate-900">
+          {staff ? `Signed in as ${staff.name}` : "Not signed in"}
+        </p>
         <p className="mt-0.5 text-sm font-medium text-slate-500">
-          {ROLE_LABELS[currentUser.role]} — you can see everything.
+          {staff
+            ? `${ROLE_LABELS[role]} — ${ROLE_SUMMARY[role]}`
+            : "Sign in to see and change anything here."}
         </p>
-        <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-medium text-slate-500">
-          Signing in is switched on in a later build. Owners will be able to add Managers and Order
-          staff, who see fewer of these settings.
-        </p>
+        <form action={signOutAction} className="mt-3">
+          <button
+            type="submit"
+            className="min-h-12 w-full rounded-xl border-2 border-slate-200 bg-white px-4 font-display text-sm font-bold text-slate-900 transition-colors hover:bg-slate-50"
+          >
+            {staff ? "Sign out" : "Go to sign in"}
+          </button>
+        </form>
       </Card>
     </AdminPage>
   );

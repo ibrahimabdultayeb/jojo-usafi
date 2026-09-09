@@ -151,7 +151,7 @@ describe("importing it did not open anything up", () => {
 });
 
 describe("stock was initialised from the master, and adds up", () => {
-  it("has an inventory row for every product, with nothing reserved", async () => {
+  it("has an inventory row for every product, and every running total adds up", async () => {
     const { data, error } = await db
       .from("inventory")
       .select("product_id, on_hand, reserved, available, products!inner(sku)")
@@ -159,8 +159,18 @@ describe("stock was initialised from the master, and adds up", () => {
 
     expect(error).toBeNull();
     expect(data).toHaveLength(201);
-    expect(data!.every((row) => row.reserved === 0)).toBe(true);
-    expect(data!.every((row) => row.available === row.on_hand)).toBe(true);
+
+    // Until Build 08C this also asserted `reserved === 0` across the whole
+    // catalogue, which was true only because nothing had ever been ordered. It
+    // described a moment, not a rule, and the first development order made it
+    // false — correctly, because reserving stock is the engine working.
+    //
+    // What is still a rule, and is what this test was really for:
+    for (const row of data!) {
+      expect(row.reserved, "stock is never negatively reserved").toBeGreaterThanOrEqual(0);
+      expect(row.reserved, "nothing may be promised that is not on the shelf").toBeLessThanOrEqual(row.on_hand);
+      expect(row.available, "the generated column agrees with its inputs").toBe(row.on_hand - row.reserved);
+    }
   });
 
   it("agrees with its own ledger", async () => {

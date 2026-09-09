@@ -1455,3 +1455,238 @@ an approved control to satisfy a measurement.
 Impact:
 The breadcrumb link was the same class of bug — 44px tall, 25px wide — and got its `min-w-11`
 back. Both were caught by the gate rather than by review.
+
+---
+
+## 2026-09-09 — Admin reads go through the caller's session; only the order operations use the service role
+
+Decision:
+`src/lib/admin/orders.ts` and `src/lib/catalogue/admin.ts` deliberately do not import the
+service-role client. Every dashboard read — orders, timeline, customers, delivery zones, the
+home snapshot, the product list — runs on the signed-in staff member's own session, so Row
+Level Security decides what comes back. The service role is used by exactly four writes:
+advance, complete, cancel and delivery-failed.
+
+Reason:
+A read path that can bypass RLS turns a policy mistake into a data leak. With the session
+client, the worst a wrong policy can do is show an empty screen — which is loud, local and
+harmless. The four exceptions are not a convenience: each one is a single transaction across
+`orders`, `inventory`, `order_events` and `inventory_movements`, and the ledgers have no
+INSERT policy for a browser token, because a ledger a client can append to is not a ledger.
+
+Alternatives:
+Use the service role everywhere and check the role in TypeScript. Rejected: that makes the
+application the boundary, and the application is the thing most likely to be wrong. Give
+staff INSERT on the ledgers. Rejected: it would make the audit trail forgeable by the one
+group with a reason to forge it.
+
+Impact:
+Reaching the service role requires `authorize()` to have already said yes, and `authorize()`
+reads the same capability matrix the screens read — so a control that is drawn and an
+operation that is permitted cannot drift apart. `getAdminCatalogue()` has to ask
+`jojo_is_staff()` before it names `on_hand`, because a stranger's column grant does not
+include it and asking anyway would turn the boundary working into a 500 page.
+
+---
+
+## 2026-09-09 — Completion and payment are one call, because they are one transaction
+
+Decision:
+`completeOrderAction` passes the payment method and reference to `jojo_advance_order` in the
+same call that moves the order to `completed`. There is no separate "record payment" write.
+
+Reason:
+Recording the payment first and hoping the completion follows leaves a paid order that never
+completed if the second call fails — money received, stock still reserved, and nothing on
+screen saying so. The database already refuses to complete an order with no payment, so the
+two facts have to arrive together or the constraint would simply reject the first half.
+
+Alternatives:
+Two actions with the client sequencing them. Rejected: the client cannot offer a
+transaction, and a network failure between the two is not rare on a phone in a shop.
+
+Impact:
+The payment sheet is the confirmation step for completing, not a separate errand. Cancelling
+the sheet cancels the completion, which is what an operator expects from a dialog.
+
+---
+
+## 2026-09-09 — A stock count records the difference, and must say why
+
+Decision:
+"Set counted stock" calls `jojo_count_stock`, which writes an `adjustment` movement for the
+**difference** between the count and the system, never the total, and refuses a count with an
+empty reason. The dashboard offers four reasons as buttons, plus an optional note.
+
+Reason:
+The ledger is the record of what happened, and "there are now 40" is not something that
+happened — "four were damaged" is. Writing the total would make the history unreplayable.
+The reason is required because a month later a stock take and a typo look identical without
+one, and reasons offered as buttons can be counted while free text cannot.
+
+Alternatives:
+Let the operator type the new number straight into the field, as the prototype did.
+Rejected: it is the one edit that cannot be traced, and stock is the number the shop's money
+is in. Make the reason optional. Rejected: it would be optional every time.
+
+Impact:
+A count that matches writes nothing and says "the count matched the system" rather than
+pretending to have done work. Add stock and Set counted stock are both refused for Order
+staff by the function itself, not only by the hidden button.
+
+---
+
+## 2026-09-09 — The dashboard counts available stock, not what is in the store
+
+Decision:
+The product list's "out of stock" and "low stock" badges and filters read `available`
+(`on_hand − reserved`), the same column `product_shelf` uses. The on-shelf versus reserved
+breakdown appears on the product only when something is actually reserved.
+
+Reason:
+Ten bottles with ten promised to open orders cannot be sold. Calling that "in stock" sends an
+operator to pick goods that are already spoken for, and disagrees with what the storefront
+and the home page's counts say — two screens, two answers, in the same shop.
+
+Alternatives:
+Show `on_hand`, as the prototype did with mock data. Rejected as above. Show both everywhere.
+Rejected: it puts a database concept on every row of a list that is read at a glance.
+
+Impact:
+"Available stock" is the phrase used throughout, and the reserved figure is shown as "set
+aside for orders" rather than as a column name.
+
+---
+
+## 2026-09-09 — Development QA staff exist, hold no stored password, and are removed by exact identity
+
+Decision:
+`scripts/qa-staff.mjs` creates a development Manager and Order staff account, prints one
+randomly generated password to the terminal and stores it nowhere. It records each account's
+exact auth user id and `admin_profiles` id in `.qa-staff.local.json`, which is gitignored, and
+`remove` deletes exactly those ids. `qa:screenshots` mints its own fresh password, resets it
+on the recorded id and signs in through the real form.
+
+Reason:
+The dashboard cannot be judged without signing in, and Ibrahim's real Owner account is the
+one account no automated process may use. A committed password would be a credential in Git
+forever; a stored one would be a credential on disk. Neither is needed — the service role can
+always reset a password it owns.
+
+Cleanup by exact identity is the same rule the test fixtures follow, for the same reason:
+Build 06 deleted a real audit row by matching on what had happened rather than on who had
+made it. Nothing here matches a role, an email domain, a name or a business state, and with
+no manifest `remove` refuses rather than guessing.
+
+Alternatives:
+A fixed password in `.env.local`. Rejected: it becomes permanent, gets shared and outlives
+the machine. Inject a session cookie instead of signing in. Rejected: signing in through the
+form is better QA — it exercises the server action, the cookie and the middleware exactly as
+a person does.
+
+Impact:
+`npm run qa:staff create` is a prerequisite for the dashboard QA pass; without it the pass is
+skipped with a note rather than failing, because a missing fixture is not a defect in the
+shop. A signed-in staff member being bounced to `/admin/sign-in` **is** a failure.
+
+---
+
+## 2026-09-09 — Development orders are placed, not inserted
+
+Decision:
+`scripts/seed-dev-orders.mjs` creates its two orders by calling `jojo_place_order` — the same
+function the checkout server action calls — rather than by inserting rows. Both carry a
+marker in the customer note saying what they are, and the script does nothing if they exist.
+
+Reason:
+A hand-built order would have no reservation, no sequence-issued order number and no first
+event, and the dashboard would faithfully display all three absences as if they were normal.
+An order placed the real way is the only kind worth looking at.
+
+Alternatives:
+Screenshot an empty dashboard. Rejected: the next-action button, the four dialogs and the
+order card are most of what Build 08C is. Insert rows directly. Rejected as above.
+
+Impact:
+The development dashboard shows two orders and a day's sales figure. They are real
+development orders, marked as such, on the development project — not invented numbers, which
+is what the mock data was and why it is gone.
+
+---
+
+## 2026-09-09 — The mock admin data is deleted, not kept as a fallback
+
+Decision:
+`src/mocks/admin/data.ts` no longer exports orders, customers, zones, today's figures, the
+attention counts or the activity feed. The vocabulary that lived beside them — stage labels,
+the next action per stage, the cancellation reasons, `AdminOrder` — moved to
+`src/lib/admin/model.ts`, which is not a mock. What remains is the Website screen's draft
+content, because that screen genuinely is still a prototype.
+
+Reason:
+A dashboard that can fall back to plausible fiction is a dashboard that can quietly show
+fiction. Keeping the arrays "in case the database is down" would mean an operator seeing
+seven orders and TSh 186,400 in sales on a day the shop sold nothing.
+
+Alternatives:
+Keep them behind a flag. Rejected: the flag would be wrong exactly when it mattered. Keep
+them for the tests. Rejected: the tests build their own fixtures, scoped to one run.
+
+Impact:
+An empty database now produces an empty screen with a sentence explaining it, which is the
+honest answer. The Website screen still says on its face that it saves nothing.
+
+---
+
+## 2026-09-09 — The order history is composed for the reader, not read out of the ledger
+
+Decision:
+`getOrderTimeline` and `getRecentActivity` build each sentence from the event's `kind` and
+`to_state`, using a table of what *arriving* at a state means — "Sent out for delivery",
+"Being prepared". The stored `summary` is used only for the events whose summary is genuinely
+a person's sentence: a cancellation reason, a failed delivery, a note, a payment.
+
+Reason:
+`order_events` is a ledger and its summaries are written for the ledger. Trusting them put
+`preparing → out_for_delivery` and `new → confirmed` on the order screen, and `checkout` and
+`system` in the "who did it" column — exactly the database jargon `docs/ADMIN_UX.md` forbids,
+in the one place an operator looks to understand what happened. The QA screenshots caught it;
+review had not.
+
+Alternatives:
+Rewrite the summaries in the SQL functions. Rejected: the ledger's job is to record what
+happened precisely, and `preparing → out_for_delivery` is the precise thing. Making it
+friendlier would make the audit trail vaguer to make one screen nicer. Post-process the
+summary with a find-and-replace. Rejected: it would keep working by accident until a new
+state name appeared.
+
+Impact:
+Actor codes are translated too — `checkout` is "Website", `system` is "Jojo Usafi", and a real
+staff member is their own name. The home page's activity feed puts the timestamp and actor
+under the sentence rather than beside it: as columns they fought the sentence for width on a
+390px screen and left it wrapping one word per line.
+
+---
+
+## 2026-09-09 — The QA gate waits for the route, never for a guessed delay
+
+Decision:
+The dashboard QA pass waits for the URL to match `/admin/orders/<id>` after clicking into an
+order, refuses to continue if it does not, and says so when a dialog's opener is not on the
+screen.
+
+Reason:
+The first version waited 600ms and then read `tab.url()`. Client-side navigation had not
+finished, so the "order URL" it captured was the orders *list* — and every dialog audited
+afterwards silently found nothing. The run passed with two of the four order dialogs never
+looked at. A gate that skips quietly is worse than one that fails, because it reports
+success.
+
+Alternatives:
+A longer timeout. Rejected: it is the same bug with a bigger number, and it would come back
+on a slower machine.
+
+Impact:
+`QA_ONLY=admin` was added at the same time, so the dashboard pass can be re-run in about four
+minutes instead of the full gate's twenty-five — the reason the original bug survived a run
+was partly that re-running to check was expensive.

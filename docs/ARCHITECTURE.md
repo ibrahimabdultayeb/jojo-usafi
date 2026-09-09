@@ -18,7 +18,7 @@ Firebase is **permanently unapproved** for Jojo Usafi. The approved direction is
 - **Validated two-way Google Sheet ↔ Supabase synchronization**
 
 **As of Build 06 the database is real.** A free Supabase development project exists — *Jojo
-Usafi Dev*, `dyjhacbbedytcstxxjzl`, ap-south-1 — and all 15 migrations have been applied to
+Usafi Dev*, `dyjhacbbedytcstxxjzl`, ap-south-1 — and all 19 migrations have been applied to
 it: 30 tables, 2 views, 16 enum types, 95 Row Level Security policies, 3 Storage buckets and
 the Supabase Auth foundation for Owner / Manager / Order staff. No billing is attached and
 no paid feature is enabled.
@@ -28,7 +28,7 @@ What is real and what is not:
 | | |
 | --- | --- |
 | Schema applied, constraints and triggers firing | **yes**, proved by `npm run test:db` |
-| Row Level Security enforcing, per role | **yes**, 169 tests against real sessions |
+| Row Level Security enforcing, per role | **yes**, 193 tests against real sessions |
 | Supabase Auth, staff roles, first-Owner bootstrap | **yes**, mechanism built and tested |
 | Storage buckets and their security | **yes** — and deliberately **empty** |
 | The real Owner account | **yes** — Ibrahim Abdul Tayeb, claimed 2026-09-09 |
@@ -36,14 +36,15 @@ What is real and what is not:
 | The 95 product photographs in Storage | **yes** — `product-media/<SKU>/` |
 | The catalogue in the database | **yes** — 201 products, 95 on the public shelf |
 | The application reading Supabase | **yes** — storefront and admin product screens |
-| Google Sheet synchronisation | **not connected** — Build 08 |
+| Google Sheet synchronisation | **not connected** — Build 09 |
 | The stock reservation engine | **yes** — one transaction, concurrency proved |
 | Server-authoritative quotation and order creation | **yes** |
 | Cancellation with reservation release | **yes** — idempotent |
 | A sign-in guard on the real-data admin routes | **yes** — all seven redirect |
 | The customer-facing checkout, confirmation and Track Order screens | **yes** — real, bilingual, guest checkout |
-| Order transitions, payment completion, delivery-failed | **yes** as server operations — no admin UI yet |
-| Admin write screens (orders, product, stock, zones) | **not built** — every server operation exists and is tested; the screens do not call them |
+| Order transitions, payment completion, delivery-failed | **yes** — server operations, and the admin screens that call them |
+| Admin write screens (orders, product, stock, zones) | **yes** — real reads, real writes, role-enforced |
+| The Website, Reports, Staff and Settings screens | **not built** — Website is the last screen on mock content, and says so |
 
 See `docs/DATA_MODEL.md`, `docs/TESTING_REQUIREMENTS.md` and `docs/PROGRESS.md`.
 
@@ -75,9 +76,9 @@ approximation of it. `supabase db reset` is never run against a hosted project �
 ## Backend layering
 
 ```
-supabase/migrations/               the schema — 15 migrations, all applied
+supabase/migrations/               the schema — 19 migrations, all applied
 supabase/seed.sql                  deliberately empty of business data
-src/lib/domain/                    the rules as pure TypeScript, 156 unit tests, no I/O
+src/lib/domain/                    the rules as pure TypeScript, 162 unit tests, no I/O
 src/lib/supabase/env.ts            environment validation — no defaults, no placeholders
 src/lib/supabase/client.ts         browser, as the visitor    — anon key, RLS applies
 src/lib/supabase/server.ts         server, as the visitor     — anon key, RLS applies
@@ -86,11 +87,49 @@ src/lib/supabase/database.types.ts GENERATED from the real database — never ha
 src/lib/supabase/types.ts          friendly aliases into the generated types
 scripts/schema-check.mjs           offline: the SQL and the domain layer agree
 scripts/gen-types.mjs              generate / drift-check the types against the database
-tests/db/                          169 tests against the real database, Auth and Storage
+tests/db/                          193 tests against the real database, Auth and Storage
 scripts/import-catalogue.mjs       CSV artifact -> Supabase, idempotent, never deletes
 src/lib/catalogue/queries.ts       the storefront read: product_shelf, cached 5 minutes
 src/lib/catalogue/admin.ts         the admin read, under the CALLER's own RLS
 ```
+
+## The admin dashboard (Build 08C)
+
+Every operational screen reads the real database and every control writes it. The layering
+is deliberately three files, each with one job:
+
+```
+src/lib/admin/model.ts        the vocabulary and the view-model — labels, stages, AdminOrder
+src/lib/admin/orders.ts       the READS: orders, timeline, home snapshot, customers, zones
+src/lib/admin/authorize.ts    the GATE: signed in? active staff? does the role allow it?
+src/lib/admin/actions.ts      the WRITES: one server action per operation
+src/lib/admin/permissions.ts  the capability matrix, read by both the screens and the gate
+```
+
+**Reads go through the caller's own session.** `orders.ts` deliberately does not import the
+service-role client: staff see everything because a policy says so, and a stranger sees an
+empty screen rather than the shop's order book. A policy mistake shows up as missing data,
+not as a leak.
+
+**Writes are split by what they touch.**
+
+| Operation | Client | Why |
+| --- | --- | --- |
+| Product price, offer, visibility, lifecycle | caller's session | the product policies already say Owner and Manager; RLS is the enforcement |
+| Add stock, count stock | caller's session | `jojo_add_stock` / `jojo_count_stock` re-ask `jojo_manages_catalogue()` themselves |
+| Delivery zones | caller's session | same |
+| Advance, complete, cancel, delivery-failed | service role, behind `authorize()` | one transaction spans `orders`, `inventory`, `order_events` and `inventory_movements` |
+| Audit rows | service role | `audit_events` has no INSERT policy for anybody holding a browser token |
+
+The service-role path is never reachable without passing `authorize()` first, and
+`authorize()` reads the same capability matrix the screens read — so a button that is drawn
+and an action that is allowed cannot drift apart. The UI hiding a control is never the
+boundary; it decides what is worth rendering.
+
+**No arithmetic happens twice.** Reservation maths, transition legality, the payment rules
+and the delivery quote all live in SQL functions proved in Build 08. The actions translate a
+refusal into a sentence and revalidate the screens that have gone stale. `orderTotals()` in
+`model.ts` re-adds the lines for display and is the only sum in the dashboard.
 
 ## Authorization: two locks, with different jobs
 

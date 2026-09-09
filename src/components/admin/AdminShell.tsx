@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
-import { currentUser, ROLE_LABELS } from "@/lib/admin/permissions";
+import { ROLE_LABELS, type Role } from "@/lib/admin/permissions";
 
 /**
  * The admin frame.
@@ -45,7 +45,17 @@ function isBareRoute(pathname: string) {
   return BARE_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 }
 
-export function AdminShell({ children }: { children: ReactNode }) {
+export interface ShellStaff {
+  name: string;
+  role: Role;
+}
+
+/** Two letters from a real name. Never a placeholder: no name, no circle. */
+function initialsOf(name: string): string {
+  return name.trim().split(/s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase();
+}
+
+export function AdminShell({ children, staff }: { children: ReactNode; staff?: ShellStaff | null }) {
   const pathname = usePathname();
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -85,19 +95,21 @@ export function AdminShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        <div className="border-t border-slate-100 p-3">
-          <div className="flex items-center gap-3 rounded-xl px-3 py-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-black text-white">
-              {currentUser.initials}
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-bold text-slate-900">{currentUser.name}</span>
-              <span className="block text-[11px] font-semibold text-slate-400">
-                {ROLE_LABELS[currentUser.role]}
+        {staff && (
+          <div className="border-t border-slate-100 p-3">
+            <Link href="/admin/sign-in" className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-slate-50">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-black text-white">
+                {initialsOf(staff.name)}
               </span>
-            </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-bold text-slate-900">{staff.name}</span>
+                <span className="block text-[11px] font-semibold text-slate-400">
+                  {ROLE_LABELS[staff.role]}
+                </span>
+              </span>
+            </Link>
           </div>
-        </div>
+        )}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -119,9 +131,15 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <span className="truncate">Search orders, products, customers…</span>
             </button>
 
-            <span className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-black text-white lg:hidden sm:flex">
-              {currentUser.initials}
-            </span>
+            {staff && (
+              <Link
+                href="/admin/sign-in"
+                aria-label={`Signed in as ${staff.name}`}
+                className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-black text-white lg:hidden sm:flex"
+              >
+                {initialsOf(staff.name)}
+              </Link>
+            )}
           </div>
 
           {searchOpen && (

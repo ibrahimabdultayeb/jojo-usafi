@@ -294,13 +294,24 @@ export function EmptyState({ title, body, icon = "package" }: { title: string; b
   );
 }
 
-/** Mock save feedback: Saved / Syncing… / Sync pending. */
-export function SaveState({ state }: { state: "idle" | "saving" | "saved" | "pending" }) {
+/**
+ * Honest save feedback.
+ *
+ * `saved` means the database said yes, and nothing else. It deliberately does
+ * not say "Synced": no Google Sheet write-back exists yet, and a badge claiming
+ * one would be the dashboard lying about where the truth is.
+ */
+export function SaveState({
+  state,
+}: {
+  state: "idle" | "saving" | "saved" | "pending" | "failed";
+}) {
   if (state === "idle") return null;
   const map = {
-    saving: { tone: "info" as const, icon: "clock" as const, text: "Syncing…" },
+    saving: { tone: "info" as const, icon: "clock" as const, text: "Saving…" },
     saved: { tone: "good" as const, icon: "check" as const, text: "Saved" },
     pending: { tone: "warn" as const, icon: "clock" as const, text: "Sync pending" },
+    failed: { tone: "bad" as const, icon: "close" as const, text: "Not saved" },
   };
   const { tone, icon, text } = map[state];
   return (

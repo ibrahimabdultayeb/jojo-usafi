@@ -5,25 +5,22 @@ import { Badge, Card, SectionTitle } from "@/components/admin/ui";
 import { formatTsh } from "@/lib/admin/format";
 import { Icon } from "@/components/ui/Icon";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
-import { orderTotals, orders, STAGE_LABEL, STAGE_TONE, timelineFor } from "@/mocks/admin/data";
-
-export function generateStaticParams() {
-  return orders.map((order) => ({ id: order.id }));
-}
+import { orderTotals, STAGE_LABEL, STAGE_TONE } from "@/lib/admin/model";
+import { getAdminOrder, getOrderTimeline } from "@/lib/admin/orders";
+import { currentStaff } from "@/lib/admin/authorize";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const order = orders.find((o) => o.id === id);
+  const order = await getAdminOrder(id);
   return { title: order ? order.number : "Order" };
 }
 
 export default async function AdminOrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const order = orders.find((o) => o.id === id);
+  const order = await getAdminOrder(id);
   if (!order) notFound();
 
-  const totals = orderTotals(order);
-  const timeline = timelineFor(order);
+  const [totals, timeline, staff] = [orderTotals(order), await getOrderTimeline(order.id), await currentStaff()];
   const digits = order.customer.phone.replace(/[^0-9]/g, "");
   const telHref = "tel:" + order.customer.phone.replace(/\s/g, "");
   const waText = encodeURIComponent(
@@ -34,13 +31,13 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
   return (
     <AdminPage
       title={order.number}
-      subtitle={"Placed " + order.placed.toLowerCase()}
+      subtitle={"Placed " + new Date(order.placed).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}
       back={{ href: "/admin/orders", label: "All orders" }}
       action={<Badge tone={STAGE_TONE[order.stage]}>{STAGE_LABEL[order.stage]}</Badge>}
     >
       {/* The next action sits at the top: it is why the screen was opened. */}
       <div className="mb-5">
-        <OrderActions order={order} />
+        <OrderActions order={order} role={staff?.role ?? "order_staff"} />
       </div>
 
       <SectionTitle>Customer</SectionTitle>
@@ -159,7 +156,7 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
       <Card className="p-4">
         <ol className="space-y-3">
           {timeline.map((entry) => (
-            <li key={entry.label} className="flex gap-3">
+            <li key={`${entry.at}-${entry.label}`} className="flex gap-3">
               <span
                 className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
                   entry.done ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-300"
@@ -173,7 +170,7 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
                 </span>
                 {entry.done && (
                   <span className="block text-xs font-medium text-slate-500">
-                    {entry.at} · {entry.by}
+                    {new Date(entry.at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })} · {entry.by}
                   </span>
                 )}
               </span>

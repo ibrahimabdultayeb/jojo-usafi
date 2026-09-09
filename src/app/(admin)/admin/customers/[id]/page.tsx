@@ -2,30 +2,42 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminPage } from "@/components/admin/AdminShell";
 import { Badge, Card, SectionTitle, StatTile } from "@/components/admin/ui";
-import { formatTsh } from "@/lib/admin/format";
+import { formatTsh, whenExactly, whenWords } from "@/lib/admin/format";
 import { Icon } from "@/components/ui/Icon";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
-import { customers, orderTotals, orders, STAGE_LABEL, STAGE_TONE } from "@/mocks/admin/data";
-
-export function generateStaticParams() {
-  return customers.map((customer) => ({ id: customer.id }));
-}
+import { orderTotals, STAGE_LABEL, STAGE_TONE } from "@/lib/admin/model";
+import { getAdminCustomer } from "@/lib/admin/orders";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const customer = customers.find((c) => c.id === id);
-  return { title: customer ? customer.name : "Customer" };
+  const found = await getAdminCustomer(id);
+  return { title: found ? found.customer.name : "Customer" };
 }
 
 export default async function AdminCustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const customer = customers.find((c) => c.id === id);
-  if (!customer) notFound();
+  const found = await getAdminCustomer(id);
+  if (!found) notFound();
 
-  const history = orders.filter((o) => o.customer.id === customer.id);
+  const { customer, orders } = found;
   const digits = customer.phone.replace(/[^0-9]/g, "");
   const waHref = "https://wa.me/" + digits;
   const telHref = "tel:" + customer.phone.replace(/\s/g, "");
+
+  /*
+    There is no address book: an address belongs to the order it was delivered
+    to, not to the person. So the places this customer has been delivered to are
+    read back off their real orders, newest first, without inventing a record
+    that the shop never kept.
+  */
+  const addresses = Array.from(
+    new Map(
+      orders.map((order) => [
+        `${order.delivery.zone}|${order.delivery.address}`,
+        { zone: order.delivery.zone, line: order.delivery.address },
+      ]),
+    ).values(),
+  );
 
   return (
     <AdminPage
@@ -53,9 +65,9 @@ export default async function AdminCustomerPage({ params }: { params: Promise<{ 
       </div>
 
       <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-        <StatTile label="Orders" value={String(customer.orderCount)} />
-        <StatTile label="Total spent" value={formatTsh(customer.totalSpend)} />
-        <StatTile label="Last order" value={customer.lastOrder} />
+        <StatTile label="Orders" value={String(customer.orders)} />
+        <StatTile label="Total spent" value={formatTsh(customer.spendTzs)} />
+        <StatTile label="Last order" value={whenWords(customer.lastOrder)} />
       </div>
 
       <SectionTitle>Contact and addresses</SectionTitle>
@@ -71,24 +83,28 @@ export default async function AdminCustomerPage({ params }: { params: Promise<{ 
           </div>
         </dl>
         <ul className="mt-3 space-y-2 border-t border-slate-100 pt-3">
-          {customer.addresses.map((address) => (
-            <li key={address.line} className="flex gap-2.5 text-sm">
-              <Icon name="mapPin" className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
-              <span>
-                <span className="block font-bold text-slate-900">{address.zone}</span>
-                <span className="block font-medium text-slate-500">{address.line}</span>
-              </span>
-            </li>
-          ))}
+          {addresses.length === 0 ? (
+            <li className="text-sm font-medium text-slate-500">No delivery address on record yet.</li>
+          ) : (
+            addresses.map((address) => (
+              <li key={address.zone + address.line} className="flex gap-2.5 text-sm">
+                <Icon name="mapPin" className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
+                <span>
+                  <span className="block font-bold text-slate-900">{address.zone}</span>
+                  <span className="block font-medium text-slate-500">{address.line}</span>
+                </span>
+              </li>
+            ))
+          )}
         </ul>
       </Card>
 
       <SectionTitle>Order history</SectionTitle>
       <Card className="divide-y divide-slate-100">
-        {history.length === 0 ? (
+        {orders.length === 0 ? (
           <p className="p-4 text-sm font-medium text-slate-500">No orders yet.</p>
         ) : (
-          history.map((order) => {
+          orders.map((order) => {
             const totals = orderTotals(order);
             return (
               <Link
@@ -101,7 +117,9 @@ export default async function AdminCustomerPage({ params }: { params: Promise<{ 
                     <span className="font-display text-sm font-bold text-slate-900">{order.number}</span>
                     <Badge tone={STAGE_TONE[order.stage]}>{STAGE_LABEL[order.stage]}</Badge>
                   </span>
-                  <span className="mt-0.5 block text-xs font-medium text-slate-500">{order.placed}</span>
+                  <span className="mt-0.5 block text-xs font-medium text-slate-500">
+                    {whenExactly(order.placed)}
+                  </span>
                 </span>
                 <span className="shrink-0 text-sm font-black text-slate-900 tabular-nums">
                   {formatTsh(totals.total)}
