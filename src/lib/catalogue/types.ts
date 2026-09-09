@@ -96,6 +96,12 @@ export interface Product {
   /** Millilitres or grams, so pack sizes sort smallest-first rather than by price. */
   sizeRank: number;
   price: number;
+  /** Import-only catalogue facts, carried for Supabase rather than the shelf. */
+  offerPrice: number | null;
+  ean: string | null;
+  itf14: string | null;
+  stockQty: number;
+  lowStockThreshold: number;
   /** Blank for 200 of 201 master rows. Never invented. */
   description: string;
   badges: ProductBadge[];

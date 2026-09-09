@@ -9,9 +9,9 @@ import { toneSet } from "@/lib/tones";
  * new story. Only brands with something publishable on the shelf are listed, so
  * a tile never leads into an empty catalogue.
  */
-export function BrandSection({ locale }: { locale: Locale }) {
+export async function BrandSection({ locale }: { locale: Locale }) {
   const t = getDictionary(locale);
-  const brands = getBrands();
+  const brands = await getBrands();
 
   return (
     <section className="bg-white py-12 md:py-16">

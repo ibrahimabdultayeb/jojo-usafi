@@ -17,7 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { anonClient, serviceClient, signIn } from "./support";
-import { EMAIL, ensureOwnerProfile } from "./fixtures";
+import { EMAIL, NAMES, ensureOwnerProfile } from "./fixtures";
 
 type Client = SupabaseClient<Database>;
 
@@ -25,7 +25,7 @@ const db = serviceClient();
 const anon = anonClient();
 
 const BUCKET = "product-media";
-const PATH = "zztest/zztest-storage-probe.webp";
+const PATH = `${NAMES.storagePrefix}/storage-probe.webp`;
 
 /** Bytes, not a photograph. The mime type is what the bucket screens on. */
 const bytes = () => new Blob([new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x00])], { type: "image/webp" });
@@ -103,7 +103,7 @@ describe("who may put a photograph in", () => {
   it("refuses a file type the bucket does not accept", async () => {
     const { error } = await manager.storage
       .from(BUCKET)
-      .upload("zztest/zztest-not-an-image.txt", new Blob(["not an image"], { type: "text/plain" }), {
+      .upload(`${NAMES.storagePrefix}/not-an-image.txt`, new Blob(["not an image"], { type: "text/plain" }), {
         contentType: "text/plain",
       });
     expect(error).not.toBeNull();

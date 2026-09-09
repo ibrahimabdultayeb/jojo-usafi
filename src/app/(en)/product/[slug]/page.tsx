@@ -8,16 +8,16 @@ const locale = "en" as const;
 type Params = Promise<{ slug: string }>;
 
 /** Only publishable products are prerendered — the shelf is the source of truth. */
-export function generateStaticParams() {
-  return getProducts().map((product) => ({ slug: product.slug }));
+export async function generateStaticParams() {
+  return (await getProducts()).map((product) => ({ slug: product.slug }));
 }
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { slug } = await params;
-  const product = getProduct(slug);
+  const product = await getProduct(slug);
   if (!product) return { title: "Product not found" };
   return {
-    title: fullProductName(product),
+    title: await fullProductName(product),
     // The master carries a description for 1 of 201 rows; none is invented here.
     description: product.description || undefined,
     alternates: localeAlternates(locale, `/product/${product.slug}`),

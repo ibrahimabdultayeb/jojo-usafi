@@ -1,11 +1,7 @@
 import { notFound } from "next/navigation";
 import { AdminPage } from "@/components/admin/AdminShell";
 import { ProductEditor } from "@/components/admin/products/ProductEditor";
-import { adminProducts } from "@/mocks/admin/data";
-
-export function generateStaticParams() {
-  return adminProducts().map((product) => ({ sku: product.sku }));
-}
+import { getAdminCatalogue } from "@/lib/catalogue/admin";
 
 export async function generateMetadata({ params }: { params: Promise<{ sku: string }> }) {
   const { sku } = await params;
@@ -14,7 +10,8 @@ export async function generateMetadata({ params }: { params: Promise<{ sku: stri
 
 export default async function AdminProductPage({ params }: { params: Promise<{ sku: string }> }) {
   const { sku } = await params;
-  const product = adminProducts().find((p) => p.sku === sku);
+  const { products } = await getAdminCatalogue();
+  const product = products.find((p) => p.sku === sku);
   if (!product) notFound();
 
   return (

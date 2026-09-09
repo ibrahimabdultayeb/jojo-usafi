@@ -1,22 +1,21 @@
 /**
- * Fake development fixtures.
+ * Fake development fixtures, scoped to one test run.
  *
  * Everything here is invented and obviously so. Nothing in this file is a real
  * price, a real customer, a real order or a real delivery zone — the whole
  * point of `supabase/seed.sql` refusing to seed business data is that unreal
- * figures must never appear on the admin dashboard's revenue tiles. These rows
- * exist for the length of one test run and are then removed.
+ * figures must never appear on the admin dashboard's revenue tiles.
  *
- * Every identifier starts `ZZTEST` / `zztest` / `aa000000-`, so anything left
- * behind by a crashed run is unmistakable and the teardown can find it with a
- * pattern rather than a list.
+ * Every identifier carries THIS RUN'S token (see `run-context.ts`), so teardown
+ * can delete exactly the rows this run created and nothing else. It never
+ * matches on a role, an action, a business state or a shared email domain.
  *
  * The shelf built here is deliberately awkward, because the interesting cases
  * are the ones RLS gets wrong:
  *
- *   ZZTEST-P1  active, visible, photographed   → public, and on the shelf
- *   ZZTEST-P2  active but switched off         → not public
- *   ZZTEST-P3  active and visible, NO photo    → readable, but NOT on the shelf
+ *   ...-P1  active, visible, photographed   → public, and on the shelf
+ *   ...-P2  active but switched off         → not public
+ *   ...-P3  active and visible, NO photo    → readable, but NOT on the shelf
  *
  * P3 is the one that proves the row policy and the view are different rules:
  * `products_public_read` does not require a photograph — it cannot, or the
@@ -27,50 +26,58 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, TablesInsert } from "@/lib/supabase/types";
 import { serviceClient, testPassword } from "./support";
+import { namesFor, readManifest } from "./run-context";
 
 type Service = SupabaseClient<Database>;
 
-const u = (tail: string) => `aa000000-0000-4000-8000-${tail.padStart(12, "0")}`;
+/** This run's identity. Read once, at import, from the manifest globalSetup wrote. */
+export const NAMES = namesFor(readManifest().token);
 
 export const ID = {
-  supplier: u("1"),
-  brand: u("2"),
-  brandInactive: u("3"),
-  category: u("4"),
-  mediaP1: u("5"),
-  mediaP2: u("6"),
-  mediaLoose: u("7"),
-  family: u("8"),
-  familyDraft: u("9"),
-  productPublic: u("a"),
-  productHidden: u("b"),
-  productNoPhoto: u("c"),
-  zone: u("d"),
-  customer: u("e"),
-  order: u("f"),
-  orderItem: u("10"),
-  orderEvent: u("11"),
-  optionValue: u("12"),
-  profileManager: u("13"),
-  profileStaff: u("14"),
+  supplier: NAMES.uuid(1),
+  brand: NAMES.uuid(2),
+  brandInactive: NAMES.uuid(3),
+  category: NAMES.uuid(4),
+  mediaP1: NAMES.uuid(5),
+  mediaP2: NAMES.uuid(6),
+  mediaLoose: NAMES.uuid(7),
+  family: NAMES.uuid(8),
+  familyDraft: NAMES.uuid(9),
+  productPublic: NAMES.uuid(10),
+  productHidden: NAMES.uuid(11),
+  productNoPhoto: NAMES.uuid(12),
+  zone: NAMES.uuid(13),
+  customer: NAMES.uuid(14),
+  order: NAMES.uuid(15),
+  orderItem: NAMES.uuid(16),
+  orderEvent: NAMES.uuid(17),
+  optionValue: NAMES.uuid(18),
+  profileManager: NAMES.uuid(19),
+  profileStaff: NAMES.uuid(20),
 } as const;
 
 export const SKU = {
-  public: "ZZTEST-P1",
-  hidden: "ZZTEST-P2",
-  noPhoto: "ZZTEST-P3",
+  public: NAMES.sku("P1"),
+  hidden: NAMES.sku("P2"),
+  noPhoto: NAMES.sku("P3"),
+  /** Used by constraint tests that expect the insert to be refused. */
+  temp: NAMES.sku("TMP"),
+  renamed: NAMES.sku("P3B"),
 } as const;
 
 export const EMAIL = {
-  owner: "zztest-owner@jojo-usafi.test",
-  manager: "zztest-manager@jojo-usafi.test",
-  staff: "zztest-staff@jojo-usafi.test",
+  owner: NAMES.email("owner"),
+  manager: NAMES.email("manager"),
+  staff: NAMES.email("staff"),
   /** Signed in, but not staff and not a customer: a stranger with a token. */
-  nobody: "zztest-nobody@jojo-usafi.test",
+  nobody: NAMES.email("nobody"),
 } as const;
 
-export const TEST_PHONE = "+255700000001";
-export const ANALYTICS_SESSION = "zztest-session";
+export const TEST_PHONE = NAMES.phone;
+export const ANALYTICS_SESSION = NAMES.session;
+
+/** The image path prefix this run owns inside the Storage buckets. */
+export const STORAGE_PREFIX = NAMES.storagePrefix;
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -91,8 +98,8 @@ export async function createFixtures(): Promise<void> {
     (
       await db.from("suppliers").insert({
         id: ID.supplier,
-        code: "ZZTEST-SUP",
-        name: "ZZTEST Supplier",
+        code: NAMES.code("SUP"),
+        name: `ZZ${NAMES.token} Supplier`,
         active: true,
       })
     ).error,
@@ -104,17 +111,18 @@ export async function createFixtures(): Promise<void> {
       await db.from("brands").insert([
         {
           id: ID.brand,
-          code: "ZZTEST-BR",
-          slug: "zztest-brand",
-          name: "ZZTEST Brand",
+          code: NAMES.code("BR"),
+          slug: NAMES.slug("brand"),
+          name: `ZZ${NAMES.token} Brand`,
           supplier_id: ID.supplier,
           active: true,
         },
         {
           id: ID.brandInactive,
-          code: "ZZTEST-BR2",
-          slug: "zztest-brand-inactive",
-          name: "ZZTEST Brand Inactive",
+          code: NAMES.code("BR2"),
+          slug: NAMES.slug("brand-inactive"),
+          name: `ZZ${NAMES.token} Brand Inactive`,
+          supplier_id: null,
           active: false,
         },
       ])
@@ -126,9 +134,9 @@ export async function createFixtures(): Promise<void> {
     (
       await db.from("categories").insert({
         id: ID.category,
-        code: "ZZTEST-CAT",
-        slug: "zztest-category",
-        name: "ZZTEST Category",
+        code: NAMES.code("CAT"),
+        slug: NAMES.slug("category"),
+        name: `ZZ${NAMES.token} Category`,
         active: true,
       })
     ).error,
@@ -141,21 +149,21 @@ export async function createFixtures(): Promise<void> {
         {
           id: ID.mediaP1,
           storage_bucket: "product-media",
-          storage_path: "zztest/zztest-p1-primary-1.webp",
-          alt_text: "ZZTEST product one",
+          storage_path: `${STORAGE_PREFIX}/p1-primary-1.webp`,
+          alt_text: "fixture product one",
         },
         {
           id: ID.mediaP2,
           storage_bucket: "product-media",
-          storage_path: "zztest/zztest-p2-primary-1.webp",
-          alt_text: "ZZTEST product two",
+          storage_path: `${STORAGE_PREFIX}/p2-primary-1.webp`,
+          alt_text: "fixture product two",
         },
         {
           // Attached to nothing. A shopper must never be able to read it.
           id: ID.mediaLoose,
           storage_bucket: "product-media",
-          storage_path: "zztest/zztest-unattached.webp",
-          alt_text: "ZZTEST unattached",
+          storage_path: `${STORAGE_PREFIX}/unattached.webp`,
+          alt_text: "fixture unattached",
         },
       ])
     ).error,
@@ -167,20 +175,20 @@ export async function createFixtures(): Promise<void> {
       await db.from("product_families").insert([
         {
           id: ID.family,
-          code: "ZZTEST-FAM",
-          slug: "zztest-family",
+          code: NAMES.code("FAM"),
+          slug: NAMES.slug("family"),
           brand_id: ID.brand,
           category_id: ID.category,
-          name: "ZZTEST Family",
+          name: `ZZ${NAMES.token} Family`,
           lifecycle: "active",
         },
         {
           id: ID.familyDraft,
-          code: "ZZTEST-FAM2",
-          slug: "zztest-family-draft",
+          code: NAMES.code("FAM2"),
+          slug: NAMES.slug("family-draft"),
           brand_id: ID.brand,
           category_id: ID.category,
-          name: "ZZTEST Family Draft",
+          name: `ZZ${NAMES.token} Family Draft`,
           lifecycle: "draft",
         },
       ])
@@ -214,8 +222,8 @@ export async function createFixtures(): Promise<void> {
         product({
           id: ID.productPublic,
           sku: SKU.public,
-          slug: "zztest-p1",
-          display_name: "ZZTEST Product One",
+          slug: NAMES.slug("p1"),
+          display_name: `ZZ${NAMES.token} Product One`,
           pack_size_label: "5LT",
           price_tzs: 10_000,
           storefront_visible: true,
@@ -224,16 +232,16 @@ export async function createFixtures(): Promise<void> {
         product({
           id: ID.productHidden,
           sku: SKU.hidden,
-          slug: "zztest-p2",
-          display_name: "ZZTEST Product Two",
+          slug: NAMES.slug("p2"),
+          display_name: `ZZ${NAMES.token} Product Two`,
           price_tzs: 20_000,
           storefront_visible: false,
         }),
         product({
           id: ID.productNoPhoto,
           sku: SKU.noPhoto,
-          slug: "zztest-p3",
-          display_name: "ZZTEST Product Three",
+          slug: NAMES.slug("p3"),
+          display_name: `ZZ${NAMES.token} Product Three`,
           price_tzs: 30_000,
           storefront_visible: true,
         }),
@@ -255,8 +263,8 @@ export async function createFixtures(): Promise<void> {
     "product_content",
     (
       await db.from("product_content").insert([
-        { product_id: ID.productPublic, locale: "en", name: "ZZTEST Product One" },
-        { product_id: ID.productHidden, locale: "en", name: "ZZTEST Product Two" },
+        { product_id: ID.productPublic, locale: "en", name: `ZZ${NAMES.token} Product One` },
+        { product_id: ID.productHidden, locale: "en", name: `ZZ${NAMES.token} Product Two` },
       ])
     ).error,
   );
@@ -276,8 +284,8 @@ export async function createFixtures(): Promise<void> {
       await db.from("product_option_values").insert({
         id: ID.optionValue,
         axis_id: sizeAxisId,
-        code: "zztest-5lt",
-        label: "ZZTEST 5LT",
+        code: NAMES.slug("5lt"),
+        label: `ZZ${NAMES.token} 5LT`,
         numeric_rank: 5000,
       })
     ).error,
@@ -314,8 +322,8 @@ export async function createFixtures(): Promise<void> {
     (
       await db.from("delivery_zones").insert({
         id: ID.zone,
-        slug: "zztest-zone",
-        name: "ZZTEST Zone",
+        slug: NAMES.slug("zone"),
+        name: `ZZ${NAMES.token} Zone`,
         fee_tzs: 4000,
         active: true,
       })
@@ -328,8 +336,8 @@ export async function createFixtures(): Promise<void> {
       await db.from("customers").insert({
         id: ID.customer,
         phone_e164: TEST_PHONE,
-        phone_display: "0700 000 001",
-        full_name: "ZZTEST Customer",
+        phone_display: "fixture",
+        full_name: `ZZ${NAMES.token} Customer`,
       })
     ).error,
   );
@@ -340,11 +348,11 @@ export async function createFixtures(): Promise<void> {
       await db.from("orders").insert({
         id: ID.order,
         customer_id: ID.customer,
-        customer_name: "ZZTEST Customer",
+        customer_name: `ZZ${NAMES.token} Customer`,
         customer_phone_e164: TEST_PHONE,
         delivery_zone_id: ID.zone,
-        delivery_zone_name: "ZZTEST Zone",
-        delivery_address: "ZZTEST address",
+        delivery_zone_name: `ZZ${NAMES.token} Zone`,
+        delivery_address: "fixture address",
         delivery_fee_tzs: 4000,
         subtotal_tzs: 20_000,
         discount_tzs: 0,
@@ -363,7 +371,7 @@ export async function createFixtures(): Promise<void> {
         order_id: ID.order,
         product_id: ID.productPublic,
         sku: SKU.public,
-        product_name: "ZZTEST Product One",
+        product_name: `ZZ${NAMES.token} Product One`,
         pack_size_label: "5LT",
         quantity: 2,
         unit_price_tzs: 10_000,
@@ -381,7 +389,7 @@ export async function createFixtures(): Promise<void> {
         kind: "order_created",
         to_state: "new",
         actor_type: "system",
-        summary: "ZZTEST order created",
+        summary: "fixture order created",
       })
     ).error,
   );
@@ -398,7 +406,7 @@ export async function createFixtures(): Promise<void> {
           kind: "receipt",
           on_hand_delta: 10,
           reserved_delta: 0,
-          reference: "ZZTEST receipt",
+          reference: "fixture receipt",
         },
         {
           product_id: ID.productPublic,
@@ -432,9 +440,9 @@ async function createLogins(db: Service): Promise<void> {
 
   const ids = await loginIds(db);
 
-  // The Owner profile is NOT created here. tests/db/02-auth.test.ts proves the
-  // first-Owner bootstrap by having the Owner login claim the seat itself,
-  // which is the only way to prove the bootstrap actually works.
+  // The Owner profile is NOT created here. `ensureOwnerProfile()` adds it when a
+  // test needs to act as an Owner — as a SECOND Owner alongside Jojo Usafi's
+  // real one, which no test may touch.
   ok(
     "staff profiles",
     (
@@ -442,7 +450,7 @@ async function createLogins(db: Service): Promise<void> {
         {
           id: ID.profileManager,
           auth_user_id: ids[EMAIL.manager],
-          full_name: "ZZTEST Manager",
+          full_name: `ZZ${NAMES.token} Manager`,
           email: EMAIL.manager,
           role: "manager",
           active: true,
@@ -450,7 +458,7 @@ async function createLogins(db: Service): Promise<void> {
         {
           id: ID.profileStaff,
           auth_user_id: ids[EMAIL.staff],
-          full_name: "ZZTEST Order Staff",
+          full_name: `ZZ${NAMES.token} Order Staff`,
           email: EMAIL.staff,
           role: "order_staff",
           active: true,
@@ -460,7 +468,7 @@ async function createLogins(db: Service): Promise<void> {
   );
 }
 
-/** Auth user ids for the fixture logins, keyed by email. */
+/** Auth user ids for this run's fixture logins, keyed by email. */
 export async function loginIds(db: Service = serviceClient()): Promise<Record<string, string>> {
   const wanted = new Set<string>(Object.values(EMAIL));
   const found: Record<string, string> = {};
@@ -478,18 +486,12 @@ export async function loginIds(db: Service = serviceClient()): Promise<Record<st
 }
 
 /**
- * Give the FIXTURE owner login an active Owner profile.
+ * Give THIS RUN's owner login an active Owner profile.
  *
- * Note what this deliberately does not do: check whether *some* Owner exists.
- * Since the first-Owner bootstrap was completed on 2026-09-09 there is always a
- * real Owner on this database — Jojo Usafi's own — and an `ensureOwnerProfile`
- * that stopped there would leave `zztest-owner@jojo-usafi.test` with no profile,
- * so every "as the Owner" test would silently be running as a stranger and
- * passing for the wrong reason.
- *
- * A second Owner is legitimate: the last-Owner trigger protects the last one,
- * not the only one. The fixture Owner is removed by teardown; the real one is
- * matched by no teardown pattern and is never touched.
+ * A second Owner is legitimate — the last-Owner trigger protects the last one,
+ * not the only one — and it is the only way a test can act as an Owner without
+ * borrowing Jojo Usafi's real one. This never inspects, alters or depends on
+ * that real row.
  */
 export async function ensureOwnerProfile(): Promise<void> {
   const db = serviceClient();
@@ -521,7 +523,7 @@ export async function ensureOwnerProfile(): Promise<void> {
     (
       await db.from("admin_profiles").insert({
         auth_user_id: ids[EMAIL.owner],
-        full_name: "ZZTEST Owner",
+        full_name: `ZZ${NAMES.token} Owner`,
         email: EMAIL.owner,
         role: "owner",
         active: true,

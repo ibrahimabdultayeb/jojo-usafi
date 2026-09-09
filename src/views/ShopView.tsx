@@ -6,7 +6,6 @@ import { Icon } from "@/components/ui/Icon";
 import {
   getBrands,
   getCategories,
-  getCategory,
   getProducts,
   searchProducts,
   sortProducts,
@@ -33,14 +32,18 @@ export async function ShopView({ locale, searchParams }: ShopViewProps) {
   const query = first(params.q) ?? "";
   const sort = (first(params.sort) ?? "featured") as SortKey;
 
-  const categories = getCategories();
-  const category = categorySlug ? getCategory(categorySlug) : undefined;
-  const brand = brandSlug ? getBrands().find((b) => b.slug === brandSlug) : undefined;
+  const [categories, brands, allProducts] = await Promise.all([
+    getCategories(),
+    getBrands(),
+    getProducts(),
+  ]);
+  const category = categorySlug ? categories.find((c) => c.slug === categorySlug) : undefined;
+  const brand = brandSlug ? brands.find((b) => b.slug === brandSlug) : undefined;
 
-  let list = getProducts();
+  let list = allProducts;
   if (category) list = list.filter((p) => p.categoryId === category.id);
   if (brand) list = list.filter((p) => p.brandId === brand.id);
-  list = sortProducts(searchProducts(list, query), sort);
+  list = sortProducts(searchProducts(list, query, new Map(brands.map((b) => [b.id, b]))), sort);
 
   const heading = category?.name ?? brand?.name ?? t.shop.allProducts;
   const blurb =

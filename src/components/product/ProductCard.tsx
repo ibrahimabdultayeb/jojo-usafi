@@ -21,9 +21,9 @@ interface ProductCardProps {
   priority?: boolean;
 }
 
-export function ProductCard({ product, locale, priority = false }: ProductCardProps) {
+export async function ProductCard({ product, locale, priority = false }: ProductCardProps) {
   const t = getDictionary(locale);
-  const brand = getBrand(product.brandId);
+  const brand = await getBrand(product.brandId);
   const badge = product.badges[0];
   const href = localePath(locale, `/product/${product.slug}`);
   const name = productName(product);

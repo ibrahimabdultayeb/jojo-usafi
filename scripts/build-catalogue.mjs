@@ -264,7 +264,9 @@ function toNumber(value) {
 
 const products = records.map((row) => {
   const price = toNumber(row["PRICE TZS"]);
+  const offerPrice = toNumber(row["OFFER PRICE TZS"]);
   const stock = toNumber(row["STOCK QTY"]);
+  const lowStock = toNumber(row["LOW STOCK THRESHOLD"]);
   const brand = brandByName.get(row["PRODUCT BRAND"]);
   const category = categoryByName.get(row.CATEGORY);
   const supplier = supplierByName.get(row.SUPPLIER);
@@ -299,6 +301,15 @@ const products = records.map((row) => {
     packType: packTypeFor(row.SIZE),
     sizeRank: sizeRank(row.SIZE),
     price: Number.isFinite(price) ? price : 0,
+    // Carried for the Supabase importer rather than for the storefront: these
+    // are catalogue facts the shelf never renders, but the database holds.
+    // Blank stays blank — the master has no offer prices today, and inventing
+    // one would be inventing a discount.
+    offerPrice: Number.isFinite(offerPrice) && offerPrice > 0 ? offerPrice : null,
+    ean: /^[0-9]{8}$|^[0-9]{13}$/.test(String(row.EAN).trim()) ? String(row.EAN).trim() : null,
+    itf14: /^[0-9]{14}$/.test(String(row.ITF).trim()) ? String(row.ITF).trim() : null,
+    stockQty: Number.isFinite(stock) && stock >= 0 ? Math.trunc(stock) : 0,
+    lowStockThreshold: Number.isFinite(lowStock) && lowStock >= 0 ? Math.trunc(lowStock) : 0,
     // 200 of 201 master rows carry no description. Blank stays blank.
     description: row.DESCRIPTION,
     badges,

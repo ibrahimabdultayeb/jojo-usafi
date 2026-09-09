@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { Badge, Card, EmptyState, inputClass } from "@/components/admin/ui";
 import { formatTsh } from "@/lib/admin/format";
 import { Icon } from "@/components/ui/Icon";
-import { getBrand, productName } from "@/lib/catalogue/queries";
+
 import type { AdminProduct } from "@/mocks/admin/data";
 
 /**
@@ -74,8 +74,8 @@ export function ProductsBrowser({
       if (!matchesFilter(product, filter)) return false;
       if (!q) return true;
       // Name, SKU, barcode and brand — the four things printed on a shelf label.
-      const brand = getBrand(product.brandId)?.name ?? "";
-      const haystack = `${productName(product)} ${product.sku} ${brand} ${product.packSize}`.toLowerCase();
+      const brand = product.brandName ?? "";
+      const haystack = `${product.name} ${product.sku} ${brand} ${product.packSize}`.toLowerCase();
       return haystack.includes(q);
     });
   }, [products, filter, term]);
@@ -134,7 +134,7 @@ export function ProductsBrowser({
         <Card className="divide-y divide-slate-100">
           {visible.map((product) => {
             const badges = badgesFor(product);
-            const brand = getBrand(product.brandId)?.name;
+            const brand = product.brandName;
             return (
               <Link
                 key={product.sku}
@@ -145,7 +145,7 @@ export function ProductsBrowser({
                   {product.image ? (
                     <Image
                       src={product.image.src}
-                      alt={productName(product)}
+                      alt={product.name}
                       fill
                       sizes="56px"
                       className="object-contain"
@@ -159,7 +159,7 @@ export function ProductsBrowser({
 
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-bold text-slate-900">
-                    {productName(product)}
+                    {product.name}
                   </span>
                   <span className="block truncate text-xs font-medium text-slate-500">
                     {brand} · {product.packSize} · {product.sku}

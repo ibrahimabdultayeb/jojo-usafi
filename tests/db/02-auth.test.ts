@@ -1,19 +1,16 @@
 /**
  * Supabase Auth, the three staff roles, and the first-Owner bootstrap.
  *
- * The fixtures deliberately do NOT create an Owner profile. They create the
- * Owner's LOGIN and stop, so that the bootstrap can be proved the only way it
- * can honestly be proved: by an empty shop having no Owner, one account taking
- * the seat, and every later attempt being refused.
- *
- * Everything after that depends on it, which is why this file is 02 and runs
- * with `fileParallelism: false`.
+ * Every fixture identity here carries this run's token, and nothing in this file
+ * inspects, mutates or depends on Jojo Usafi's real Owner row beyond asserting
+ * that it exists and is unchanged.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { AdminProfileRow } from "@/lib/supabase/types";
-import { anonClient, errorOf, isRefusedByTrigger, PG, serviceClient, signIn } from "./support";
-import { EMAIL, ID, ensureOwnerProfile, loginIds } from "./fixtures";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { beforeAll, describe, expect, it } from "vitest";
+import { anonClient, errorOf, PG, serviceClient, signIn } from "./support";
+import { EMAIL, ID, NAMES, ensureOwnerProfile, loginIds } from "./fixtures";
 
 const db = serviceClient();
 
@@ -32,7 +29,7 @@ const db = serviceClient();
  * stranger, and cannot be taken by a signed-in account that simply fancies it.
  *
  * The real Owner is found by asking the database rather than by naming anybody:
- * the active Owner whose email is not a `zztest-` fixture.
+ * the active Owner whose email does not carry this run's fixture prefix.
  */
 describe("the Owner seat is taken, and cannot be taken again", () => {
   it("reports that the shop has an Owner", async () => {
@@ -47,7 +44,7 @@ describe("the Owner seat is taken, and cannot be taken again", () => {
       .select("id, full_name, email, role, active, auth_user_id")
       .eq("role", "owner")
       .eq("active", true)
-      .not("email", "like", "zztest-%");
+      .not("email", "like", `${NAMES.emailPrefix}%`);
 
     expect(error).toBeNull();
     expect(data).toHaveLength(1);
@@ -116,7 +113,7 @@ describe("a signed-in account cannot promote itself", () => {
     const error = errorOf(
       await stranger.from("admin_profiles").insert({
         auth_user_id: ids[EMAIL.nobody],
-        full_name: "ZZTEST Self Promoted",
+        full_name: `ZZ${NAMES.token} Self Promoted`,
         email: EMAIL.nobody,
         role: "owner",
         active: true,
@@ -133,7 +130,7 @@ describe("a signed-in account cannot promote itself", () => {
       .select("id")
       .eq("role", "owner")
       .eq("active", true)
-      .not("email", "like", "zztest-%");
+      .not("email", "like", `${NAMES.emailPrefix}%`);
 
     const realOwnerId = owners![0].id;
 
@@ -159,7 +156,7 @@ describe("a signed-in account cannot promote itself", () => {
   it("still sees the public shelf — RLS denies staff data, not everything", async () => {
     const stranger = await signIn(EMAIL.nobody);
 
-    const shelf = await stranger.from("product_shelf").select("sku").like("sku", "ZZTEST%");
+    const shelf = await stranger.from("product_shelf").select("sku").like("sku", `${NAMES.skuPrefix}%`);
     expect(shelf.error).toBeNull();
     expect(shelf.data!.length).toBeGreaterThan(0);
 
@@ -222,127 +219,44 @@ describe("a caller's role is whatever admin_profiles says it is", () => {
 
 describe("there must always be an Owner", () => {
   /**
-   * The guard fires for the LAST active Owner, so there has to be exactly one.
-   * Earlier tests give the fixture login an Owner profile, which would be a
-   * second one and would make every assertion below pass for the wrong reason —
-   * demoting one of two Owners is supposed to be allowed. It is stood down for
-   * the length of this section and put back afterwards.
+   * The guard fires only for the LAST active Owner, and Jojo Usafi's real Owner
+   * is permanent — so any fixture Owner is always a second one and the guard
+   * never fires on it. Exercising it needs a world with exactly one Owner.
    *
-   * Standing it down is itself legitimate: the real Owner remains, so the guard
-   * has no reason to object.
-   */
-  beforeAll(async () => {
-    await db
-      .from("admin_profiles")
-      .update({ active: false })
-      .eq("role", "owner")
-      .like("email", "zztest-%");
-  });
-
-  afterAll(ensureOwnerProfile);
-
-  /**
-   * The Owner this shop actually belongs to — found by asking, never named.
+   * Build 06 got that world by attempting refused mutations against the real
+   * Owner row, and on one run a DELETE actually went through. So the whole
+   * scenario now runs inside a transaction that always rolls back, in
+   * `last-owner-guard.sql`: probe Owners are created, every other Owner stands
+   * down *within the transaction*, the guard is exercised against the probes,
+   * and the lot is undone.
    *
-   * Every mutation below is expected to be REFUSED, so in the correct case this
-   * row is never touched. `restoring()` exists for the incorrect case: if the
-   * guard were broken, the test that discovered it must not also be the thing
-   * that leaves Jojo Usafi without an Owner.
+   * No committed row changes. `05-real-data-untouched.test.ts` proves it
+   * independently, byte for byte.
    */
-  async function realOwner() {
-    const { data, error } = await db
-      .from("admin_profiles")
-      .select("*")
-      .eq("role", "owner")
-      .eq("active", true)
-      .not("email", "like", "zztest-%");
-
-    expect(error).toBeNull();
-    expect(data, "the real Owner must exist for these tests to mean anything").toHaveLength(1);
-    return data![0];
-  }
-
-  /** Run an attempt that must fail, and undo it if it somehow did not. */
-  async function restoring<T>(snapshot: AdminProfileRow, run: () => Promise<T>): Promise<T> {
-    try {
-      return await run();
-    } finally {
-      const still = await db
-        .from("admin_profiles")
-        .select("id, role, active")
-        .eq("id", snapshot.id)
-        .maybeSingle();
-
-      if (!still.data) {
-        await db.from("admin_profiles").insert(snapshot);
-      } else if (still.data.role !== "owner" || !still.data.active) {
-        await db
-          .from("admin_profiles")
-          .update({ role: "owner", active: true })
-          .eq("id", snapshot.id);
-      }
-    }
-  }
-
-  it("refuses to demote the last Owner", async () => {
-    const owner = await realOwner();
-    await restoring(owner, async () => {
-      const error = errorOf(
-        await db.from("admin_profiles").update({ role: "manager" }).eq("id", owner.id),
-      );
-      expect(isRefusedByTrigger(error)).toBe(true);
-      expect(error.message).toContain("must always have one active Owner");
+  it("refuses to demote, deactivate or delete the last Owner", () => {
+    const script = fileURLToPath(new URL("./last-owner-guard.sql", import.meta.url));
+    const result = spawnSync(`npx supabase db query --linked -f "${script}"`, {
+      encoding: "utf8",
+      shell: true,
+      maxBuffer: 16 * 1024 * 1024,
     });
-  });
 
-  it("refuses to deactivate the last Owner", async () => {
-    const owner = await realOwner();
-    await restoring(owner, async () => {
-      const error = errorOf(
-        await db.from("admin_profiles").update({ active: false }).eq("id", owner.id),
-      );
-      expect(isRefusedByTrigger(error)).toBe(true);
-    });
-  });
+    // Every failure inside the script raises, which the CLI reports as a
+    // non-zero exit. The message says which assertion gave way.
+    expect(result.stdout + result.stderr).not.toContain("GUARD FAILED");
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain("last-owner guard verified in a rolled-back transaction");
 
-  it("refuses to delete the last Owner, even with the service-role key", async () => {
-    const owner = await realOwner();
-    await restoring(owner, async () => {
-      const error = errorOf(await db.from("admin_profiles").delete().eq("id", owner.id));
-      expect(isRefusedByTrigger(error)).toBe(true);
-    });
-  });
-
-  it("allows an Owner to step down once somebody else is one", async () => {
-    // A second Owner, so the guard has no reason to fire. The real Owner is
-    // never the one demoted — that is the whole point of the guard.
-    const second = await db
-      .from("admin_profiles")
-      .insert({
-        full_name: "ZZTEST Second Owner",
-        email: "zztest-owner2@jojo-usafi.test",
-        role: "owner",
-        active: true,
-      })
-      .select("id")
-      .single();
-    expect(second.error).toBeNull();
-
-    const demoted = await db
-      .from("admin_profiles")
-      .update({ role: "manager" })
-      .eq("id", second.data!.id)
-      .select("role")
-      .single();
-    expect(demoted.error).toBeNull();
-    expect(demoted.data?.role).toBe("manager");
-
-    const removed = await db.from("admin_profiles").delete().eq("id", second.data!.id);
-    expect(removed.error).toBeNull();
-
-    // And the shop still has its Owner.
-    await realOwner();
-  });
+    // And the transaction left the real world exactly as it found it: the shop
+    // still has an Owner and not one probe row survived. (The count is "at
+    // least one" rather than exactly one because this run's fixture Owner is
+    // legitimately alongside Jojo Usafi's real one.)
+    const report = JSON.parse(result.stdout.slice(result.stdout.indexOf("{"))) as {
+      rows: { active_owners: number; probe_rows_left: number }[];
+    };
+    expect(report.rows[0].active_owners).toBeGreaterThanOrEqual(1);
+    expect(report.rows[0].probe_rows_left).toBe(0);
+  }, 120_000);
 
   it("allows an ordinary staff member to be deactivated", async () => {
     const updated = await db
@@ -364,8 +278,8 @@ describe("admin_profiles is really tied to auth.users", () => {
     const error = errorOf(
       await db.from("admin_profiles").insert({
         auth_user_id: "00000000-0000-4000-8000-999999999999",
-        full_name: "ZZTEST Ghost",
-        email: "zztest-ghost@jojo-usafi.test",
+        full_name: `ZZ${NAMES.token} Ghost`,
+        email: NAMES.email("ghost"),
         role: "order_staff",
       }),
     );
@@ -374,7 +288,7 @@ describe("admin_profiles is really tied to auth.users", () => {
 
   it("keeps the profile, unlinked, when the login is deleted", async () => {
     const created = await db.auth.admin.createUser({
-      email: "zztest-temp@jojo-usafi.test",
+      email: NAMES.email("temp"),
       password: "not-used-for-sign-in-12345",
       email_confirm: true,
     });
@@ -384,8 +298,8 @@ describe("admin_profiles is really tied to auth.users", () => {
       .from("admin_profiles")
       .insert({
         auth_user_id: created.data.user!.id,
-        full_name: "ZZTEST Temporary Staff",
-        email: "zztest-temp@jojo-usafi.test",
+        full_name: `ZZ${NAMES.token} Temporary Staff`,
+        email: NAMES.email("temp"),
         role: "order_staff",
       })
       .select("id")
@@ -405,7 +319,7 @@ describe("admin_profiles is really tied to auth.users", () => {
 
     expect(after.error).toBeNull();
     expect(after.data).toMatchObject({
-      full_name: "ZZTEST Temporary Staff",
+      full_name: `ZZ${NAMES.token} Temporary Staff`,
       auth_user_id: null,
     });
 

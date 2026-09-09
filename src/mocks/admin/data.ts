@@ -1,4 +1,3 @@
-import { getAllProductRecords, getProducts } from "@/lib/catalogue/queries";
 
 /**
  * MOCK ADMIN DATA.
@@ -289,16 +288,18 @@ export interface AttentionItem {
  * it is the number of master rows the pipeline withheld for having no approved
  * photograph or flagged data.
  */
-export const attention: AttentionItem[] = [
+export function attentionItems(missingImage: number): AttentionItem[] {
+  return [
   { label: "New orders", count: 1, href: "/admin/orders?stage=new", tone: "urgent", hint: "Waiting to be confirmed" },
   { label: "Awaiting confirmation", count: 1, href: "/admin/orders?stage=awaiting_confirmation", tone: "urgent", hint: "Customer contacted, not confirmed" },
   { label: "Preparing", count: 1, href: "/admin/orders?stage=preparing", tone: "calm", hint: "Being packed now" },
   { label: "Out for delivery", count: 1, href: "/admin/orders?stage=out_for_delivery", tone: "calm", hint: "On the way to the customer" },
   { label: "Out of stock", count: 0, href: "/admin/products?filter=out-of-stock", tone: "warn", hint: "Cannot be ordered" },
   { label: "Low stock", count: 3, href: "/admin/products?filter=low-stock", tone: "warn", hint: "Running out soon" },
-  { label: "Missing image", count: withheldCount(), href: "/admin/products?filter=missing-image", tone: "warn", hint: "Held back from the website" },
+  { label: "Missing image", count: missingImage, href: "/admin/products?filter=missing-image", tone: "warn", hint: "Held back from the website" },
   { label: "Sync issues", count: 0, href: "/admin/more", tone: "calm", hint: "Product sheet and website agree" },
-];
+  ];
+}
 
 export const activity = [
   { at: "09:44", text: "Order JU-000126 confirmed", by: "Ibrahim" },
@@ -349,27 +350,12 @@ export const contentDraft = {
  * state are mock: the master has no such columns, and inventing them in the
  * catalogue itself would be inventing business data. They live only here.
  */
-export function adminProducts() {
-  return getProducts().map((product, i) => {
-    const stock = [0, 3, 4, 48, 120, 260, 15, 7][i % 8];
-    return {
-      ...product,
-      /** Mock: the Product Master carries no offer-price column. */
-      offerPrice: null as number | null,
-      stock,
-      lowStockThreshold: 10,
-      hidden: i % 17 === 5,
-      syncIssue: i % 29 === 7,
-    };
-  });
-}
-
 /**
- * Products the catalogue withheld — no approved photograph, or flagged data.
- * A real figure from the real report, not a mock number.
+ * REPLACED IN BUILD 07 — the admin product list reads the real database.
+ *
+ * See . Stock, visibility, offer price and the
+ * blocked reasons used to be invented here because the Product Master had
+ * nowhere to put them; they are real columns now, so inventing them would be
+ * worse than useless. Orders and customers remain mock until their own builds.
  */
-export function withheldCount(): number {
-  return getAllProductRecords().filter((product) => !product.publishable).length;
-}
-
-export type AdminProduct = ReturnType<typeof adminProducts>[number];
+export type { AdminCatalogueProduct as AdminProduct } from "@/lib/catalogue/admin";

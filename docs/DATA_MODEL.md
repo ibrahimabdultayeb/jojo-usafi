@@ -7,11 +7,12 @@ The **Supabase PostgreSQL** schema, authored as version-controlled migrations in
 > **Status: applied and verified.** All 15 migrations have been executed against the hosted
 > development project (*Jojo Usafi Dev*, `dyjhacbbedytcstxxjzl`, free tier). Everything below
 > is checked statically by `npm run schema:check` and — since Build 06 — proved at runtime by
-> `npm run test:db`, 112 tests against the real database, Supabase Auth and Supabase Storage.
+> `npm run test:db`, 129 tests against the real database, Supabase Auth and Supabase Storage.
 >
-> The database holds **no business data**: no products, no customers, no orders, no delivery
-> zones. Only the reference rows the migrations themselves insert — 2 locales, 6 pack types,
-> 2 option axes — because those are true of every environment.
+> Since Build 07 the database holds the **real catalogue**: 201 products from the Product
+> Master, 95 of them on the public shelf, 22 brands, 5 categories, 65 families, 201 inventory
+> rows and 95 photographs in Supabase Storage. There are still no customers and no orders —
+> nobody has bought anything yet.
 >
 > The one exception is **staff**: since 2026-09-09 there is a single `admin_profiles` row, the
 > real Owner, created by the first-Owner bootstrap rather than by a seed. See *Authorization →

@@ -5,9 +5,9 @@ import { getCategories } from "@/lib/catalogue/queries";
 import { fill, getDictionary, localePath, type Locale } from "@/lib/i18n";
 import { site, whatsappLink } from "@/lib/site";
 
-export function Footer({ locale }: { locale: Locale }) {
+export async function Footer({ locale }: { locale: Locale }) {
   const t = getDictionary(locale);
-  const categories = getCategories();
+  const categories = await getCategories();
   const path = (p: string) => localePath(locale, p);
 
   const shopLinks = [

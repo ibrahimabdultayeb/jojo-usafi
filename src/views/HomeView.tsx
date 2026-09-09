@@ -11,12 +11,15 @@ import { getBestSellers, getCategories, getCategoryRail } from "@/lib/catalogue/
 import { fill, getDictionary, localePath, type Locale } from "@/lib/i18n";
 import { site } from "@/lib/site";
 
-export function HomeView({ locale }: { locale: Locale }) {
+export async function HomeView({ locale }: { locale: Locale }) {
   const t = getDictionary(locale);
-  const categories = getCategories();
+  const categories = await getCategories();
   // Ten so the widest shelf is two complete rows of five; narrower
   // column counts trim the tail themselves (see ProductGrid).
-  const bestSellers = getBestSellers(10);
+  const bestSellers = await getBestSellers(10);
+  // One await for every rail, resolved together: a rail per category, but not
+  // a database round trip per category — the catalogue is fetched once.
+  const rails = await Promise.all(categories.map((c) => getCategoryRail(c.id, 5)));
   const shop = localePath(locale, "/shop");
 
   return (
@@ -33,13 +36,13 @@ export function HomeView({ locale }: { locale: Locale }) {
         <ProductGrid products={bestSellers} locale={locale} priorityCount={5} variant="twoRows" />
       </section>
 
-      {categories.map((category) => (
+      {categories.map((category, index) => (
         <section key={category.id} className="shell scroll-mt-24 pb-12 md:pb-16">
           <SectionHeading
             title={category.name}
             action={{ label: t.home.viewAll, href: `${shop}?category=${category.slug}` }}
           />
-          <ProductGrid products={getCategoryRail(category.id, 5)} locale={locale} variant="rail" />
+          <ProductGrid products={rails[index]} locale={locale} variant="rail" />
         </section>
       ))}
 

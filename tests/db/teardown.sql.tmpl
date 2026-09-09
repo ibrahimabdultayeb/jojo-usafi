@@ -1,0 +1,120 @@
+-- =============================================================================
+-- Remove the fixtures of ONE test run from the development database.
+--
+-- Rendered per run by `tests/db/global-setup.ts`, which substitutes the run
+-- token into the placeholders below. It is run for this run's token and, if the
+-- previous run crashed, for that run's token as well — both tokens this suite
+-- minted itself.
+--
+-- THE RULE, learned the hard way in Build 06:
+--
+--   Teardown identifies rows by WHO MADE THEM, never by what they are or what
+--   happened. There is no matching on a role, an action name, a lifecycle, a
+--   shared email domain or any other business state. An earlier version deleted
+--   `audit_events where action = 'admin_profile.first_owner_claimed'` and
+--   destroyed Jojo Usafi's real audit row the first time the real first-Owner
+--   bootstrap ran.
+--
+-- Consequences of that rule, both deliberate:
+--
+--   * Nothing here can touch the real Owner, or any other real record. There is
+--     no pattern in this file that a real row could match.
+--   * The `admin_profiles_last_owner` trigger is NOT disabled. Fixture Owners
+--     are never the last Owner — the real one is always there — so the trigger
+--     has no reason to fire, and leaving it armed means this file cannot delete
+--     the last Owner even by accident.
+--
+-- The four append-only ledgers still need their triggers lifted: they refuse
+-- DELETE from everyone, including the service role. That is correct in
+-- production and is why this file exists at all rather than the API doing it.
+--
+-- Placeholders: __SKU_PREFIX__ __SLUG_PREFIX__ __EMAIL_PREFIX__ __PHONE__
+--               __STORAGE_PREFIX__ __SESSION__
+-- =============================================================================
+
+alter table public.order_events        disable trigger order_events_append_only;
+alter table public.inventory_movements disable trigger inventory_movements_append_only;
+alter table public.audit_events        disable trigger audit_events_append_only;
+alter table public.analytics_events    disable trigger analytics_events_append_only;
+
+-- ---- measurement and audit --------------------------------------------------
+delete from public.analytics_events
+ where session_id = '__SESSION__'
+    or sku like '__SKU_PREFIX__%';
+
+delete from public.audit_events
+ where entity_key like '__SKU_PREFIX__%'
+    or entity_key like '__SLUG_PREFIX__%'
+    or entity_key like '__EMAIL_PREFIX__%';
+
+-- ---- synchronisation --------------------------------------------------------
+delete from public.sync_conflicts where entity_key like '__SKU_PREFIX__%';
+delete from public.sync_events    where entity_key like '__SKU_PREFIX__%';
+delete from public.sync_state     where entity_key like '__SKU_PREFIX__%';
+delete from public.sync_jobs      where idempotency_key like '__SKU_PREFIX__%';
+
+-- ---- stock ledger, before the products it points at -------------------------
+delete from public.inventory_movements
+ where product_id in (select id from public.products where sku like '__SKU_PREFIX__%');
+
+-- ---- orders -----------------------------------------------------------------
+delete from public.order_events
+ where order_id in (select id from public.orders where customer_phone_e164 = '__PHONE__');
+
+delete from public.order_items
+ where order_id in (select id from public.orders where customer_phone_e164 = '__PHONE__');
+
+delete from public.orders where customer_phone_e164 = '__PHONE__';
+
+-- ---- product-shaped rows ----------------------------------------------------
+delete from public.inventory
+ where product_id in (select id from public.products where sku like '__SKU_PREFIX__%');
+
+delete from public.product_option_assignments
+ where product_id in (select id from public.products where sku like '__SKU_PREFIX__%');
+
+delete from public.product_media
+ where product_id in (select id from public.products where sku like '__SKU_PREFIX__%');
+
+delete from public.product_content
+ where product_id in (select id from public.products where sku like '__SKU_PREFIX__%');
+
+delete from public.products where sku like '__SKU_PREFIX__%';
+
+delete from public.product_family_axes
+ where family_id in (select id from public.product_families where code like '__SKU_PREFIX__%');
+
+delete from public.product_families    where code like '__SKU_PREFIX__%';
+delete from public.product_option_values where code like '__SLUG_PREFIX__%';
+delete from public.media_assets        where storage_path like '__STORAGE_PREFIX__/%';
+
+-- ---- catalogue scaffolding --------------------------------------------------
+delete from public.category_content
+ where category_id in (select id from public.categories where code like '__SKU_PREFIX__%');
+
+delete from public.categories where code like '__SKU_PREFIX__%';
+delete from public.brands     where code like '__SKU_PREFIX__%';
+delete from public.suppliers  where code like '__SKU_PREFIX__%';
+
+-- ---- people and places ------------------------------------------------------
+delete from public.customer_addresses
+ where customer_id in (select id from public.customers where phone_e164 = '__PHONE__');
+
+delete from public.customers      where phone_e164 = '__PHONE__';
+delete from public.delivery_zones where slug like '__SLUG_PREFIX__%';
+
+-- ---- staff ------------------------------------------------------------------
+-- The logins themselves are removed through the Auth admin API by the global
+-- setup; `auth_user_id` is `on delete set null`, so the order does not matter.
+delete from public.admin_profiles where email like '__EMAIL_PREFIX__%';
+
+alter table public.order_events        enable trigger order_events_append_only;
+alter table public.inventory_movements enable trigger inventory_movements_append_only;
+alter table public.audit_events        enable trigger audit_events_append_only;
+alter table public.analytics_events    enable trigger analytics_events_append_only;
+
+-- What is left of this run: nothing.
+select
+  (select count(*) from public.products        where sku  like '__SKU_PREFIX__%')   as products_left,
+  (select count(*) from public.admin_profiles  where email like '__EMAIL_PREFIX__%') as staff_left,
+  (select count(*) from public.orders          where customer_phone_e164 = '__PHONE__') as orders_left;

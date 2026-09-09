@@ -5,7 +5,8 @@ import { useEffect } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { ProductPhoto } from "@/components/product/ProductPhoto";
 import { useCart } from "@/lib/cart";
-import { getBrand, productName } from "@/lib/catalogue/queries";
+import { productName } from "@/lib/catalogue/format";
+import { useCatalogue } from "@/lib/catalogue/CatalogueContext";
 import { formatPrice } from "@/lib/format";
 import { fill } from "@/lib/i18n";
 import { useLocale } from "@/lib/i18n/client";
@@ -15,6 +16,7 @@ import { site } from "@/lib/site";
 export function CartDrawer() {
   const { isOpen, closeCart, items, count, subtotal, add, setQuantity, remove } = useCart();
   const { t, path } = useLocale();
+  const { brandsById } = useCatalogue();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -93,7 +95,7 @@ export function CartDrawer() {
 
                   <div className="flex min-w-0 flex-1 flex-col">
                     <p className="text-[10px] font-black tracking-widest text-brand-700 uppercase">
-                      {getBrand(product.brandId)?.name}
+                      {brandsById.get(product.brandId)?.name}
                     </p>
                     <Link
                       href={path(`/product/${product.slug}`)}

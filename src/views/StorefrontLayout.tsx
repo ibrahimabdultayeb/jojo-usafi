@@ -11,6 +11,8 @@ import { MobileDock } from "@/components/layout/MobileDock";
 import { SupportButton } from "@/components/layout/SupportButton";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { CartProvider } from "@/lib/cart";
+import { CatalogueProvider } from "@/lib/catalogue/CatalogueContext";
+import { getCatalogue } from "@/lib/catalogue/queries";
 import { LocaleProvider } from "@/lib/i18n/client";
 import { getDictionary, localeAlternates, localeTag, type Locale } from "@/lib/i18n";
 import { site } from "@/lib/site";
@@ -52,13 +54,23 @@ export function storefrontMetadata(locale: Locale): Metadata {
  * static HTML rather than corrected after hydration. Both call this with their
  * own locale, so there is exactly one copy of the markup.
  */
-export function StorefrontLayout({ locale, children }: { locale: Locale; children: ReactNode }) {
+export async function StorefrontLayout({
+  locale,
+  children,
+}: {
+  locale: Locale;
+  children: ReactNode;
+}) {
+  // One fetch of the published catalogue for the whole page, handed to the
+  // client components that need to turn a SKU back into a product.
+  const catalogue = await getCatalogue();
   const t = getDictionary(locale);
 
   return (
     <html lang={localeTag[locale]} className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <body className="min-h-screen bg-slate-50 font-sans antialiased selection:bg-brand-100">
         <LocaleProvider locale={locale}>
+          <CatalogueProvider catalogue={catalogue}>
           <CartProvider>
             <a
               href="#main"
@@ -77,6 +89,7 @@ export function StorefrontLayout({ locale, children }: { locale: Locale; childre
             <CartDrawer />
             <LanguageGate />
           </CartProvider>
+          </CatalogueProvider>
         </LocaleProvider>
       </body>
     </html>

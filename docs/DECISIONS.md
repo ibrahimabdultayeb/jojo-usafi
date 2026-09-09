@@ -911,3 +911,237 @@ including re-inserting it from a snapshot — if the guard ever fails. A test th
 broken guard must not also be the thing that leaves the shop without an Owner. That safety net
 earned its place on the first run, when the guard tests failed for an unrelated reason (a
 second Owner was present) and the deletion actually went through.
+
+---
+
+## 2026-09-09 — Test fixtures are scoped to one run, and teardown never matches on business state
+
+Decision:
+Every database test run mints an eight-hex-character token. Every fixture identifier carries
+it — SKU, slug, email, phone, storage path, analytics session — and `teardown.sql.tmpl` is
+rendered per run and deletes exactly that token, plus the previous run's token if it crashed.
+No rule matches a role, an action name, a lifecycle or a shared email domain.
+`05-real-data-untouched.test.ts` compares every real `admin_profiles` and `audit_events` row
+against a snapshot taken before any fixture existed, byte for byte.
+
+Reason:
+The Owner bootstrap exposed two ways the old fixtures could reach real data. Teardown deleted
+`audit_events where action = 'admin_profile.first_owner_claimed'` — a rule about what had
+*happened* rather than about who had made the row — and destroyed Jojo Usafi's real audit
+entry. Separately, the last-Owner tests mutated the real Owner directly, and on one run a
+DELETE went through, saved only by a restore net. Neither was acceptable with real catalogue
+data about to land.
+
+The general fix is a rule, not a patch: **teardown identifies rows by who made them.** A
+class marker like `ZZTEST%` is not that — it cannot tell this run's rows from a previous
+run's, and it invites "while we are here" clauses like the one that caused the incident.
+
+Alternatives:
+Keep the class prefix and exclude real rows by email. Rejected: a hard-coded exception that
+goes stale the moment a second real person exists. A separate test project. Rejected: it
+would need a third Supabase project and the free tier is not to be stretched without asking.
+
+Impact:
+Fixture Owners are never the last Owner, so the `admin_profiles_last_owner` trigger no longer
+has to be disabled during cleanup — one fewer dangerous capability in the test path. The
+suite also **fails closed**: if there is not exactly one real active Owner before it starts,
+nothing runs, because a suite that cannot identify the fixtures cannot be trusted to decide
+what to delete.
+
+---
+
+## 2026-09-09 — The last-Owner guard is exercised in a transaction that always rolls back
+
+Decision:
+`tests/db/last-owner-guard.sql` opens a transaction, creates two probe Owners, stands every
+other Owner down *inside the transaction*, exercises all three refusals (demote, deactivate,
+delete) against the probes, and `ROLLBACK`s unconditionally.
+
+Reason:
+The guard fires only for the last active Owner. Jojo Usafi's Owner is permanent, so any
+fixture Owner is always a second one and the guard never fires on it — the scenario simply
+cannot be reached without a world containing exactly one Owner. Build 06 reached it by
+attacking the real row, which is what Build 07 was told to stop doing.
+
+A rolled-back transaction is the sanctioned way out: nothing is ever committed, a crash makes
+PostgreSQL roll back for us, and the byte-for-byte regression test proves the outcome
+independently rather than taking the transaction's word for it.
+
+Alternatives:
+Test a copy of the trigger on a clone table. Rejected: it would prove a copy correct, and the
+copy is exactly the thing that could drift. Drop the test. Rejected: this guard is the only
+thing standing between the shop and being locked out of its own staff management.
+
+Impact:
+A discovery along the way, now asserted: **a staff member named in the audit trail cannot be
+deleted by anybody**, because the delete nulls `audit_events.actor_admin_id` and that table
+is append-only. Deactivation is the only way to retire someone — which is what the dashboard
+already offers.
+
+---
+
+## 2026-09-09 — The importer reads the built artifact, not the CSV a second time
+
+Decision:
+`scripts/import-catalogue.mjs` reads `src/lib/catalogue/generated/catalogue.json` and
+re-runs `build-catalogue.mjs --check` first, refusing to continue if the artifact has drifted
+from `imports/`. `build-catalogue.mjs` gained the columns the database needs and the shelf
+never showed: EAN, ITF-14, offer price, stock quantity, low-stock threshold.
+
+Reason:
+Parsing the Product Master twice would put SKU-to-photograph matching in two places, and that
+is the one rule this catalogue cannot afford to get wrong — a product wearing another
+product's photograph is worse than a product with none. One deterministic build, guarded by
+`catalogue:check`, keeps "the CSV" and "the artifact" incapable of disagreeing.
+
+Alternatives:
+Parse the CSV in the importer. Rejected for the reason above. Import from the CSV and drop the
+artifact. Rejected: the artifact is also what the QA gate reads to know which SKUs are
+publishable, and it is the deterministic step that makes the whole pipeline reproducible.
+
+Impact:
+`npm run catalogue:build` is now the only place the master is interpreted. The importer's own
+validation — SKU pattern, integer money, duplicate SKUs, resolvable brand and category — is a
+second gate over that, not a second interpretation.
+
+---
+
+## 2026-09-09 — A blocked product is never made visible by an import
+
+Decision:
+The importer sets `storefront_visible` to true only when a product carries no blocking flag.
+The master's WEBSITE STATUS is honoured for everything else, but it can never *raise*
+visibility on a product the catalogue build blocked. Nothing is ever deleted: a row that
+disappears from the master stays in the database.
+
+Reason:
+Re-imports will be routine once the Google Sheet is connected, and the failure that matters is
+a spreadsheet edit quietly publishing a product with an implausible price or no photograph.
+Making "blocked" win is the rule that survives somebody typing "Show" in a cell.
+
+Deleting is worse than useless: `products` is referenced by `order_items`, and a row vanishing
+from an export means somebody stopped exporting it, not that the product stopped existing.
+
+Alternatives:
+Let the master decide visibility outright. Rejected — that is the hole. Delete rows absent
+from the master. Rejected — it would destroy order history and cannot be undone.
+
+Impact:
+`EP01-A01` is in the database at its unchanged price of TZS 128, active, and invisible. The
+106 products with no approved photograph are all present and none is public. Asserted in
+`tests/db/06-catalogue.test.ts` against the anon key.
+
+---
+
+## 2026-09-09 — Variant axes come from the data, not from the brand we happen to sell
+
+Decision:
+The importer declares the size axis for a family only when that family's SKUs genuinely have
+more than one distinct pack size. Scent is not modelled at all.
+
+Reason:
+The project constitution forbids assuming the current catalogue is the model. EcoPlus varies
+by size and, in its product names, by scent — but the Product Master has a SIZE column and no
+scent column, so a scent axis would have to be guessed out of names. That is the fuzzy
+identity matching this catalogue refuses everywhere else, and it would bake a cleaning-product
+assumption into the schema's data.
+
+Alternatives:
+Declare size and scent for everything. Rejected: it invents an axis and asserts a variant
+structure the source does not contain. Declare no axes. Rejected: the size chooser on the
+product page is real and the data supports it.
+
+Impact:
+65 families, 65 of them varying by size, 12 size values, 201 assignments. A future brand
+varying by colour, grit or voltage adds axis rows and values — no migration, and no
+re-interpretation of what a variant is.
+
+---
+
+## 2026-09-09 — The storefront reads a cached view, three queries for the whole catalogue
+
+Decision:
+`queries.ts` fetches `product_shelf` plus the brand and category lists once, through
+`unstable_cache` with a five-minute revalidation, using a **session-less anon client**. Client
+components receive the published catalogue through `CatalogueProvider` instead of importing a
+JSON file.
+
+Reason:
+The constitution forbids a Firestore-style read per product per visitor. Ninety-five products
+on a Shop All page must never be ninety-five round trips to Mumbai. The shelf changes when
+Ibrahim changes it, which is rarely and never mid-page-load, so one shared fetch is both
+correct and enormously cheaper.
+
+Reading `product_shelf` rather than `products` matters as much: the view is the single
+definition of "a customer may see this", so the storefront **cannot** publish something the
+database considers hidden — it has no way to see it. A session client would have made every
+page dynamic for no gain, since the shelf is identical for everyone.
+
+Alternatives:
+`React.cache`. Rejected: it dedupes within one render, so still one round trip per page view.
+Per-query reads with joins. Rejected: more queries, and a second definition of "public" in
+TypeScript.
+
+Impact:
+95 product pages per language prerender with 5-minute ISR. Caching is time-based rather than
+invalidated by the importer: a `revalidateTag('catalogue')` endpoint needs an authenticated
+caller to be safe, so it belongs with the admin write path. A re-import is visible within five
+minutes. Commerce is explicitly excluded — checkout will price the cart from the database at
+the moment of the order, not from this snapshot.
+
+---
+
+## 2026-09-09 — The admin reads the catalogue as the caller, not as the server
+
+Decision:
+`src/lib/catalogue/admin.ts` uses the request's session client. It asks `jojo_is_staff()`
+first and selects the stock columns that answer permits: staff get `on_hand` and `reserved`,
+anyone else gets `available` only. The page says which of the two happened.
+
+Reason:
+The ten dashboard screens are still not behind a sign-in guard, because they showed mock data
+and there was nothing to protect. Now they show real prices and stock. A service-role read
+would hand the shop's full commercial position to anyone who typed `/admin`; the session
+client makes Row Level Security answer instead.
+
+This surfaced immediately: the admin pages returned 500 with `permission denied for table
+inventory`, because `anon` holds a column grant covering `available` and not `on_hand`. That
+is the boundary working. Asking only for permitted columns is the fix; widening the grant
+would not have been.
+
+Alternatives:
+Service role plus a guard on the page. Rejected as the only mechanism: it makes the page the
+security boundary. Guard all ten screens now. Rejected as scope — the guard belongs with the
+build that lets those screens write.
+
+Impact:
+Product writing is still not enabled. Orders and customers stay mock. `src/mocks/admin/data.ts`
+no longer invents stock, visibility or sync state, because those are real columns now.
+
+---
+
+## 2026-09-09 — Photographs go in the existing bucket, filed under SKU
+
+Decision:
+The 95 approved WebP files are uploaded to `product-media`, at
+`<SKU>/<sku>-primary-1.webp`, with each file's sha256 stored on its `media_assets` row. A
+new `product-images` bucket was not created.
+
+Reason:
+`product-media` already exists with the policies Build 06 wrote and tested — public read,
+Owner-and-Manager write, Owner-only delete, size and MIME screening. A second bucket would
+duplicate that surface to gain a different name. The path is the convention already recorded
+on `media_assets.storage_path`, SKU-first so renaming a product never moves its photographs
+and an orphaned folder reads immediately as a SKU that no longer exists.
+
+The checksum is what makes re-imports cheap and safe: unchanged bytes are not re-uploaded, and
+no image is re-encoded, so the approved Build 03 processing is preserved exactly.
+
+Alternatives:
+A new bucket named for the instruction. Rejected: names are cheap, tested policies are not.
+Re-process images during import. Rejected: it would change approved photography and create a
+duplicate transformed asset on every run.
+
+Impact:
+2.6 MB in Storage, comfortably inside the free tier. `EP23-A02` — the orphan approved image —
+is **not** uploaded and exists only in the import report.

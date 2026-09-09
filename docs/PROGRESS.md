@@ -7,16 +7,20 @@ product photography — and, since Build 06, a **real Supabase database behind i
 
 All 15 migrations are applied to a free hosted development project. The constraints fire,
 the triggers refuse, Row Level Security holds for each of the three staff roles, Supabase
-Auth works and the Storage buckets are secured — all proved by 112 tests against the actual
+Auth works and the Storage buckets are secured — all proved by 129 tests against the actual
 database rather than asserted in a document.
 
 Jojo Usafi has a real Owner — **Ibrahim Abdul Tayeb** — who signs in at `/admin/sign-in`.
 The first-Owner bootstrap is done and has disabled itself.
 
-What is not yet true: **the application still does not read Supabase for its data.** The
-storefront reads the committed catalogue artifact, the ten admin screens run on mock data and
-are deliberately not yet behind the sign-in guard, the database holds no business rows, and
-the Storage buckets are empty. Wiring those together is Build 07.
+**The storefront reads Supabase.** 201 products imported from the Product Master, 95 on the
+public shelf, 95 photographs served from Supabase Storage, opening stock explained by a
+receipt movement per product. The admin's product screens read the real catalogue too, under
+the caller's own Row Level Security.
+
+What is still not true: no order has ever been placed, orders and customers in the admin are
+still mock, product writing is not enabled, the ten dashboard screens are not yet behind a
+sign-in guard, and nothing has talked to Google Sheets. That is Build 08 onward.
 
 ## Completed
 
@@ -367,7 +371,7 @@ column as read-only, so `inventory.available` appears in the generated Insert an
 types and assigning to it compiles. The database refuses it with `428C9`, and a test asserts
 that it does.
 
-#### 112 tests against the real database
+#### 129 tests against the real database
 
 `npm run test:db` — a second Vitest project, separate on purpose so `npm run test` keeps
 working with no network, no Docker and no Supabase project.
@@ -434,7 +438,7 @@ Offline: `typecheck` · `lint` · `test` (156 domain tests) · `schema:check` (1
 no overflow, console errors, broken images, small touch targets, floating-layer collisions
 or wrong shelf columns).
 
-Against the real database: `db:types:check` · `test:db` (112 tests).
+Against the real database: `db:types:check` · `test:db` (129 tests).
 
 The approved storefront and admin UI are untouched. Not one component changed in this build.
 
@@ -583,6 +587,201 @@ and the deletion actually went through.
 
 No migration was added. The database schema is byte-for-byte what Build 06 left.
 
+
+### Build 07 — the real catalogue, in the database and on the shelf — 2026-09-09
+
+The storefront now reads Supabase. 201 products, 95 on the public shelf, 95 photographs in
+Storage, and the local CSV demoted from "what the shop is" to "what the shop is imported
+from". **Cost: TZS 0** — 2.6 MB of images on the free tier.
+
+#### 0. Test isolation, before anything was imported
+
+The Owner-bootstrap build ended with an uncomfortable finding: teardown had deleted Jojo
+Usafi's real audit row, and the last-Owner tests had been mutating the real Owner — on one
+run a DELETE actually went through. None of that could be allowed near real catalogue data,
+so it was fixed first and verified before a single product was imported.
+
+**Every run now mints a token** (`run-context.ts`), eight hex characters, and every fixture
+row carries it — SKUs `ZZ1A2B3C4D-P1`, emails `zz1a2b3c4d-owner@jojo-usafi.test`, storage
+paths, the customer phone number, the analytics session. Teardown is rendered per run from
+`teardown.sql.tmpl` and deletes **that token and nothing else**. The previous run's token is
+swept too, if it crashed — but only ever a token this suite minted itself.
+
+**The rule that broke last time is now explicit**: teardown identifies rows by who made
+them, never by what they are or what happened. No matching on a role, an action name, a
+lifecycle or a shared email domain. There is no pattern left in that file that a real row
+could match — and because fixture Owners are never the last Owner, the
+`admin_profiles_last_owner` trigger is no longer disabled during cleanup either.
+
+**The last-Owner guard is exercised without touching a committed row.** It only fires for
+the last active Owner, and Jojo Usafi's is permanent, so the whole scenario moved into
+`last-owner-guard.sql`: a transaction that creates probe Owners, stands the others down
+*inside the transaction*, exercises all three refusals, and always `ROLLBACK`s.
+
+**`05-real-data-untouched.test.ts` is the regression test.** `globalSetup` snapshots every
+real `admin_profiles` and `audit_events` row *before* any fixture exists; the last test file
+compares the live rows against that snapshot **byte for byte**, whole rows, sorted keys. It
+also fails closed: if there is not exactly one real active Owner before the suite starts,
+nothing runs at all, because a suite that cannot identify the fixtures cannot be trusted to
+decide what to delete.
+
+Two protections were discovered while writing it, both worth knowing:
+
+- **A staff member who appears in the audit trail cannot be deleted by anybody.** Deleting a
+  profile nulls `audit_events.actor_admin_id`, and that table is append-only, so the delete
+  is refused outright. Deactivation is the only way to retire someone — which is exactly
+  what the dashboard offers.
+- The `restoring()` net written during the bootstrap build earned its place on its very
+  first run and is now unnecessary, because nothing points at the real Owner any more.
+
+#### 1–4. The importer
+
+`scripts/import-catalogue.mjs` — dry-run first, idempotent, and incapable of deleting.
+
+It reads the **built artifact** rather than re-parsing the CSV, and re-runs
+`build-catalogue.mjs --check` first so the two cannot disagree. Parsing the master a second
+time was the obvious alternative and the wrong one: SKU-to-photograph matching would then
+exist in two places, and that is the one rule this catalogue cannot afford to get wrong.
+
+The builder gained the columns the database needs and the shelf never showed — EAN, ITF-14,
+offer price, stock quantity, low-stock threshold — so `catalogue:check` guards them too.
+
+What it refuses to do: delete a product because a row vanished from the master; invent a
+product for an orphan photograph; correct a suspicious price; raise a blocked product's
+visibility. **Blocked always wins over the master's WEBSITE STATUS**, so a re-import can
+never publish something that should not be public.
+
+Classification is real: it reads the existing rows, compares column by column, and reports
+insert / update / unchanged. **The second run reported 201 unchanged, 0 uploads, 95 images
+reused** — which is what idempotent means.
+
+#### 3. Families and variants, from the data rather than from an assumption
+
+65 families, and the size axis is declared **only for families whose data actually varies by
+size**. Scent is deliberately not modelled: the Product Master carries one descriptive name
+per row and no scent column, so a scent axis would have to be guessed out of product names —
+the fuzzy identity matching this catalogue refuses everywhere else. 12 size values,
+65 family-axis rows, 201 assignments. Every SKU keeps its own price, barcode, size, stock,
+image, visibility and merchandising flags.
+
+#### 5–6. Photographs in Storage
+
+The 95 approved WebP files — the ones the approved Build 03 pipeline already produced, white
+background, 800px square, unaltered — uploaded to the existing `product-media` bucket under
+
+```
+product-media/<SKU>/<sku>-primary-1.webp
+```
+
+A second bucket was not created: `product-media` already exists with the policies Build 06
+wrote and tested, and duplicating that surface to gain a different name would be a cost with
+no benefit. The path convention is the one already recorded on `media_assets.storage_path`.
+
+Each object's **sha256 is stored on the `media_assets` row**, so a re-import compares
+checksums and uploads nothing that has not changed. No images were re-encoded, and no orphan
+or archive image was uploaded — `EP23-A02` exists only in the import report.
+
+#### 7. What is actually in the database
+
+| | |
+| --- | --- |
+| Products | **201** — every master row kept |
+| On the public shelf | **95** |
+| Withheld, kept | **106** (105 no approved photograph; `EP01-A01` also `PRICE_IMPLAUSIBLE`) |
+| Brands / categories / suppliers | 22 / 5 / 1 |
+| Families | 65, all varying by size |
+| Photographs in Storage | 95, one folder per SKU |
+| Wrong-SKU photographs | **0** |
+| `EP23-A02` | not a product — orphan image, reported only |
+| `EP01-A01` | price **128** unchanged, not visible, not on the shelf |
+
+#### 8. Opening stock
+
+201 inventory rows, `on_hand` from the master's STOCK QTY, `reserved` 0, `available` equal to
+`on_hand` — 12,822 units. Every opening balance is explained by a `receipt` movement
+referencing the import run, so the ledger reconciles from day one rather than beginning with
+unexplained numbers.
+
+Stock is initialised **once per product**. A re-import never resets a count the shop has
+since corrected, sold from or received against: after day one the ledger is the authority,
+not the spreadsheet.
+
+#### 9–11. The storefront reads Supabase
+
+`src/lib/catalogue/queries.ts` is still the only seam, and is now async and Supabase-backed.
+The UI was not redesigned; server components gained `await`.
+
+**Three queries for the whole catalogue, shared by every visitor for five minutes.** The
+shelf comes from the `product_shelf` view — the one definition of "a customer may see this" —
+so the storefront cannot publish something the database considers hidden, because it has no
+way to see it. A homepage rendering four shelves, a category strip and a brand row costs the
+same three queries as a single product page, and usually none: the 95 product pages per
+language are prerendered with 5-minute ISR.
+
+Reads go through a **session-less anon client**, so pages stay cacheable and everything is
+fetched under exactly the policies a shopper's browser would get.
+
+Client components — the cart drawer, the checkout summary, the mobile menu — receive the
+published catalogue through `CatalogueProvider` rather than importing a JSON file. The cart
+still stores only SKUs and quantities; the catalogue turns them back into products to draw.
+This ships *less* to the browser than before: 95 published products instead of all 201 rows.
+
+One deliberate UI change: the product page no longer shows "Supplied by". `suppliers` is
+closed to anonymous readers by policy, and a shopper does not need the shop's supply chain.
+
+#### 12. The admin reads the real catalogue
+
+`/admin`, `/admin/products` and the product editor now show real SKUs, names, prices, stock,
+visibility, images and missing-image state. The invented stock/hidden/sync figures are gone.
+
+It reads through **the caller's own session, not the service role** — because the ten
+dashboard screens are still not behind a sign-in guard, and a privileged read would hand the
+shop's full price and stock list to anyone who typed `/admin`. Row Level Security answers
+instead: staff see all 201, anyone else sees the 95 that are already public, and the page
+says which. Writing products is still not enabled; orders and customers remain mock.
+
+That boundary announced itself during QA: the admin pages returned 500 with
+`permission denied for table inventory`, because an anonymous reader holds a column grant
+covering `available` and not `on_hand`. The query now asks for what the caller may see.
+
+#### 13. Security, re-checked after the import
+
+Verified with the anon key, in `06-catalogue.test.ts`: a shopper still cannot read
+`suppliers`, `inventory.on_hand`, `audit_events` or the sync tables; cannot update a price;
+and cannot upload into `product-media`. Availability, which the shelf needs, is readable.
+
+#### 14. Import audit
+
+Every run writes an `audit_events` row (`catalogue.imported`) with the counts, and produces
+`docs/CATALOGUE_IMPORT_REPORT.md` plus `src/lib/catalogue/generated/import-report.json` —
+rows read, inserts, updates, unchanged, blocked with reasons, image matches, missing images,
+orphan images, warnings and errors. No secrets are logged.
+
+#### Verified
+
+`typecheck` · `lint` · `test` (156) · `schema:check` · `i18n:check` · `catalogue:check` ·
+`db:types:check` · `build` (230 static pages) · `qa:screenshots` (**125** screenshots, all 15
+locale-stability comparisons stable, SKU↔photograph checked against the Storage URLs) ·
+`test:db` (**129** tests).
+
+Plus, specifically: importer dry-run, importer idempotency (second run 0 changes, 0 uploads),
+PostgreSQL row counts, public-visibility checks, Storage object/SKU mapping, RLS as an
+anonymous shopper, real storefront fetch, and the byte-for-byte real-Owner regression test.
+
+#### Deliberately not done
+
+Build 08 was not started: no Google Sheets API, no Apps Script, no Sheet↔Supabase sync.
+Product writing from the admin is not enabled. Orders and customers are still mock. The ten
+dashboard screens are still not behind a sign-in guard — that belongs with the build that
+lets them write.
+
+#### One thing to be aware of
+
+Catalogue caching is **time-based** (5 minutes) rather than invalidated by the importer. A
+re-import is visible on the storefront within five minutes, not immediately. A
+`revalidateTag('catalogue')` endpoint needs an authenticated caller to be safe, so it belongs
+with the admin write path rather than being bolted on here.
+
 ## Next
 
 - Confirm the open business rules (delivery fee, free-delivery threshold, served areas,
@@ -597,14 +796,16 @@ No migration was added. The database schema is byte-for-byte what Build 06 left.
 - **Ibrahim, tidy-up:** disable the legacy JWT API keys for the development project in the
   Supabase dashboard (*Settings → API Keys → Legacy keys*). Nothing in this repository uses
   them; the reason is under *Build 06 → One thing to be aware of*.
-- **Build 07 candidates**, in the order they unblock each other:
-  1. Import the catalogue into Supabase from the same committed artifact the storefront
-     already reads, so there is one source of truth rather than a hand-typed copy
-  2. Move the 95 approved photographs into `product-media` and point `media_assets` at them
-  3. Transactional stock reservation, with real concurrency tests — it belongs with the
+- ~~**Build 07:** import the catalogue, move the photographs into Storage, wire the
+  storefront to Supabase~~ — **done, 2026-09-09**
+- **Build 08 candidates**, in the order they unblock each other:
+  1. Transactional stock reservation, with real concurrency tests — it belongs with the
      checkout that calls it
-  4. Wire the storefront and admin to Supabase: `queries.ts` becomes async reads, checkout
-     becomes a server action that writes the order **before** WhatsApp opens
+  2. Checkout as a server action that prices the cart from the database and writes the order
+     **before** WhatsApp opens
+  3. Admin writes: product edits, stock counts, order state — with the sign-in guard that
+     belongs with them, and cache invalidation on save
+  4. The validated two-way Google Sheet ↔ Supabase synchronisation
 - Then: the validated two-way Google Sheet ↔ Supabase synchronisation
 
 Claude must update this file after meaningful milestones.

@@ -2,7 +2,8 @@
 
 import { Icon } from "@/components/ui/Icon";
 import { useCart } from "@/lib/cart";
-import { fullProductName } from "@/lib/catalogue/queries";
+import { fullProductNameWith } from "@/lib/catalogue/format";
+import { useBrand } from "@/lib/catalogue/CatalogueContext";
 import type { Product } from "@/lib/catalogue/types";
 import { fill } from "@/lib/i18n";
 import { useLocale } from "@/lib/i18n/client";
@@ -16,7 +17,8 @@ export function AddToCartControl({ product }: { product: Product }) {
   const { quantityOf, add, setQuantity, hydrated } = useCart();
   const { t } = useLocale();
   const quantity = hydrated ? quantityOf(product.sku) : 0;
-  const name = fullProductName(product);
+  const brand = useBrand(product.brandId);
+  const name = fullProductNameWith(product, brand);
 
   if (!product.inStock) {
     return (
@@ -69,7 +71,8 @@ export function AddToCartButton({ product }: { product: Product }) {
   const { quantityOf, add, setQuantity, openCart, hydrated } = useCart();
   const { t } = useLocale();
   const quantity = hydrated ? quantityOf(product.sku) : 0;
-  const name = fullProductName(product);
+  const brand = useBrand(product.brandId);
+  const name = fullProductNameWith(product, brand);
 
   if (!product.inStock) {
     return (

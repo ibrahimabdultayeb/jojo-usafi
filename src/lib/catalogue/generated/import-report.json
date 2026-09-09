@@ -1,0 +1,715 @@
+{
+  "runId": "c815c7cb-ce4f-4d8e-9d6f-7ca869b502a7",
+  "startedAt": "2026-09-09T06:08:33.813Z",
+  "finishedAt": "2026-09-09T06:08:42.858Z",
+  "dryRun": false,
+  "project": "dyjhacbbedytcstxxjzl",
+  "source": "imports/jojo-usafi-product-master.csv",
+  "rowsRead": 201,
+  "counts": {
+    "suppliers": {
+      "insert": 0,
+      "update": 0,
+      "unchanged": 1
+    },
+    "brands": {
+      "insert": 0,
+      "update": 0,
+      "unchanged": 22
+    },
+    "categories": {
+      "insert": 0,
+      "update": 0,
+      "unchanged": 5
+    },
+    "families": {
+      "insert": 0,
+      "update": 0,
+      "unchanged": 65
+    },
+    "products": {
+      "insert": 0,
+      "update": 0,
+      "unchanged": 201
+    },
+    "media": {
+      "insert": 0,
+      "update": 0,
+      "unchanged": 95
+    },
+    "inventory": {
+      "insert": 0,
+      "update": 0,
+      "unchanged": 201
+    },
+    "movements": {
+      "insert": 0
+    },
+    "images": {
+      "total": 95,
+      "upload": 0,
+      "reused": 95
+    },
+    "optionValues": {
+      "insert": 0,
+      "unchanged": 12
+    },
+    "familyAxes": {
+      "insert": 65
+    },
+    "optionAssignments": {
+      "insert": 201
+    }
+  },
+  "publishable": 95,
+  "blocked": 106,
+  "blockedSkus": [
+    {
+      "sku": "EP01-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE",
+        "PRICE_IMPLAUSIBLE"
+      ]
+    },
+    {
+      "sku": "EP01-B01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP01-C01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP01-D01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-B01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-C01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-D01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-E12",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-E13",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-E14",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-F12",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-F13",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-F14",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-G12",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-G13",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-G14",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-H12",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-H13",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP02-H14",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP03-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP03-B01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP03-C01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP03-D01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP04-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP04-B01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP04-C01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP04-D01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP05-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP05-A06",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP05-B01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP05-B06",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP05-C01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP05-C06",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP06-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP06-A06",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP06-B01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP06-B06",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP06-C01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP06-C06",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP06-D01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP06-D06",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP07-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP07-B01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP07-B02",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP07-B06",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP07-C01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP07-C02",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP07-C06",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP08-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP09-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP09-B01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP09-C01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP09-D01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP09-E01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP09-F01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP09-G01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP09-H01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP10-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP10-B01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP10-C01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP10-D01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP11-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP11-A02",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP11-A05",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP11-B01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP11-B02",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP11-B05",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP12-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP13-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP14-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP15-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP16-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP16-A04",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP17-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP18-A01",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-A10",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-B07",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-B10",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-C02",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-C07",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-C10",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-D02",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-D07",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-D10",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-E02",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-E07",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-E10",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-F02",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-F07",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-F10",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-G02",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-G07",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-G10",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-H02",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-H07",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP19-H10",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP22-A12",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP22-A13",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP22-A14",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP22-B12",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP22-B13",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP22-B14",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP22-C12",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP22-C13",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    },
+    {
+      "sku": "EP22-C14",
+      "reasons": [
+        "MISSING_APPROVED_IMAGE"
+      ]
+    }
+  ],
+  "imageMatches": 95,
+  "missingImages": 106,
+  "orphanImages": [
+    {
+      "sku": "EP23-A02",
+      "file": "EP23-A02 - 5L Spirix Methylated Spirit.png"
+    }
+  ],
+  "warnings": [],
+  "errors": []
+}

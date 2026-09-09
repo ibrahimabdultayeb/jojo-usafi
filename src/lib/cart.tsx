@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getProductBySku } from "./catalogue/queries";
+import { useCatalogue } from "./catalogue/CatalogueContext";
 import type { CartLine, Product } from "./catalogue/types";
 
 /**
@@ -62,13 +62,18 @@ function readStored(): CartLine[] {
           typeof (l as CartLine).sku === "string" &&
           typeof (l as CartLine).quantity === "number",
       )
-      .filter((l) => Boolean(getProductBySku(l.sku)) && l.quantity > 0);
+      // Shape only. Whether the SKU still exists is decided when the line is
+      // drawn, against the catalogue the server sent — a cart read at parse
+      // time has no catalogue to consult.
+      .filter((l) => l.quantity > 0);
   } catch {
     return [];
   }
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  // The cart stores SKUs; the catalogue turns them back into products to draw.
+  const { productsBySku } = useCatalogue();
   const [lines, setLines] = useState<CartLine[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -124,7 +129,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<CartValue>(() => {
     const items: CartItem[] = lines.flatMap((line) => {
-      const product = getProductBySku(line.sku);
+      const product = productsBySku.get(line.sku);
       if (!product) return [];
       return [{ product, quantity: line.quantity, lineTotal: product.price * line.quantity }];
     });
@@ -144,7 +149,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       remove,
       clear: () => setLines([]),
     };
-  }, [lines, hydrated, isOpen, add, setQuantity, remove]);
+  }, [lines, hydrated, isOpen, add, setQuantity, remove, productsBySku]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

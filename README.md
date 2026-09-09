@@ -3,16 +3,14 @@
 Jojo Usafi is a scalable ecommerce retail store for Dar es Salaam. EcoPlus is the
 first brand catalogue it sells — not the whole store.
 
-**The storefront is a working prototype; the database behind it is real and the two are not
-connected yet.** The storefront and admin run in English and Kiswahili on the real Product
-Master and the approved photography, reading a committed catalogue artifact. Separately, a
-free Supabase development project holds the full schema with Row Level Security, Supabase
-Auth and the Storage buckets, proved by 112 tests against the live database.
+**The storefront runs on Supabase.** English and Kiswahili, on the real Product Master and
+the approved photography: 201 products imported, 95 on the public shelf, photographs served
+from Supabase Storage, and 129 tests proving the database, Auth, Row Level Security and
+Storage behave as claimed.
 
-What does not exist yet: any page that reads Supabase, an order backend, payments, product
-images in Storage, and the Google Sheet connection. See
-[`PROTOTYPE_NOTES.md`](./PROTOTYPE_NOTES.md) for what is mocked in the UI and
-[`docs/PROGRESS.md`](./docs/PROGRESS.md) for exactly where the backend stands.
+What does not exist yet: an order backend, payments, admin writes, and the Google Sheet
+connection. See [`PROTOTYPE_NOTES.md`](./PROTOTYPE_NOTES.md) for what is still mocked in the
+UI and [`docs/PROGRESS.md`](./docs/PROGRESS.md) for exactly where the backend stands.
 
 ## Run it locally
 
@@ -40,7 +38,8 @@ Then open **http://localhost:3000**.
 
 The back office is at `/admin`, and **sign in at `/admin/sign-in`**. Jojo Usafi's Owner
 account is set up; further staff are added by the Owner. The ten dashboard screens still show
-mock data and are not yet behind the sign-in guard — that arrives with the real data.
+real products, prices and stock; orders and customers are still mock. They are not yet behind
+a sign-in guard, so an unauthenticated visitor sees only what is already public.
 
 On a first visit you are asked to choose a language; the choice is remembered. The EN/SW
 switcher is in the header on desktop and in the menu on phones, and switching keeps the
@@ -79,7 +78,7 @@ These need the hosted development project, and `.env.local`:
 | --- | --- |
 | `npm run db:types` | Regenerate `src/lib/supabase/database.types.ts` from the live schema |
 | `npm run db:types:check` | Fail if the committed types and the live schema have drifted |
-| `npm run test:db` | 112 tests against real PostgreSQL, Supabase Auth and Supabase Storage |
+| `npm run test:db` | 129 tests against real PostgreSQL, Supabase Auth and Supabase Storage |
 
 ### Connecting to the development database
 
@@ -110,6 +109,9 @@ git-ignored — and writes the committed product images, catalogue data and vali
 report. SKU is the identity key, images are matched on the exact SKU with no fuzzy
 matching, and a product with no approved photograph is never shown.
 
+`scripts/import-catalogue.mjs` then loads that artifact into Supabase — idempotent, dry-runnable,
+and incapable of deleting a product. `docs/CATALOGUE_IMPORT_REPORT.md` records every run.
+
 Current state: **201 master rows → 95 publishable products**, 106 withheld for having no
 approved photograph. Full detail, including the two items needing Ibrahim's input, is in
 [`docs/CATALOGUE_REPORT.md`](./docs/CATALOGUE_REPORT.md) and
@@ -131,7 +133,7 @@ src/lib/supabase/         the three clients, generated types, environment valida
 src/lib/i18n/             locale config, dictionaries, client hook
 src/lib/                  cart state, formatting, site settings, colour tones
 supabase/migrations/      the schema — 15 migrations, all applied to the dev project
-tests/db/                 112 tests against the real database, Auth and Storage
+tests/db/                 129 tests against the real database, Auth and Storage
 scripts/                  catalogue build, i18n check, schema check, type generation, QA gate
 public/products/          approved product photography, one file per SKU
 preview/screenshots/      QA screenshots
@@ -139,15 +141,14 @@ docs/                     constitution, architecture, data model, decisions, pro
 imports/                  restored source inputs — source-only, not in Git
 ```
 
-Everything the UI knows about products goes through `src/lib/catalogue/queries.ts`.
-That is the single seam where Supabase replaces the generated data later.
+Everything the UI knows about products goes through `src/lib/catalogue/queries.ts` — which
+now reads Supabase, three cached queries for the whole catalogue rather than one per product.
 
 ## Stack
 
 Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · sharp for the
 catalogue image pipeline · Playwright for the QA gate.
 
-Backend: Supabase PostgreSQL, Auth, Storage and Row Level Security — **provisioned and
-verified** on a free development project, not yet read by the application. Vercel for
-hosting and a validated two-way Google Sheet ↔ Supabase sync are still ahead. Firebase is
-permanently unapproved.
+Backend: Supabase PostgreSQL, Auth, Storage and Row Level Security on a free development
+project — **and the storefront reads it**. Vercel hosting, the order backend and a validated
+two-way Google Sheet ↔ Supabase sync are still ahead. Firebase is permanently unapproved.

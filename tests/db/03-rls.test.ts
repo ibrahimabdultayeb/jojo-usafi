@@ -25,7 +25,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { anonClient, errorOf, PG, serviceClient, signIn } from "./support";
-import { ANALYTICS_SESSION, EMAIL, ID, SKU, ensureOwnerProfile } from "./fixtures";
+import { ANALYTICS_SESSION, EMAIL, ID, NAMES, SKU, ensureOwnerProfile } from "./fixtures";
 
 type Client = SupabaseClient<Database>;
 
@@ -48,14 +48,14 @@ beforeAll(async () => {
 }, 120_000);
 
 /** The ZZTEST rows of a table, so unrelated data cannot affect the count. */
-const zzProducts = (client: Client) => client.from("products").select("sku").like("sku", "ZZTEST%");
+const zzProducts = (client: Client) => client.from("products").select("sku").like("sku", `${NAMES.skuPrefix}%`);
 
 describe("a shopper who has not signed in", () => {
   it("sees the shelf", async () => {
     const { data, error } = await anon
       .from("product_shelf")
       .select("sku, display_name, effective_price_tzs, in_stock")
-      .like("sku", "ZZTEST%");
+      .like("sku", `${NAMES.skuPrefix}%`);
 
     expect(error).toBeNull();
     expect(data).toHaveLength(1);
@@ -72,21 +72,21 @@ describe("a shopper who has not signed in", () => {
     const { data, error } = await anon
       .from("media_assets")
       .select("storage_path")
-      .like("storage_path", "zztest/%");
+      .like("storage_path", `${NAMES.storagePrefix}/%`);
 
     expect(error).toBeNull();
-    expect(data!.map((row) => row.storage_path)).toEqual(["zztest/zztest-p1-primary-1.webp"]);
+    expect(data!.map((row) => row.storage_path)).toEqual([`${NAMES.storagePrefix}/p1-primary-1.webp`]);
   });
 
   it("sees only active brands", async () => {
-    const { data } = await anon.from("brands").select("code").like("code", "ZZTEST%");
-    expect(data!.map((row) => row.code)).toEqual(["ZZTEST-BR"]);
+    const { data } = await anon.from("brands").select("code").like("code", `${NAMES.skuPrefix}%`);
+    expect(data!.map((row) => row.code)).toEqual([NAMES.code("BR")]);
   });
 
   it("sees active delivery zones, because checkout must price delivery", async () => {
     const { data, error } = await anon.from("delivery_zones").select("name, fee_tzs").eq("id", ID.zone);
     expect(error).toBeNull();
-    expect(data![0]).toMatchObject({ name: "ZZTEST Zone", fee_tzs: 4000 });
+    expect(data![0]).toMatchObject({ name: `ZZ${NAMES.token} Zone`, fee_tzs: 4000 });
   });
 
   it("may learn that stock is available, but not how the shop's stock breaks down", async () => {
@@ -134,12 +134,12 @@ describe("a shopper who has not signed in", () => {
   it("cannot write to the catalogue", async () => {
     const inserted = errorOf(
       await anon.from("products").insert({
-        sku: "ZZTEST-HACK",
-        slug: "zztest-hack",
+        sku: NAMES.sku("HACK"),
+        slug: NAMES.slug("hack"),
         family_id: ID.family,
         brand_id: ID.brand,
         category_id: ID.category,
-        display_name: "ZZTEST Injected",
+        display_name: "fixture injected",
         price_tzs: 1,
       }),
     );
@@ -228,12 +228,12 @@ describe("a signed-in account that is neither staff nor a customer", () => {
   it("cannot create a product", async () => {
     const error = errorOf(
       await nobody.from("products").insert({
-        sku: "ZZTEST-NOBODY",
-        slug: "zztest-nobody",
+        sku: NAMES.sku("NOBODY"),
+        slug: NAMES.slug("nobody"),
         family_id: ID.family,
         brand_id: ID.brand,
         category_id: ID.category,
-        display_name: "ZZTEST Nobody",
+        display_name: "fixture Nobody",
         price_tzs: 1,
       }),
     );
@@ -263,7 +263,7 @@ describe("Order staff: advance orders, change nothing else", () => {
   it("sees customers, so an order can be chased by telephone", async () => {
     const { data, error } = await staff.from("customers").select("full_name").eq("id", ID.customer);
     expect(error).toBeNull();
-    expect(data![0]?.full_name).toBe("ZZTEST Customer");
+    expect(data![0]?.full_name).toBe(`ZZ${NAMES.token} Customer`);
   });
 
   it("advances an order", async () => {
@@ -337,8 +337,8 @@ describe("Order staff: advance orders, change nothing else", () => {
   it("cannot manage staff", async () => {
     const error = errorOf(
       await staff.from("admin_profiles").insert({
-        full_name: "ZZTEST Self Promoted",
-        email: "zztest-self@jojo-usafi.test",
+        full_name: "fixture Self Promoted",
+        email: NAMES.email("self"),
         role: "owner",
       }),
     );
@@ -362,7 +362,7 @@ describe("Order staff: advance orders, change nothing else", () => {
         kind: "note_added",
         actor_type: "staff",
         actor_admin_id: adminId,
-        summary: "ZZTEST rang the customer",
+        summary: "fixture rang the customer",
       })
       .select("id");
 
@@ -377,7 +377,7 @@ describe("Order staff: advance orders, change nothing else", () => {
         kind: "note_added",
         actor_type: "staff",
         actor_admin_id: ID.profileManager,
-        summary: "ZZTEST forged",
+        summary: "fixture forged",
       }),
     );
     expect(error.code).toBe(PG.insufficientPrivilege);
@@ -410,7 +410,7 @@ describe("Manager: runs the shop, does not run the staff", () => {
 
     const customer = await manager
       .from("customers")
-      .update({ notes: "ZZTEST prefers mornings" })
+      .update({ notes: "fixture prefers mornings" })
       .eq("id", ID.customer)
       .select("id");
     expect(customer.data).toHaveLength(1);
@@ -425,7 +425,7 @@ describe("Manager: runs the shop, does not run the staff", () => {
         kind: "receipt",
         on_hand_delta: 5,
         reserved_delta: 0,
-        reference: "ZZTEST delivery note",
+        reference: "fixture delivery note",
       })
       .select("id");
 
@@ -438,7 +438,7 @@ describe("Manager: runs the shop, does not run the staff", () => {
       kind: "correction",
       on_hand_delta: -5,
       reserved_delta: 0,
-      reason: "ZZTEST undo the test receipt",
+      reason: "fixture undo the test receipt",
     });
   });
 
@@ -464,15 +464,15 @@ describe("Manager: runs the shop, does not run the staff", () => {
       expect(error, `${table} should be readable by a Manager`).toBeNull();
     }
 
-    const suppliers = await manager.from("suppliers").select("code").like("code", "ZZTEST%");
-    expect(suppliers.data!.map((row) => row.code)).toEqual(["ZZTEST-SUP"]);
+    const suppliers = await manager.from("suppliers").select("code").like("code", `${NAMES.skuPrefix}%`);
+    expect(suppliers.data!.map((row) => row.code)).toEqual([NAMES.code("SUP")]);
   });
 
   it("cannot add or change staff", async () => {
     const inserted = errorOf(
       await manager.from("admin_profiles").insert({
-        full_name: "ZZTEST Manager's Friend",
-        email: "zztest-friend@jojo-usafi.test",
+        full_name: "fixture Manager's Friend",
+        email: NAMES.email("friend"),
         role: "manager",
       }),
     );
@@ -493,8 +493,8 @@ describe("Owner: the only one who manages staff", () => {
     const { data, error } = await owner
       .from("admin_profiles")
       .insert({
-        full_name: "ZZTEST New Staff",
-        email: "zztest-new@jojo-usafi.test",
+        full_name: "fixture New Staff",
+        email: NAMES.email("new"),
         role: "order_staff",
       })
       .select("id, role");

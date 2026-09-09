@@ -19,7 +19,7 @@ and, since Build 06, the half that needs a real database:
 
 ```bash
 npm run db:types:check   # the generated types still match the live schema
-npm run test:db          # 112 tests against PostgreSQL, Supabase Auth and Storage
+npm run test:db          # 129 tests against PostgreSQL, Supabase Auth and Storage
 ```
 
 The two halves are deliberately separate. `npm run test` must keep working on a laptop with
@@ -71,7 +71,7 @@ types disagreeing with the live schema.
 
 ## Database, Auth, RLS and Storage tests
 
-`npm run test:db` — 112 tests against the hosted development project. Four files, run in
+`npm run test:db` — 129 tests against the hosted development project. Six files, run in
 name order by a custom sequencer, sharing one database with `fileParallelism` off.
 
 | File | Tests | Proves |
@@ -80,19 +80,34 @@ name order by a custom sequencer, sharing one database with `fileParallelism` of
 | `02-auth.test.ts` | 20 | the three roles resolve from `admin_profiles`; the Owner seat is taken and cannot be taken again by anyone; a signed-in non-staff account cannot promote itself; the last Owner cannot be demoted, deactivated or deleted; deleting a login leaves the staff record behind |
 | `03-rls.test.ts` | 39 | five callers — anonymous, signed-in stranger, Order staff, Manager, Owner — against every policy |
 | `04-storage.test.ts` | 10 | bucket configuration; who may upload, replace and delete |
+| `05-real-data-untouched.test.ts` | 6 | every real staff and audit row is byte-for-byte what it was before the suite ran |
+| `06-catalogue.test.ts` | 14 | the real catalogue as an anonymous shopper receives it: 95 on the shelf, 201 kept, EP01-A01 blocked, EP23-A02 not invented, photographs filed and fetchable, nothing newly readable or writable |
 
-Fixtures are fake, marked `ZZTEST` / `zztest` / `aa000000-`, and removed afterwards. Nothing
-invented ever persists: no prices, customers or orders that could put unreal figures on the
-dashboard's revenue tiles.
+### Fixtures are scoped to one run
 
-Two things about the suite are worth knowing before changing it.
+Every run mints a token — eight hex characters — and every fixture identifier carries it:
+SKU `ZZ1A2B3C4D-P1`, email `zz1a2b3c4d-owner@jojo-usafi.test`, storage path, customer phone,
+analytics session. Teardown is rendered per run from `teardown.sql.tmpl` and deletes exactly
+that token, plus the previous run's if it crashed — both tokens this suite minted itself.
 
-**Teardown runs as `postgres`, through the CLI, not through the API.** `order_events`,
-`inventory_movements`, `audit_events` and `analytics_events` carry `jojo_forbid_mutation`,
-which refuses DELETE from everyone including the service role — so `tests/db/teardown.sql`
-disables those triggers around itself. A consequence worth stating plainly: **an order with
-history cannot be deleted through the API at all**, because the cascade to `order_events`
-hits the append-only trigger. History is permanent by design.
+**Teardown identifies rows by WHO MADE THEM, never by what they are or what happened.** No
+rule matches a role, an action name, a lifecycle or a shared email domain. Build 06 had one
+that matched `audit_events` on `action = ...first_owner_claimed` and destroyed Jojo Usafi's
+real audit row the first time the real bootstrap ran. There is no pattern left in that file
+that a real row could match.
+
+It runs as `postgres` through the CLI, because the four append-only ledgers refuse DELETE
+from everyone including the service role. It does **not** disable the last-Owner trigger:
+fixture Owners are never the last Owner, so it never fires. A consequence worth stating
+plainly: **an order with history cannot be deleted through the API at all**, and **a staff
+member named in the audit trail cannot be deleted by anybody** — the delete nulls
+`audit_events.actor_admin_id`, which is append-only. History is permanent by design.
+
+**Nothing in the suite touches real data.** The last-Owner guard is exercised in
+`last-owner-guard.sql`, a transaction that always rolls back;
+`05-real-data-untouched.test.ts` then compares every real row against a snapshot taken
+before any fixture existed. The suite also **fails closed**: if there is not exactly one real
+active Owner before it starts, nothing runs at all.
 
 **Two kinds of "no" appear, and they are not interchangeable.**
 
@@ -107,16 +122,10 @@ Asserting an error where the answer is an empty result tests nothing.
 
 - **concurrent stock reservation** — the transactional reserve/release functions are not
   built. They belong with the checkout that calls them; see `docs/DATA_MODEL.md`.
-- **the storefront and admin against Supabase** — the three clients are written,
-  typechecked and now pointed at a real project, and `/admin/sign-in` and `/admin/setup` do
-  use them for real. No page reads the database for its **data** yet; the storefront still
-  reads the committed catalogue artifact and the ten dashboard screens still show mock rows.
-- **a sign-in guard on the ten dashboard screens** — deliberately absent. They show mock data,
-  so there is nothing behind them to protect; the guard belongs with the build that gives
-  them real data. Sign-in itself works and is covered by the QA gate.
-- **the catalogue in the database** — 95 products exist as a build artifact, not as rows.
-- **product photography in Storage** — the buckets and their policies are proved; they are
-  empty.
+- **admin writes** — the product screens read the real catalogue; nothing writes yet.
+- **a sign-in guard on the ten dashboard screens** — deliberately absent while they cannot
+  write. The one screen carrying real data reads under the caller's own RLS, so an
+  unauthenticated visitor sees only what is already public.
 - **the order workflow end to end** — no order has been placed through the application.
 - **Google Sheet sync** — the rules are unit-tested; nothing has ever talked to Google.
 

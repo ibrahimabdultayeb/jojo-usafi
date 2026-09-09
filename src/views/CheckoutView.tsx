@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { useCart } from "@/lib/cart";
-import { productName } from "@/lib/catalogue/queries";
+import { productName } from "@/lib/catalogue/format";
 import { formatPrice } from "@/lib/format";
 import { fill } from "@/lib/i18n";
 import { useLocale } from "@/lib/i18n/client";

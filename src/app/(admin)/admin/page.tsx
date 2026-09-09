@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { getAdminCatalogue } from "@/lib/catalogue/admin";
 import { AdminPage } from "@/components/admin/AdminShell";
 import { Badge, Card, SectionTitle, StatTile } from "@/components/admin/ui";
 import { formatTsh } from "@/lib/admin/format";
 import { Icon } from "@/components/ui/Icon";
 import {
   activity,
-  attention,
+  attentionItems,
   orderTotals,
   orders,
   STAGE_LABEL,
@@ -27,7 +28,10 @@ const TONE_RING = {
  * Attention comes first, figures second, history last — the opposite of a
  * reporting dashboard, because this screen is read standing up between jobs.
  */
-export default function AdminHomePage() {
+export default async function AdminHomePage() {
+  // The withheld-product count is real: it comes from the database.
+  const { totals } = await getAdminCatalogue();
+  const attention = attentionItems(totals.missingImage);
   const needsAttention = attention.filter((item) => item.count > 0);
   const allClear = attention.filter((item) => item.count === 0);
   const recent = orders.slice(0, 5);

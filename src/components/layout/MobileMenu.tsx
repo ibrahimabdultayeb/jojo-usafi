@@ -6,7 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 import { Logo } from "@/components/layout/Logo";
-import { getCategories } from "@/lib/catalogue/queries";
+import { useCategories } from "@/lib/catalogue/CatalogueContext";
 import { useLocale } from "@/lib/i18n/client";
 import { fill } from "@/lib/i18n";
 import { site, whatsappLink } from "@/lib/site";
@@ -35,9 +35,12 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
     };
   }, [open, onClose]);
 
+  // Hooks before the early return: the menu is unmounted when closed, and a
+  // hook called after  would change order between renders.
+  const categories = useCategories();
+
   if (!open) return null;
 
-  const categories = getCategories();
   const nav = [
     { label: t.nav.home, href: "/" },
     { label: t.nav.shop, href: "/shop" },

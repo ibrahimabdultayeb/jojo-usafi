@@ -15,7 +15,7 @@
 import { describe, expect, it } from "vitest";
 import type { TablesInsert } from "@/lib/supabase/types";
 import { errorOf, isRefusedByTrigger, PG, serviceClient } from "./support";
-import { ID, SKU, TEST_PHONE } from "./fixtures";
+import { ANALYTICS_SESSION, ID, NAMES, SKU, TEST_PHONE } from "./fixtures";
 
 const db = serviceClient();
 
@@ -28,12 +28,12 @@ const db = serviceClient();
  */
 function validProduct(overrides: Partial<TablesInsert<"products">> = {}): TablesInsert<"products"> {
   return {
-    sku: "ZZTEST-TMP",
-    slug: "zztest-tmp",
+    sku: SKU.temp,
+    slug: NAMES.slug("tmp"),
     family_id: ID.family,
     brand_id: ID.brand,
     category_id: ID.category,
-    display_name: "ZZTEST Temporary",
+    display_name: `ZZ${NAMES.token} Temporary`,
     price_tzs: 5000,
     ...overrides,
   };
@@ -41,10 +41,10 @@ function validProduct(overrides: Partial<TablesInsert<"products">> = {}): Tables
 
 function validOrder(overrides: Partial<TablesInsert<"orders">> = {}): TablesInsert<"orders"> {
   return {
-    customer_name: "ZZTEST Constraint",
+    customer_name: `ZZ${NAMES.token} Constraint`,
     customer_phone_e164: TEST_PHONE,
-    delivery_zone_name: "ZZTEST Zone",
-    delivery_address: "ZZTEST address",
+    delivery_zone_name: `ZZ${NAMES.token} Zone`,
+    delivery_address: "fixture address",
     delivery_fee_tzs: 4000,
     subtotal_tzs: 10_000,
     discount_tzs: 0,
@@ -88,7 +88,7 @@ describe("money is integer shillings, and the arithmetic is a constraint", () =>
       await db.from("order_items").insert({
         order_id: ID.order,
         sku: SKU.noPhoto,
-        product_name: "ZZTEST wrong arithmetic",
+        product_name: "fixture wrong arithmetic",
         quantity: 3,
         unit_price_tzs: 1000,
         line_total_tzs: 2999,
@@ -102,21 +102,21 @@ describe("money is integer shillings, and the arithmetic is a constraint", () =>
 describe("SKU is the identity key", () => {
   it("refuses a SKU that does not match the pattern", async () => {
     const error = errorOf(
-      await db.from("products").insert(validProduct({ sku: "zz test", slug: "zztest-bad-sku" })),
+      await db.from("products").insert(validProduct({ sku: "zz test", slug: NAMES.slug("bad-sku") })),
     );
     expect(error.code).toBe(PG.checkViolation);
   });
 
   it("refuses a duplicate SKU", async () => {
     const error = errorOf(
-      await db.from("products").insert(validProduct({ sku: SKU.public, slug: "zztest-dupe" })),
+      await db.from("products").insert(validProduct({ sku: SKU.public, slug: NAMES.slug("dupe") })),
     );
     expect(error.code).toBe(PG.uniqueViolation);
   });
 
   it("refuses to rewrite a SKU that has been used on an order", async () => {
     const error = errorOf(
-      await db.from("products").update({ sku: "ZZTEST-P1-RENAMED" }).eq("id", ID.productPublic),
+      await db.from("products").update({ sku: NAMES.sku("P1RENAMED") }).eq("id", ID.productPublic),
     );
     expect(isRefusedByTrigger(error)).toBe(true);
     expect(error.message).toContain("cannot be changed");
@@ -125,12 +125,12 @@ describe("SKU is the identity key", () => {
   it("allows a SKU that has never been ordered to be corrected", async () => {
     const renamed = await db
       .from("products")
-      .update({ sku: "ZZTEST-P3B" })
+      .update({ sku: SKU.renamed })
       .eq("id", ID.productNoPhoto)
       .select("sku")
       .single();
     expect(renamed.error).toBeNull();
-    expect(renamed.data?.sku).toBe("ZZTEST-P3B");
+    expect(renamed.data?.sku).toBe(SKU.renamed);
 
     const restored = await db
       .from("products")
@@ -211,7 +211,7 @@ describe("customers and delivery zones", () => {
       const error = errorOf(
         await db.from("customers").insert({
           phone_e164: phone,
-          full_name: "ZZTEST Bad Phone",
+          full_name: "fixture bad phone",
         }),
       );
       expect(error.code, `expected ${phone} to be refused`).toBe(PG.checkViolation);
@@ -221,8 +221,8 @@ describe("customers and delivery zones", () => {
   it("refuses a free delivery zone that still charges a fee", async () => {
     const error = errorOf(
       await db.from("delivery_zones").insert({
-        slug: "zztest-zone-contradiction",
-        name: "ZZTEST Contradiction",
+        slug: NAMES.slug("zone-contradiction"),
+        name: `ZZ${NAMES.token} Contradiction`,
         fee_tzs: 4000,
         free_delivery: true,
       }),
@@ -234,7 +234,7 @@ describe("customers and delivery zones", () => {
   it("defaults a new zone's fee to the approved TSh 4,000", async () => {
     const created = await db
       .from("delivery_zones")
-      .insert({ slug: "zztest-zone-default", name: "ZZTEST Default Fee" })
+      .insert({ slug: NAMES.slug("zone-default"), name: `ZZ${NAMES.token} Default Fee` })
       .select("fee_tzs, free_delivery")
       .single();
 
@@ -329,7 +329,7 @@ describe("the stock ledger only moves stock in the direction each kind claims", 
 
   it("refuses a movement that changes nothing", async () => {
     const error = errorOf(
-      await db.from("inventory_movements").insert(movement({ kind: "stock_count", reason: "ZZTEST" })),
+      await db.from("inventory_movements").insert(movement({ kind: "stock_count", reason: "fixture" })),
     );
     expect(error.code).toBe(PG.checkViolation);
     expect(error.message).toContain("inventory_movements_not_empty");
@@ -357,7 +357,7 @@ describe("the stock ledger only moves stock in the direction each kind claims", 
     const created = await db
       .from("inventory_movements")
       .insert(
-        movement({ kind: "correction", on_hand_delta: 1, reason: "ZZTEST recount after breakage" }),
+        movement({ kind: "correction", on_hand_delta: 1, reason: "fixture recount after breakage" }),
       )
       .select("id, kind")
       .single();
@@ -371,7 +371,7 @@ describe("the stock ledger only moves stock in the direction each kind claims", 
     // reconciliation test below depends on.
     const undone = await db
       .from("inventory_movements")
-      .insert(movement({ kind: "correction", on_hand_delta: -1, reason: "ZZTEST undo recount" }))
+      .insert(movement({ kind: "correction", on_hand_delta: -1, reason: "fixture undo recount" }))
       .select("id")
       .single();
 
@@ -403,7 +403,7 @@ describe("history is append-only, for everyone including the service role", () =
   it("refuses to delete an analytics event", async () => {
     const inserted = await db
       .from("analytics_events")
-      .insert({ kind: "page_view", session_id: "zztest-append-only", path: "/" })
+      .insert({ kind: "page_view", session_id: ANALYTICS_SESSION, path: "/" })
       .select("id")
       .single();
     expect(inserted.error).toBeNull();
@@ -415,7 +415,7 @@ describe("history is append-only, for everyone including the service role", () =
   it("refuses to delete an audit event", async () => {
     const inserted = await db
       .from("audit_events")
-      .insert({ action: "zztest.append_only", entity_table: "products", entity_key: "zztest" })
+      .insert({ action: "fixture.append_only", entity_table: "products", entity_key: NAMES.slug("audit") })
       .select("id")
       .single();
     expect(inserted.error).toBeNull();
@@ -445,7 +445,7 @@ describe("updated_at is maintained by the database", () => {
 
     const after = await db
       .from("delivery_zones")
-      .update({ notes: `ZZTEST touch ${Date.now()}` })
+      .update({ notes: `fixture touch ${Date.now()}` })
       .eq("id", ID.zone)
       .select("updated_at")
       .single();
@@ -472,9 +472,9 @@ describe("product_shelf is the one definition of what a shopper may see", () => 
       available: 7,
       in_stock: true,
       low_stock: false,
-      brand_name: "ZZTEST Brand",
+      brand_name: `ZZ${NAMES.token} Brand`,
     });
-    expect(data?.image_path).toBe("zztest/zztest-p1-primary-1.webp");
+    expect(data?.image_path).toBe(`${NAMES.storagePrefix}/p1-primary-1.webp`);
   });
 
   it("excludes a product that is switched off for the storefront", async () => {

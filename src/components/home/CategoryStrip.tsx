@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SHOP_SECTION_ID } from "@/components/home/Hero";
-import { getCategories, getProductsByCategory } from "@/lib/catalogue/queries";
+import { getCategories, getProducts } from "@/lib/catalogue/queries";
 import { fill, getDictionary, localePath, type Locale } from "@/lib/i18n";
 import { toneSet } from "@/lib/tones";
 
@@ -9,9 +9,15 @@ import { toneSet } from "@/lib/tones";
  * shopping surface below the fold. On phones this is a horizontal rail so the
  * categories stay one thumb-swipe away instead of pushing the shelf off screen.
  */
-export function CategoryStrip({ locale }: { locale: Locale }) {
+export async function CategoryStrip({ locale }: { locale: Locale }) {
   const t = getDictionary(locale);
-  const categories = getCategories();
+  const categories = await getCategories();
+  // Counted from the one catalogue fetch rather than a query per tile.
+  const products = await getProducts();
+  const totals = new Map<string, number>();
+  for (const product of products) {
+    totals.set(product.categoryId, (totals.get(product.categoryId) ?? 0) + 1);
+  }
 
   return (
     <section
@@ -35,7 +41,7 @@ export function CategoryStrip({ locale }: { locale: Locale }) {
       <div className="no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:px-6 lg:grid lg:grid-cols-5 lg:gap-4 lg:overflow-visible">
         {categories.map((category) => {
           const tone = toneSet(category.tone);
-          const total = getProductsByCategory(category.id).length;
+          const total = totals.get(category.id) ?? 0;
           return (
             <Link
               key={category.id}

@@ -140,7 +140,7 @@ async function loadEverything(tab) {
     }
     window.scrollTo(0, 0);
   });
-  await tab.waitForLoadState("networkidle");
+  await tab.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => {});
   await tab
     .waitForFunction(() => [...document.images].every((i) => i.complete), null, { timeout: 30000 })
     .catch(() => {});
@@ -172,7 +172,7 @@ async function checkImages(tab, label) {
   const unlabelled = await tab.evaluate(() =>
     [...document.images]
       .filter((img) => {
-        if (!img.src.includes("/products/")) return false;
+        if (!img.src.includes("/product-media/") && !img.src.includes("/products/")) return false;
         if (img.closest("[aria-hidden='true']")) return false;
         // alt="" is a deliberate "decorative" marker and is only correct when
         // something else names the control the image sits inside.
@@ -321,15 +321,51 @@ async function checkProductGrids(tab, label, expected) {
   }
 }
 
+/**
+ * The SKU a product photograph belongs to, read out of its URL.
+ *
+ * Build 07 moved the photographs into Supabase Storage, so the shape changed
+ * from `/products/EP01-A02.webp` to
+ * `…/product-media/EP01-A02/ep01-a02-primary-1.webp` — the SKU is the folder
+ * now, not the filename. Both are understood, because this check exists to
+ * catch a photograph appearing on the wrong product and must not be quietly
+ * defeated by a path change.
+ */
+function skuFromPhotoUrl(src) {
+  const storage = src.match(/\/product-media\/([^/]+)\//);
+  if (storage) return decodeURIComponent(storage[1]);
+  const local = src.match(/\/products\/([^/]+)\.webp/);
+  return local ? decodeURIComponent(local[1]) : null;
+}
+
+/** Every product photograph on the page, wherever it is served from. */
+const PHOTO_SELECTOR = 'img[src*="/product-media/"], img[src*="/products/"]';
+
 /** The photo on the product page must belong to the SKU being viewed. */
 async function checkProductPhotoMatchesSku(tab, label, sku) {
-  const src = await tab.evaluate(() => {
-    const img = document.querySelector('main img[src*="/products/"]');
+  const src = await tab.evaluate((selector) => {
+    const img = document.querySelector(`main ${selector}`);
     return img ? img.getAttribute("src") : null;
-  });
+  }, PHOTO_SELECTOR);
   if (!src) return fail(`NO PRODUCT PHOTO — ${label}`);
-  const shown = src.split("/").pop().replace(".webp", "");
+  const shown = skuFromPhotoUrl(src);
   if (shown !== sku) fail(`WRONG PHOTO — ${label}: showing ${shown} on ${sku}`);
+}
+
+/**
+ * Navigate, and wait for the page to settle.
+ *
+ * Since Build 07 the product photographs come from Supabase Storage rather than
+ * from this server, so a shelf holds dozens of connections to a CDN in Mumbai
+ * and `networkidle` can legitimately never arrive. Waiting for `load` and then
+ * giving the network a bounded chance to go quiet gives the same practical
+ * guarantee the gate needs — every image request issued and answered — without
+ * failing on latency. `loadEverything()` still waits for every image to report
+ * `complete`, which is the assertion that actually matters.
+ */
+async function settle(tab, url) {
+  await tab.goto(url, { waitUntil: "load", timeout: 90_000 });
+  await tab.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => {});
 }
 
 async function screenshotPass(browser) {
@@ -348,7 +384,7 @@ async function screenshotPass(browser) {
 
         const tab = await context.newPage();
         watchConsole(tab, label);
-        await tab.goto(`${BASE_URL}${locale.prefix}${page.path}`, { waitUntil: "networkidle" });
+        await settle(tab, `${BASE_URL}${locale.prefix}${page.path}`);
         await tab.waitForTimeout(300);
 
         await loadEverything(tab);
@@ -393,7 +429,7 @@ async function adminPass(browser) {
 
       const tab = await context.newPage();
       watchConsole(tab, label);
-      await tab.goto(`${BASE_URL}${page.path}`, { waitUntil: "networkidle" });
+      await settle(tab, `${BASE_URL}${page.path}`);
       await tab.waitForTimeout(300);
 
       await loadEverything(tab);
@@ -457,7 +493,7 @@ async function anchorBoxes(browser, viewport, locale, pagePath) {
   await seedStorage(context, locale.code, false);
 
   const tab = await context.newPage();
-  await tab.goto(`${BASE_URL}${locale.prefix}${pagePath}`, { waitUntil: "networkidle" });
+  await settle(tab, `${BASE_URL}${locale.prefix}${pagePath}`);
   // Web fonts change text metrics, so the comparison has to happen after they
   // have swapped in — otherwise both sides are measured in the fallback face.
   await tab.evaluate(() => document.fonts.ready);
@@ -538,7 +574,7 @@ async function behaviourPass(browser) {
     await seedStorage(context, locale.code, false);
     const tab = await context.newPage();
     watchConsole(tab, `hero-arrow ${locale.code}`);
-    await tab.goto(`${BASE_URL}${locale.prefix}/`, { waitUntil: "networkidle" });
+    await settle(tab, `${BASE_URL}${locale.prefix}/`);
 
     const control = tab.locator("section button[aria-label]").first();
     await control.click();
@@ -570,7 +606,7 @@ async function behaviourPass(browser) {
     await seedStorage(context, "en", true);
     const tab = await context.newPage();
     watchConsole(tab, "support-button");
-    await tab.goto(`${BASE_URL}/`, { waitUntil: "networkidle" });
+    await settle(tab, `${BASE_URL}/`);
 
     const support = tab.locator('[data-qa="support-button"]');
     if ((await support.count()) === 0) {
@@ -601,7 +637,7 @@ async function behaviourPass(browser) {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const tab = await context.newPage();
     watchConsole(tab, "language-chooser");
-    await tab.goto(`${BASE_URL}/`, { waitUntil: "networkidle" });
+    await settle(tab, `${BASE_URL}/`);
 
     const dialog = tab.locator('[role="dialog"][aria-labelledby="language-chooser-title"]');
     if ((await dialog.count()) === 0) fail("LANGUAGE CHOOSER — did not appear on a first visit");
@@ -613,7 +649,7 @@ async function behaviourPass(browser) {
       const lang = await tab.evaluate(() => document.documentElement.lang);
       if (!lang.startsWith("sw")) fail(`LANGUAGE CHOOSER — html lang is "${lang}" after choosing sw`);
 
-      await tab.reload({ waitUntil: "networkidle" });
+      await tab.reload({ waitUntil: "load", timeout: 90_000 });
       if ((await dialog.count()) > 0) fail("LANGUAGE CHOOSER — reappeared after a choice was made");
     }
     await context.close();
@@ -625,7 +661,7 @@ async function behaviourPass(browser) {
     await seedStorage(context, "en", true);
     const tab = await context.newPage();
     watchConsole(tab, "language-switcher");
-    await tab.goto(`${BASE_URL}/shop?category=housekeeping`, { waitUntil: "networkidle" });
+    await settle(tab, `${BASE_URL}/shop?category=housekeeping`);
 
     const before = await tab.evaluate((key) => window.localStorage.getItem(key), CART_KEY);
 
@@ -659,16 +695,16 @@ async function behaviourPass(browser) {
       fail(`WITHHELD PRODUCT REACHABLE — ${hidden.sku} returned ${response.status()}`);
     }
 
-    await tab.goto(`${BASE_URL}/shop`, { waitUntil: "networkidle" });
+    await settle(tab, `${BASE_URL}/shop`);
     const body = await tab.evaluate(() => document.body.innerText);
     if (body.includes("EP23-A02") || /Spirix/i.test(body)) {
       fail("ORPHAN IMAGE LEAKED — EP23-A02 / Spirix appears on the shelf");
     }
-    const shownSkus = await tab.evaluate(() =>
-      [...document.querySelectorAll('img[src*="/products/"]')].map((img) =>
-        img.getAttribute("src").split("/").pop().replace(".webp", ""),
-      ),
+    const shownSrcs = await tab.evaluate(
+      (selector) => [...document.querySelectorAll(selector)].map((img) => img.getAttribute("src")),
+      PHOTO_SELECTOR,
     );
+    const shownSkus = shownSrcs.map(skuFromPhotoUrl).filter(Boolean);
     const allowed = new Set(publishable.map((p) => p.sku));
     for (const sku of shownSkus) {
       if (!allowed.has(sku)) fail(`UNAPPROVED PHOTO ON THE SHELF — ${sku}`);

@@ -14,7 +14,7 @@ import {
 } from "@/components/admin/ui";
 import { Icon } from "@/components/ui/Icon";
 import { can, currentUser } from "@/lib/admin/permissions";
-import { getBrand, productName } from "@/lib/catalogue/queries";
+
 import type { AdminProduct } from "@/mocks/admin/data";
 
 /**
@@ -72,7 +72,7 @@ export function ProductEditor({ product }: { product: AdminProduct }) {
           {product.image ? (
             <Image
               src={product.image.src}
-              alt={productName(product)}
+              alt={product.name}
               fill
               sizes="80px"
               className="object-contain"
@@ -84,9 +84,9 @@ export function ProductEditor({ product }: { product: AdminProduct }) {
           )}
         </span>
         <div className="min-w-0">
-          <p className="font-display text-base font-bold text-slate-900">{productName(product)}</p>
+          <p className="font-display text-base font-bold text-slate-900">{product.name}</p>
           <p className="text-sm font-medium text-slate-500">
-            {getBrand(product.brandId)?.name} · {product.packSize}
+            {product.brandName} · {product.packSize}
           </p>
           <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-slate-400">
             <Icon name="shield" className="h-3 w-3" />
@@ -244,7 +244,7 @@ export function ProductEditor({ product }: { product: AdminProduct }) {
           </p>
 
           <Field label="Product name">
-            <input defaultValue={productName(product)} className={inputClass} readOnly />
+            <input defaultValue={product.name} className={inputClass} readOnly />
           </Field>
           <Field label="Description" hint="The product sheet has no description for this product yet.">
             <textarea
@@ -257,7 +257,7 @@ export function ProductEditor({ product }: { product: AdminProduct }) {
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Brand">
-              <input defaultValue={getBrand(product.brandId)?.name ?? ""} className={inputClass} readOnly />
+              <input defaultValue={product.brandName ?? ""} className={inputClass} readOnly />
             </Field>
             <Field label="Size">
               <input defaultValue={product.packSize} className={inputClass} readOnly />

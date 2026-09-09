@@ -11,7 +11,6 @@ import {
   getFamilySizes,
   getProduct,
   getRelatedProducts,
-  getSupplierName,
   productName,
 } from "@/lib/catalogue/queries";
 import { formatAmount } from "@/lib/format";
@@ -20,13 +19,16 @@ import { site } from "@/lib/site";
 
 export async function ProductView({ locale, slug }: { locale: Locale; slug: string }) {
   const t = getDictionary(locale);
-  const product = getProduct(slug);
+  const product = await getProduct(slug);
   if (!product) notFound();
 
-  const brand = getBrand(product.brandId);
-  const category = getCategories().find((c) => c.id === product.categoryId);
-  const sizes = getFamilySizes(product.familyId);
-  const related = getRelatedProducts(product, 5);
+  const [brand, categories, sizes, related] = await Promise.all([
+    getBrand(product.brandId),
+    getCategories(),
+    getFamilySizes(product.familyId),
+    getRelatedProducts(product, 5),
+  ]);
+  const category = categories.find((c) => c.id === product.categoryId);
   const shop = localePath(locale, "/shop");
   const name = productName(product);
   const altFor = (p: typeof product) =>
@@ -193,10 +195,6 @@ export async function ProductView({ locale, slug }: { locale: Locale; slug: stri
               <div>
                 <dt className="text-xs font-bold text-slate-400">{t.product.category}</dt>
                 <dd className="font-bold text-slate-900">{category?.name}</dd>
-              </div>
-              <div>
-                <dt className="text-xs font-bold text-slate-400">{t.product.suppliedBy}</dt>
-                <dd className="font-bold text-slate-900">{getSupplierName(product.supplierId)}</dd>
               </div>
             </dl>
           </div>

@@ -28,16 +28,17 @@ What is real and what is not:
 | | |
 | --- | --- |
 | Schema applied, constraints and triggers firing | **yes**, proved by `npm run test:db` |
-| Row Level Security enforcing, per role | **yes**, 112 tests against real sessions |
+| Row Level Security enforcing, per role | **yes**, 129 tests against real sessions |
 | Supabase Auth, staff roles, first-Owner bootstrap | **yes**, mechanism built and tested |
 | Storage buckets and their security | **yes** — and deliberately **empty** |
 | The real Owner account | **yes** — Ibrahim Abdul Tayeb, claimed 2026-09-09 |
 | Admin sign-in and session | **yes** — `/admin/sign-in`, `/admin/setup`, session middleware |
 | A sign-in guard on the ten dashboard screens | **not yet** — they show mock data; the guard lands with the data |
-| The 95 product photographs in Storage | **not uploaded** — still `public/products/` |
-| The catalogue in the database | **not imported** — still a committed build artifact |
-| The application reading Supabase | **not wired** — the storefront still reads the file |
-| Google Sheet synchronisation | **not connected** |
+| The 95 product photographs in Storage | **yes** — `product-media/<SKU>/` |
+| The catalogue in the database | **yes** — 201 products, 95 on the public shelf |
+| The application reading Supabase | **yes** — storefront and admin product screens |
+| Google Sheet synchronisation | **not connected** — Build 08 |
+| Orders, checkout, admin writes | **not built** — Build 08 onward |
 
 See `docs/DATA_MODEL.md`, `docs/TESTING_REQUIREMENTS.md` and `docs/PROGRESS.md`.
 
@@ -80,7 +81,10 @@ src/lib/supabase/database.types.ts GENERATED from the real database — never ha
 src/lib/supabase/types.ts          friendly aliases into the generated types
 scripts/schema-check.mjs           offline: the SQL and the domain layer agree
 scripts/gen-types.mjs              generate / drift-check the types against the database
-tests/db/                          112 tests against the real database, Auth and Storage
+tests/db/                          129 tests against the real database, Auth and Storage
+scripts/import-catalogue.mjs       CSV artifact -> Supabase, idempotent, never deletes
+src/lib/catalogue/queries.ts       the storefront read: product_shelf, cached 5 minutes
+src/lib/catalogue/admin.ts         the admin read, under the CALLER's own RLS
 ```
 
 ## Authorization: two locks, with different jobs
@@ -126,8 +130,12 @@ site-content    5 MB   webp/png/jpeg/avif    <slot>/<name>.webp
 Owner and Manager upload and replace; only an Owner deletes, because
 `product_media.media_id` is `on delete restrict` and the bytes under a live product page
 should be at least as hard to remove as the row pointing at them. Nothing private lives in
-Storage. **Empty as of Build 06** — the 95 approved photographs are still committed build
-artifacts under `public/products/`.
+Storage.
+
+**Populated in Build 07**: the 95 approved photographs live at
+`product-media/<SKU>/<sku>-primary-1.webp`, each with its sha256 on the `media_assets` row
+so a re-import uploads nothing that has not changed. 2.6 MB — comfortably inside the free
+tier. The orphan image `EP23-A02` was **not** uploaded.
 
 The three clients are separate files on purpose: reaching for the privileged one has to be a
 deliberate act with a different import. `server.ts` and `admin.ts` both import `server-only`,
@@ -136,10 +144,11 @@ so pulling either into a client component is a build error rather than a leak.
 `src/lib/domain/` imports nothing from Supabase, React or Next. That is what lets the
 business rules be proved correct before the database exists.
 
-## Catalogue pipeline (built)
+## Catalogue pipeline
 
-Until Supabase exists, the catalogue is a committed build artifact rather than a live read.
-The seam is the same one Supabase will occupy.
+The CSV is now an IMPORT SOURCE, not a runtime read. The storefront reads Supabase; the
+committed artifact is the deterministic middle step that turns the Product Master into rows,
+and the one place SKU-to-photograph matching happens.
 
 ```
 imports/jojo-usafi-product-master.csv   201 rows   (source-only, git-ignored)

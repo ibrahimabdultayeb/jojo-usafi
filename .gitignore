@@ -56,3 +56,6 @@ temp/
 
 # TypeScript build info
 tsconfig.tsbuildinfo
+
+# Per-run database test manifest — machine-generated, never committed
+tests/db/.run/
