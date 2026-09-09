@@ -85,9 +85,11 @@ scattered through components.
 These change how the store operates, so the prototype avoids inventing them:
 
 - **Delivery fee** — the UI says "calculated at checkout". No number.
-- **Free-delivery threshold** — the EcoPlus reference advertises "FREE delivery over
-  TSh 30,000". Jojo Usafi's threshold, if any, is yours to set, so it is absent.
-- **Same-day cut-off time** — the reference promises same-day on orders before 2pm. Not claimed.
+- **Free-delivery threshold** — **decided: there is none.** Free delivery is a property of a
+  delivery area, not of an order total. The EcoPlus reference advertises "FREE delivery over
+  TSh 30,000"; Jojo Usafi has not adopted it, and it is not a launch blocker.
+- **Same-day cut-off time** — **decided: none at launch.** Delivery timing is confirmed with
+  the order. The reference promises same-day before 2pm; Jojo Usafi does not claim it.
 - **Which Dar es Salaam areas are served** — the copy says "selected Dar es Salaam areas",
   never a named list and never nationwide Tanzania.
 - **Loyalty / rewards** — the reference has a voucher scheme. Not reproduced.

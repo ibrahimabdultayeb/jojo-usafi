@@ -31,6 +31,13 @@ const ITEMS: {
     capability: "delivery.manage",
   },
   {
+    href: "/admin/more/catalogue-sync",
+    label: "Catalogue sync",
+    hint: "Keep the product sheet and the shop saying the same thing",
+    icon: "sparkle",
+    capability: "catalogue.sync",
+  },
+  {
     href: "/admin/more/website",
     label: "Website",
     hint: "Announcement, banner and what shows on the homepage",

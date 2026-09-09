@@ -491,6 +491,7 @@ const staffPages = [
   { name: "admin-customers", path: "/admin/customers", full: true },
   { name: "admin-more", path: "/admin/more", full: true },
   { name: "admin-zones", path: "/admin/more/delivery-zones", full: true },
+  { name: "admin-catalogue-sync", path: "/admin/more/catalogue-sync", full: true },
 ];
 
 /** Reset a QA account's password to a fresh one and hand it back. */

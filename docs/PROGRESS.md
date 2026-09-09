@@ -32,8 +32,12 @@ edits delivery areas. Every write is refused if the person's role does not allow
 database rather than by the screen. The invented orders, customers, zones and sales figures
 are deleted, not kept as a fallback.
 
+**The Google Sheet sync is built.** Two-way, validated, conflict-aware and audited, with an
+admin screen and 43 tests — but **not connected**: it is waiting on a Google service account
+and a spreadsheet ID, which only Ibrahim can create. See `docs/GOOGLE_SHEET_SYNC.md`.
+
 What is still not true: the **Website** screen saves nothing and says so; Reports, Staff and
-Settings are empty; and **nothing has talked to Google Sheets** — that is Build 09.
+Settings are empty; and no product has yet been synced to or from a real Google Sheet.
 
 ## Completed
 
@@ -1205,10 +1209,132 @@ is, the price simply arrives up to five minutes late, in production, when nobody
   exists and is tested; the durations are Ibrahim's decision.
 - **Google Sheets.** Nothing in this build touched Google, by instruction. That is Build 09.
 
+## Build 09 — the Google Sheet catalogue sync — 2026-09-09
+
+**Built, tested and waiting for a key.** The two-way synchronisation between the Product
+Master and Supabase is complete: the engine, the admin screen, the conflict resolution and 43
+new tests. What it does not have is a Google service account and a spreadsheet ID, which only
+Ibrahim can create — six free steps, listed in `docs/GOOGLE_SHEET_SYNC.md`. Until then the
+Catalogue Sync screen says "Not connected" and nothing else in the shop is affected.
+
+### The rule the design is arranged around
+
+**The Sheet is a control surface, not a second database.** Supabase stays the operational
+source of truth; the storefront reads Supabase and only Supabase. Every one of the Product
+Master's 39 columns is classified in `src/lib/sheets/columns.ts` with an explicit owner, and
+**a column that file does not name stops the whole run** — reading rows through a map nobody
+has checked is how a spreadsheet silently starts writing the wrong thing into the shop.
+
+### Stock cannot be set from the Sheet
+
+`STOCK QTY` was authoritative once. It is not now: the ledger is. Change that cell from 10 to
+1000 and the sync creates **no units** — the plan structure has no way to express an
+inventory change at all, so this is not a rule that could be forgotten, it is a shape the code
+cannot make. The shop's real figure is written back into a read-only column beside it.
+
+Proved twice: the plan can never name an inventory field, and against the real database a
+`STOCK QTY` of 999,999 moves `on_hand` by nothing and adds **zero** rows to
+`inventory_movements`.
+
+### Three-way, never last-write-wins
+
+The comparison is the Sheet's value, the database's value, and the **base** — what the two
+last agreed on. A field moves only if the side it came *from* actually changed it.
+
+- Sheet changes the name, dashboard changes the price → **merged**.
+- Both change the price → **conflict**. Neither applied, neither defaulted to, and the product
+  frozen until a person decides on *Admin → More → Catalogue sync*.
+
+Two of the first tests written failed before the base was threaded through — a price raised in
+the dashboard was being silently undone by a spreadsheet that had simply not caught up. That
+is the failure mode this whole mechanism exists to prevent, and it was real.
+
+### A product missing from the Sheet is reported, never removed
+
+Not deleted, not archived, not hidden. Orders point at it, and rows vanish for reasons that
+have nothing to do with intent. A test asserts the plan's own JSON contains no delete or
+archive verb, so the rule cannot be weakened without something noticing.
+
+### Google is never in a customer's path
+
+No storefront or checkout module imports the sync. No Google call happens inside a customer
+request. A sync that fails is a sync that failed: the shop keeps serving, checkout keeps
+taking orders, admin operations keep working, and admin product edits keep saving to Supabase
+and revalidating the storefront. Proved by a test that kills the gateway and then places and
+cancels a real order.
+
+### The admin screen
+
+*Admin → More → Catalogue sync*, Owner and Manager only — a new `catalogue.sync` capability.
+Connected or not, when it last ran, how many products, how many need a decision, how many
+rows need fixing. One primary action, **Sync now**, and a **Check first, change nothing** dry
+run beside it. Outcomes are sentences — *"Sync complete. 3 products updated from the sheet.
+1 product needs a decision."* — never JSON.
+
+A conflict shows the product, the field, both values and two equally weighted buttons. Neither
+is preselected; neither is styled as the recommendation. The shop does not know which is right.
+
+### Connection and credentials
+
+A Google **service account** with the OAuth scope `spreadsheets` and nothing else, reaching
+exactly one spreadsheet because that spreadsheet is shared with its email address. No Drive
+scope, so it cannot see anything else. The JWT is signed by hand with `node:crypto` rather
+than pulling in `googleapis` — sixty readable lines instead of a package carrying every Google
+API there is.
+
+Nothing is committed: `.env.example` holds names and placeholders, `.env.local` is gitignored,
+and no credential reaches a log line, an error message or this repository. A key-parsing
+failure is reported *without* the underlying exception, because a `node:crypto` key error can
+echo part of the key.
+
+### Manual only, on purpose
+
+No cron, no Apps Script poller, no paid scheduler. `POST /api/sync/catalogue` exists so a
+schedule has something safe to call when one is decided; it requires a bearer secret compared
+in constant time and **refuses every request when that secret is unset or too short** — a
+deployment that forgets it is closed, not open.
+
+### Business-rule correction, as instructed
+
+Two things were listed as launch blockers and are not:
+
+- **A global free-delivery spend threshold** — there is none. Free delivery is a property of a
+  delivery area. The EcoPlus reference has a TSh 30,000 threshold; Jojo Usafi has not adopted it.
+- **A same-day delivery cut-off** — none at launch. Delivery timing is confirmed with the order.
+
+Both removed from the blocker lists and recorded as decisions rather than gaps. Nothing in the
+code changed: neither was ever implemented, because neither was ever decided.
+
+### One thing worth recording
+
+The sync's own database tests were leaving their `sync_jobs` rows behind, and the Catalogue
+Sync screen was reporting a test run as the shop's last sync. Seventy-six had accumulated.
+They were removed by their own ids, and the test file now collects and deletes exactly the
+jobs it starts — never "all sync jobs", which is the rule Build 06 learned the hard way.
+
+### Verified
+
+`typecheck` · `lint` · `test` (**185**) · `schema:check` · `i18n:check` (267) ·
+`catalogue:check` · `db:types:check` · `build` · `qa:screenshots` (**127**, PASS) ·
+`test:db` (**213**).
+
+The two database-touching gates are run one at a time; running them together fails both for
+reasons that are not defects.
+
+### Still not done
+
+- **Connecting it.** Six human-only steps, all free, in `docs/GOOGLE_SHEET_SYNC.md`.
+- **Creating products from the Sheet.** Reported today. The writing half needs brand, category
+  and family to resolve, and a decision about what happens when they do not.
+- **A schedule.** The endpoint is ready; the deployment architecture is not.
+- **Media through the Sheet.** Images stay matched on exact SKU in Storage. A Sheet image URL
+  never becomes a product photograph.
+
 ## Next
 
-- Confirm the open business rules (delivery fee, free-delivery threshold, served areas,
-  retail prices, cut-off time)
+- Confirm the open business rules (delivery fee, served areas, retail prices). A global
+  free-delivery spend threshold and a same-day cut-off time are **decided against for V1** —
+  free delivery is per area, and delivery timing is confirmed with the order.
 - Confirm the `EP01-A01` price and add a master row for `EP23-A02`
 - Provide the real Jojo Usafi WhatsApp number, phone, email and logo
 - ~~**Build 06:** create a free Supabase development project, apply the migrations for real,
@@ -1230,11 +1356,23 @@ is, the price simply arrives up to five minutes late, in production, when nobody
   Manager and Order staff login (the password prints once and is stored nowhere), then sign
   in at `/admin/sign-in` to see what each role can and cannot do. `npm run qa:staff remove`
   deletes them again. Your own Owner account is untouched by any of it.
-- **Build 09**, in this order:
-  1. The **Website** screen wired to `shop_settings` — the last screen reading the mocks file
-  2. **Order amendment** before dispatch, and the **reservation-expiry scheduler** once
+- ~~**Build 09:** the validated two-way Google Sheet ↔ Supabase catalogue sync~~ — **built and
+  tested, 2026-09-09. Not connected.**
+- **Ibrahim, to switch the sync on:** six free steps in `docs/GOOGLE_SHEET_SYNC.md` →
+  *Connecting it*. A Google Cloud project, the Sheets API enabled, a service account, a JSON
+  key, share the Product Master with that service account's email as an Editor, and paste four
+  values into `.env.local`. No billing account is involved at any point. Then press **Check
+  first, change nothing** on *Admin → More → Catalogue sync* and read what it says before
+  running a real sync.
+- **Build 10**, in this order:
+  1. **Connect and prove the sync against the real Product Master** — a dry run first, then a
+     real one, then the round trip
+  2. Creating products from the Sheet: brand, category and family resolution, and what happens
+     when they do not resolve
+  3. The **Website** screen wired to `shop_settings` — the last screen reading the mocks file
+  4. **Order amendment** before dispatch, and the **reservation-expiry scheduler** once
      Ibrahim has set `reservation_warning_minutes` and `reservation_expiry_minutes`
-  3. **Staff management** for the Owner — invite, deactivate, change role
-  4. **Then** the validated two-way Google Sheet ↔ Supabase synchronisation
+  5. **Staff management** for the Owner — invite, deactivate, change role
+  6. A **schedule** for the sync, once the deployment architecture is settled
 
 Claude must update this file after meaningful milestones.

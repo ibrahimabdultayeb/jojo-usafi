@@ -7,7 +7,7 @@ The **Supabase PostgreSQL** schema, authored as version-controlled migrations in
 > **Status: applied and verified.** All 19 migrations have been executed against the hosted
 > development project (*Jojo Usafi Dev*, `dyjhacbbedytcstxxjzl`, free tier). Everything below
 > is checked statically by `npm run schema:check` and — since Build 06 — proved at runtime by
-> `npm run test:db`, 193 tests against the real database, Supabase Auth and Supabase Storage.
+> `npm run test:db`, 213 tests against the real database, Supabase Auth and Supabase Storage.
 >
 > Since Build 07 the database holds the **real catalogue**: 201 products from the Product
 > Master, 95 of them on the public shelf, 22 brands, 5 categories, 65 families, 201 inventory
@@ -201,8 +201,19 @@ The Sheet ↔ Supabase loop is survivable because four questions have answers:
 | Computed against a stale version? | `base_fingerprint` vs the current fingerprint |
 | Both sides changed one field? | a `sync_conflicts` row — never resolved automatically |
 
-`src/lib/domain/sync.ts` implements all four as pure functions with 25 tests. Nothing is
-connected to Google in this build.
+`src/lib/domain/sync.ts` implements all four as pure functions with 35 tests, and Build 09's
+`src/lib/sheets/` uses them for the real catalogue sync.
+
+**Where the "base" lives.** The three-way merge needs the values the two sides last agreed on,
+and `sync_state` deliberately holds fingerprints rather than values — it is a loop breaker,
+not a mirror. So the agreed values are written to `sync_events` as an `upsert` carrying
+`field_changes.base`. That keeps the base auditable: it is a row saying *on this date, both
+sides agreed the product was this.*
+
+Nothing has yet talked to a real Google Sheet — the engine is proved against an in-memory one
+(`tests/db/10-sheet-sync.test.ts`). The full field-ownership matrix is in
+[`GOOGLE_SHEET_SYNC.md`](./GOOGLE_SHEET_SYNC.md); the short version is that **stock, orders,
+customers, payments, ledgers and staff are Supabase-owned and the Sheet can never write them.**
 
 ## Authorization
 

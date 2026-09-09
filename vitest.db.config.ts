@@ -33,6 +33,11 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // `server-only` is a build-time guard for Next's bundler: importing it
+      // from a client module is meant to fail the build. Vitest is not that
+      // bundler, and these tests ARE the server, so the guard has nothing to
+      // protect here and only prevents the module from loading at all.
+      "server-only": fileURLToPath(new URL("./tests/db/server-only.stub.ts", import.meta.url)),
     },
   },
 });

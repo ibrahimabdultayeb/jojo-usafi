@@ -28,7 +28,7 @@ What is real and what is not:
 | | |
 | --- | --- |
 | Schema applied, constraints and triggers firing | **yes**, proved by `npm run test:db` |
-| Row Level Security enforcing, per role | **yes**, 193 tests against real sessions |
+| Row Level Security enforcing, per role | **yes**, 213 tests against real sessions |
 | Supabase Auth, staff roles, first-Owner bootstrap | **yes**, mechanism built and tested |
 | Storage buckets and their security | **yes** — and deliberately **empty** |
 | The real Owner account | **yes** — Ibrahim Abdul Tayeb, claimed 2026-09-09 |
@@ -36,7 +36,7 @@ What is real and what is not:
 | The 95 product photographs in Storage | **yes** — `product-media/<SKU>/` |
 | The catalogue in the database | **yes** — 201 products, 95 on the public shelf |
 | The application reading Supabase | **yes** — storefront and admin product screens |
-| Google Sheet synchronisation | **not connected** — Build 09 |
+| Google Sheet synchronisation | **built and tested; not connected** — waiting on a Google service account. See `docs/GOOGLE_SHEET_SYNC.md` |
 | The stock reservation engine | **yes** — one transaction, concurrency proved |
 | Server-authoritative quotation and order creation | **yes** |
 | Cancellation with reservation release | **yes** — idempotent |
@@ -78,7 +78,7 @@ approximation of it. `supabase db reset` is never run against a hosted project �
 ```
 supabase/migrations/               the schema — 19 migrations, all applied
 supabase/seed.sql                  deliberately empty of business data
-src/lib/domain/                    the rules as pure TypeScript, 162 unit tests, no I/O
+src/lib/domain/                    the rules as pure TypeScript, 185 unit tests, no I/O
 src/lib/supabase/env.ts            environment validation — no defaults, no placeholders
 src/lib/supabase/client.ts         browser, as the visitor    — anon key, RLS applies
 src/lib/supabase/server.ts         server, as the visitor     — anon key, RLS applies
@@ -87,7 +87,7 @@ src/lib/supabase/database.types.ts GENERATED from the real database — never ha
 src/lib/supabase/types.ts          friendly aliases into the generated types
 scripts/schema-check.mjs           offline: the SQL and the domain layer agree
 scripts/gen-types.mjs              generate / drift-check the types against the database
-tests/db/                          193 tests against the real database, Auth and Storage
+tests/db/                          213 tests against the real database, Auth and Storage
 scripts/import-catalogue.mjs       CSV artifact -> Supabase, idempotent, never deletes
 src/lib/catalogue/queries.ts       the storefront read: product_shelf, cached 5 minutes
 src/lib/catalogue/admin.ts         the admin read, under the CALLER's own RLS
@@ -130,6 +130,44 @@ boundary; it decides what is worth rendering.
 and the delivery quote all live in SQL functions proved in Build 08. The actions translate a
 refusal into a sentence and revalidate the screens that have gone stale. `orderTotals()` in
 `model.ts` re-adds the lines for display and is the only sum in the dashboard.
+
+## The Google Sheet sync (Build 09)
+
+Full detail in [`GOOGLE_SHEET_SYNC.md`](./GOOGLE_SHEET_SYNC.md). The shape:
+
+```
+src/lib/sheets/columns.ts   the field authority matrix — who owns each of the 39 columns
+src/lib/sheets/rows.ts      spreadsheet cells → a validated catalogue record, or an issue
+src/lib/sheets/plan.ts      the whole decision, as a PURE function
+src/lib/sheets/google.ts    the only code that talks to Google. One read, one batched write
+src/lib/sheets/run.ts       reads, applies, writes back, records the audit
+src/lib/sheets/status.ts    what the Catalogue Sync screen shows
+src/lib/sheets/actions.ts   Sync now, and settling a conflict
+src/app/api/sync/catalogue  a protected endpoint for a future schedule. Nothing calls it yet
+```
+
+**The decision is a pure function.** `planSync` takes a sheet snapshot, the database's
+products and what the two last agreed on, and returns a plan. It reads nothing, writes
+nothing and cannot see a clock — which is why every rule in the brief is a unit test over a
+literal, and why a dry run is genuinely free: it is the same function without the applier.
+
+**Three-way, never last-write-wins.** The comparison is sheet value, database value, and the
+**base** — what they last agreed. A field moves only if the side it comes *from* actually
+changed it. Without the base, a value that was simply always different is indistinguishable
+from a change, which is how naive syncs lose data. Both sides changing the same field is a
+conflict, and a conflict freezes that product until a person decides.
+
+**Stock is not in the conversation.** `STOCK QTY` is classified `database`, so the plan has no
+way to express an inventory change at all. The shop's real figure is reported back into a
+read-only column beside it instead.
+
+**An unclassified column stops the run.** A column `columns.ts` does not name is not skipped
+and not guessed at: reading rows through a map nobody has checked is how a spreadsheet
+silently starts writing the wrong thing into the shop.
+
+**Google is never in a customer's path.** No storefront or checkout module imports any of
+these files, no Google call happens inside a customer request, and a sync that fails is a
+sync that failed — the shop, the orders and the admin's own writes are untouched.
 
 ## Authorization: two locks, with different jobs
 

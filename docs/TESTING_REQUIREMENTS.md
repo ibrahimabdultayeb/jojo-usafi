@@ -7,7 +7,7 @@ Every one of these must pass before a commit:
 ```bash
 npm run typecheck        # TypeScript, no emit
 npm run lint             # ESLint
-npm run test             # 162 unit tests (vitest) — no database needed
+npm run test             # 185 unit tests (vitest) — no database needed
 npm run schema:check     # SQL is internally consistent and agrees with the domain layer
 npm run i18n:check       # en + sw key, placeholder and array parity
 npm run catalogue:check  # committed catalogue still matches imports/
@@ -20,7 +20,7 @@ and, since Build 06, the half that needs a real database:
 
 ```bash
 npm run db:types:check   # the generated types still match the live schema
-npm run test:db          # 193 tests against PostgreSQL, Supabase Auth and Storage
+npm run test:db          # 213 tests against PostgreSQL, Supabase Auth and Storage
 ```
 
 The two halves are deliberately separate. `npm run test` must keep working on a laptop with
@@ -39,7 +39,7 @@ migration path is `db push --dry-run`, read the plan, then `db push`.
 
 ## Domain unit tests
 
-`npm run test` — 162 tests over `src/lib/domain/` and the admin capability matrix, all pure
+`npm run test` — 185 tests over `src/lib/domain/`, the admin capability matrix and the Google Sheet sync planner, all pure
 TypeScript with no I/O:
 
 | Area | Covers |
@@ -53,6 +53,7 @@ TypeScript with no I/O:
 | `sync` | fingerprint stability, echo detection, stale writes, conflicts, retry backoff, record validation |
 | `content` | locale fallback to English, missing-translation reporting |
 | `admin/permissions` | the capability matrix both the screens and `authorize()` read: every role works orders; only Owner and Manager touch pricing, stock and visibility; only the Owner manages staff and settings |
+| `sheets/plan` | the Google Sheet sync decision, as a pure function: which side may change what, conflicts vs safe field merges, echoes, duplicate and blank SKUs, an unclassified column stopping the run — and that no plan can ever name an inventory field |
 
 They exist because the rules had to be provable before the database was available. Each one
 has a CHECK constraint or trigger as its counterpart in `supabase/migrations/`.
@@ -79,7 +80,7 @@ types disagreeing with the live schema.
 
 ## Database, Auth, RLS and Storage tests
 
-`npm run test:db` — 193 tests against the hosted development project. Nine files, run in
+`npm run test:db` — 213 tests against the hosted development project. Ten files, run in
 name order by a custom sequencer, sharing one database with `fileParallelism` off.
 
 | File | Tests | Proves |
@@ -92,6 +93,7 @@ name order by a custom sequencer, sharing one database with `fileParallelism` of
 | `08-order-lifecycle.test.ts` | 15 | the whole journey — place, confirm, prepare, dispatch, complete with payment — asserting that stock leaves only at completion; completion refuses without payment and digital without a reference; illegal transitions refused; both delivery-failure outcomes; every order function closed to the browser |
 | `07-commerce.test.ts` | 25 | quoting is the database answer and not the browser one; reservation is atomic; the last unit cannot be sold twice (1-in-stock/2-orders and 3-in-stock/5-orders); a refused order leaves nothing behind; customer matching on phone; cancellation releases once and is idempotent; tracking needs the number AND the phone; the commerce path is closed to the browser |
 | `06-catalogue.test.ts` | 14 | the real catalogue as an anonymous shopper receives it: 95 on the shelf, 201 kept, EP01-A01 blocked, EP23-A02 not invented, photographs filed and fetchable, nothing newly readable or writable |
+| `10-sheet-sync.test.ts` | 20 | the catalogue sync against the real database and an in-memory spreadsheet: both directions applied, a `STOCK QTY` of 999,999 moving nothing and writing no ledger row, conflicts recorded and not re-raised, a deleted sheet row leaving the product alone, a second run writing nothing, Google being down leaving checkout working, and orders, ledgers and staff rows untouched |
 | `09-admin-operations.test.ts` | 24 | the dashboard's operations run as the people who use them: Order staff refused pricing, stock, zones and self-promotion; Manager allowed all four but refused Owner and refused to rewrite what an order sold for; stock moved only through the ledger, with an actor and a reason; the whole staff journey to Completed with cash and with a digital reference; cancellation and both delivery-failure answers; what each screen can read |
 
 ### Fixtures are scoped to one run

@@ -43,6 +43,7 @@ describe("who may do what", () => {
 
   it("lets a Manager run the shop but never manage staff or settings", () => {
     expect(can("manager", "delivery.manage")).toBe(true);
+    expect(can("manager", "catalogue.sync")).toBe(true);
     expect(can("manager", "website.manage")).toBe(true);
     expect(can("manager", "analytics.view")).toBe(true);
 
@@ -56,6 +57,7 @@ describe("who may do what", () => {
     for (const capability of [
       "products.editPricing",
       "delivery.manage",
+      "catalogue.sync",
       "website.manage",
       "analytics.view",
       "staff.manage",
@@ -71,7 +73,7 @@ describe("who may do what", () => {
       "orders.view", "orders.advance", "orders.cancel", "orders.recordPayment",
       "customers.view", "customers.edit",
       "products.view", "products.editPricing", "products.editStock", "products.editVisibility",
-      "delivery.manage", "website.manage", "analytics.view", "staff.manage", "settings.manage",
+      "delivery.manage", "catalogue.sync", "website.manage", "analytics.view", "staff.manage", "settings.manage",
     ];
     for (const capability of everything) {
       expect(can("owner", capability), capability).toBe(true);

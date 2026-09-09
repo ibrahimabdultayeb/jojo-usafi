@@ -5,7 +5,7 @@ first brand catalogue it sells — not the whole store.
 
 **The storefront runs on Supabase.** English and Kiswahili, on the real Product Master and
 the approved photography: 201 products imported, 95 on the public shelf, photographs served
-from Supabase Storage, and 193 tests proving the database, Auth, Row Level Security and
+from Supabase Storage, and 213 tests proving the database, Auth, Row Level Security and
 Storage behave as claimed.
 
 **A shopper can buy, and staff can run the shop.** Guest checkout reserves stock atomically
@@ -14,9 +14,13 @@ them — confirm, prepare, send out, complete with the payment actually collecte
 a delivery failed — and edits prices, stock and delivery areas, with every write refused if
 the signed-in person's role does not allow it.
 
-What does not exist yet: online payments, the Website/Reports/Staff/Settings screens, and the
-Google Sheet connection. See [`PROTOTYPE_NOTES.md`](./PROTOTYPE_NOTES.md) for what is still
-mocked in the UI and [`docs/PROGRESS.md`](./docs/PROGRESS.md) for exactly where things stand.
+The **Google Sheet catalogue sync** is built and tested but not connected: it needs a Google
+service account and a spreadsheet ID, which is six free steps in
+[`docs/GOOGLE_SHEET_SYNC.md`](./docs/GOOGLE_SHEET_SYNC.md).
+
+What does not exist yet: online payments and the Website/Reports/Staff/Settings screens. See
+[`PROTOTYPE_NOTES.md`](./PROTOTYPE_NOTES.md) for what is still mocked in the UI and
+[`docs/PROGRESS.md`](./docs/PROGRESS.md) for exactly where things stand.
 
 ## Run it locally
 
@@ -75,7 +79,7 @@ Saved screenshots at every QA width, in both languages, are in
 | `npm run catalogue:build` | Rebuild the catalogue and photography from `imports/` |
 | `npm run catalogue:check` | Verify the committed catalogue still matches `imports/` |
 | `npm run i18n:check` | Verify English and Kiswahili carry the same copy keys |
-| `npm run test` | 162 unit tests — pure functions, **no database needed** |
+| `npm run test` | 185 unit tests — pure functions, **no database needed** |
 | `npm run schema:check` | Offline: the migrations are internally consistent and agree with the domain layer |
 | `npm run qa:screenshots` | Full QA gate — screenshots and behaviour checks at 390/430/768/1024/1440 in both languages, plus the signed-in admin dashboard and its dialogs (a server must be running; set `BASE_URL` for anything other than port 3000) |
 
@@ -85,7 +89,7 @@ These need the hosted development project, and `.env.local`:
 | --- | --- |
 | `npm run db:types` | Regenerate `src/lib/supabase/database.types.ts` from the live schema |
 | `npm run db:types:check` | Fail if the committed types and the live schema have drifted |
-| `npm run test:db` | 193 tests against real PostgreSQL, Supabase Auth and Supabase Storage |
+| `npm run test:db` | 213 tests against real PostgreSQL, Supabase Auth and Supabase Storage |
 | `npm run qa:staff create` | A development Manager and Order staff login for dashboard QA. Prints one password and stores none. `status` and `remove` complete the set |
 | `npm run dev:zones` | Four placeholder delivery areas, each marked as a development fixture |
 | `npm run dev:orders` | Two development orders, placed through the real `jojo_place_order` |
@@ -140,12 +144,13 @@ src/components/product/   product card, product photo, add-to-cart controls
 src/components/cart/      cart drawer
 src/lib/catalogue/        catalogue types, generated data and the query layer
 src/lib/admin/            the dashboard: model, reads, the authorisation gate, the writes
+src/lib/sheets/           the Google Sheet sync: field authority, planner, gateway, audit
 src/lib/domain/           business rules as pure TypeScript, 162 unit tests, no I/O
 src/lib/supabase/         the three clients, generated types, environment validation
 src/lib/i18n/             locale config, dictionaries, client hook
 src/lib/                  cart state, formatting, site settings, colour tones
 supabase/migrations/      the schema — 19 migrations, all applied to the dev project
-tests/db/                 193 tests against the real database, Auth and Storage
+tests/db/                 213 tests against the real database, Auth and Storage
 scripts/                  catalogue build, i18n check, schema check, type generation, QA gate
 public/products/          approved product photography, one file per SKU
 preview/screenshots/      QA screenshots

@@ -24,6 +24,7 @@ export type Capability =
   | "products.editStock"
   | "products.editVisibility"
   | "delivery.manage"
+  | "catalogue.sync"
   | "website.manage"
   | "analytics.view"
   | "staff.manage"
@@ -34,13 +35,13 @@ const MATRIX: Record<Role, Capability[]> = {
     "orders.view", "orders.advance", "orders.cancel", "orders.recordPayment",
     "customers.view", "customers.edit",
     "products.view", "products.editPricing", "products.editStock", "products.editVisibility",
-    "delivery.manage", "website.manage", "analytics.view", "staff.manage", "settings.manage",
+    "delivery.manage", "catalogue.sync", "website.manage", "analytics.view", "staff.manage", "settings.manage",
   ],
   manager: [
     "orders.view", "orders.advance", "orders.cancel", "orders.recordPayment",
     "customers.view", "customers.edit",
     "products.view", "products.editPricing", "products.editStock", "products.editVisibility",
-    "delivery.manage", "website.manage", "analytics.view",
+    "delivery.manage", "catalogue.sync", "website.manage", "analytics.view",
   ],
   order_staff: [
     "orders.view", "orders.advance", "orders.cancel", "orders.recordPayment",

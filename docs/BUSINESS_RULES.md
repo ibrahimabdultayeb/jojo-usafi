@@ -27,10 +27,12 @@ Mobile phone.
 
 Backend:
 Supabase PostgreSQL, Auth, Storage and Row Level Security. Firebase is permanently
-unapproved. The schema is authored (Build 05) but has not been applied to a database.
+unapproved. The schema is applied to the hosted development project and proved at runtime.
 
 Catalogue:
-Editable through both Google Sheets and the Jojo Usafi admin, synchronized both ways.
+Editable through both Google Sheets and the Jojo Usafi admin, synchronized both ways. The
+sync is built and tested; connecting it needs a Google service account. Supabase is the
+operational source of truth either way.
 
 Orders:
 Must exist in the database before any WhatsApp handoff.
@@ -63,6 +65,17 @@ Delivery fee:
 A newly created delivery area starts at **TSh 4,000**. This is a starting value for a new
 area, not a fixed price; each area is edited in the admin dashboard. An area marked "free
 delivery" must have a fee of 0, so a free area can never leak a charge onto a total.
+
+**Free delivery is per area, not per order value — confirmed 2026-09-09.** Each delivery
+zone carries `free_delivery` true or false, and that is the whole rule. There is **no
+approved order-value threshold** ("free over TSh 30,000") and it is **not a launch blocker**;
+the EcoPlus reference has one, Jojo Usafi has not adopted it. If Ibrahim ever wants one it
+becomes a new decision, not a gap to be filled.
+
+**No same-day delivery cut-off at launch — confirmed 2026-09-09.** Delivery timing is
+confirmed with the customer when the order is confirmed. Nothing on the storefront promises a
+same-day window, and no cut-off time is stored or displayed. This too is **not a launch
+blocker**.
 
 Money:
 Every amount is a whole number of shillings. `total = subtotal − discount + delivery fee`.
@@ -117,9 +130,27 @@ released. There is no default answer, because guessing it invents or loses inven
   enforced as a database CHECK, so neither can be the only guard.
 - **A price change reaches the shop immediately.** The storefront shelf is cached for five
   minutes, and saving a product invalidates that cache rather than waiting it out.
-- **Nothing claims to be synced.** There is no Google Sheet write-back yet, so the editor
-  says "Saved" and, separately, "Product sheet sync: not connected yet". A badge reading
-  "Synced" would be the dashboard lying about where the truth is.
+- **Nothing claims to be synced.** The Google Sheet is not connected yet, so the editor says
+  "Saved" and, separately, "Product sheet sync: not connected yet". A badge reading "Synced"
+  would be the dashboard lying about where the truth is.
+
+## Where a catalogue fact comes from
+
+Since Build 09 the catalogue has two places a person can change it — the Google Sheet and the
+admin dashboard — and exactly one operational source of truth: **Supabase**. Every Product
+Master column has one declared owner, and the full table is in
+[`GOOGLE_SHEET_SYNC.md`](./GOOGLE_SHEET_SYNC.md).
+
+The rules that matter to the business:
+
+- **Stock is never set from the Sheet.** The ledger owns it. Editing the old stock-quantity
+  cell creates no units; the shop reports its real figure back into the Sheet instead.
+- **Prices, offers, names, visibility and merchandising flags** may be changed in either
+  place. If both change the *same one* before a sync, neither is applied and a person decides.
+- **A product that disappears from the Sheet is not removed** from the shop. It is reported.
+- **A new SKU in the Sheet does not become a public product** by appearing. It is reported,
+  and the publishability rules still decide.
+- **Nothing about orders, customers, payments or staff is in the Sheet at all.**
 
 ## Who may do what
 
@@ -130,6 +161,7 @@ released. There is no default answer, because guessing it invents or loses inven
 | See customers | ● | ● | ● |
 | Prices, offers, stock, website visibility | ● | ● | |
 | Delivery zones, website content, reports | ● | ● | |
+| Catalogue sync, and settling a Sheet disagreement | ● | ● | |
 | Add, remove or change staff | ● | | |
 | Shop settings | ● | | |
 
@@ -143,8 +175,6 @@ dashboard hides controls as a courtesy, and Row Level Security is what refuses.
 These change how the store operates, so nothing has been assumed:
 
 - delivery fee
-- free-delivery threshold
-- same-day cut-off time
 - which Dar es Salaam areas are served
 - loyalty / rewards scheme
 - confirmed retail prices (the catalogue currently carries EcoPlus prices)
@@ -178,7 +208,6 @@ production-verified, and the first real order would be priced from them.
 - [ ] **The real delivery zones and their fees.** Four development placeholders exist
       (`scripts/seed-dev-zones.mjs`), each carrying a `notes` value saying so. They must be
       replaced through the admin Delivery Zones screen.
-- [ ] **Free-delivery threshold** and **same-day cut-off time** — still unset.
 - [ ] **Reservation expiry durations.** `shop_settings.reservation_warning_minutes` and
       `reservation_expiry_minutes` are deliberately null: how long an unconfirmed order may
       hold stock is a business decision, and a default would be a guess. Until they are set,

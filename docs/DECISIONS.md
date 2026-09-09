@@ -1690,3 +1690,204 @@ Impact:
 `QA_ONLY=admin` was added at the same time, so the dashboard pass can be re-run in about four
 minutes instead of the full gate's twenty-five — the reason the original bug survived a run
 was partly that re-running to check was expensive.
+
+---
+
+## 2026-09-09 — Free delivery is per area, and there is no delivery cut-off
+
+Decision:
+Free delivery is a property of a delivery zone (`delivery_zones.free_delivery`), and there is
+**no order-value threshold**. There is **no same-day cut-off time**: delivery timing is
+confirmed with the customer when the order is confirmed. Neither is a launch blocker, and
+both have been removed from the blocker lists in `BUSINESS_RULES.md`, `PROGRESS.md` and
+`PROTOTYPE_NOTES.md`.
+
+Reason:
+Ibrahim confirmed it. The EcoPlus reference advertises "FREE delivery over TSh 30,000" and
+same-day before 2pm, and the prototype had recorded both as *decisions not yet made* — which
+quietly implied they were owed. They are not owed; they were considered and declined for V1.
+
+Alternatives:
+Leave them listed as open. Rejected: an open decision that nobody intends to make is a
+permanent false alarm on a launch checklist, and the checklist stops being read.
+
+Impact:
+Nothing in the code changes — neither was ever implemented, because neither was ever decided.
+What changes is that the documentation no longer implies a gap. If Ibrahim wants either
+later it becomes a new decision, not a debt.
+
+---
+
+## 2026-09-09 — The Sheet is a control surface, not a second database
+
+Decision:
+Supabase remains the operational source of truth. The Google Sheet may control catalogue
+information — names, prices, offers, visibility, merchandising flags — and owns nothing
+operational. Stock, orders, customers, payments, ledgers, staff and identity are
+Supabase-owned, and a Sheet cell holding a stale copy of one of them is never read as an
+instruction.
+
+Reason:
+Two writable copies of the same fact is not a synchronisation problem, it is a data-loss
+problem waiting for a schedule. The only way to make a two-way sync safe is for every field
+to have exactly one owner, or a rule for what happens when both change it — so every one of
+the Product Master's 39 columns is classified in `src/lib/sheets/columns.ts`, and a column
+that file does not name stops the run rather than being guessed at.
+
+Alternatives:
+Sync everything both ways. Rejected: it puts the shop's stock one careless paste away from
+being wrong. Sync one way only, Sheet → Supabase. Rejected: the dashboard is where prices are
+actually changed, and a Sheet that silently goes stale is worse than no Sheet.
+
+Impact:
+`STOCK QTY` is demoted from authoritative to decorative and the real figure is reported back
+beside it. The plan structure has no way to express an inventory change, so this is not a
+rule that could be forgotten — it is a shape the code cannot make.
+
+---
+
+## 2026-09-09 — A field moves only if the side it came from actually changed it
+
+Decision:
+The sync compares three values per field: the Sheet's, the database's, and the **base** —
+what the two last agreed on, recorded in `sync_events` as an `upsert`. A field flows in a
+direction only when that side differs from the base. Both sides differing from the base, and
+from each other, is a conflict.
+
+Reason:
+`decideSync` from Build 05 answers "does incoming differ from current", which is right for a
+one-way feed and wrong for a merge. Without the base, a Sheet cell that nobody touched looks
+like an instruction, and a price raised in the dashboard gets silently undone by a spreadsheet
+that simply had not caught up. Two of the first tests written for this failed exactly that
+way before the base was threaded through.
+
+Alternatives:
+Newest timestamp wins. Rejected outright by the brief and correctly: a spreadsheet's
+modified time says nothing about which cell a person edited. Compare only the two current
+values. Rejected — that is the bug above.
+
+Impact:
+The first time a product is seen, there is no base, so nothing flows Sheet → database at all:
+the database is the operational truth and the Sheet is brought up to it, and the agreement is
+recorded. Nothing is written into the shop from a spreadsheet whose history is unknown.
+
+---
+
+## 2026-09-09 — An echo silences one direction, not the whole product
+
+Decision:
+When the incoming Sheet values carry the fingerprint we last wrote to the Sheet, the Sheet
+contributes nothing in the Sheet → database direction. The database → Sheet direction is
+still computed.
+
+Reason:
+The first implementation returned early on an echo, and a price raised in the dashboard never
+reached a Sheet that happened to be showing our own last write — the change simply vanished
+until something else touched the row. An echo is a statement about one direction, not a
+reason to skip the product.
+
+Alternatives:
+Keep the early return and rely on a later run. Rejected: there is no later run that would
+behave differently, so "later" meant never.
+
+Impact:
+Caught by a database test that asserted the spreadsheet cell rather than the run's summary
+counts. The summary said the run succeeded, and it had.
+
+---
+
+## 2026-09-09 — A product missing from the Sheet is reported, never removed
+
+Decision:
+If a product is in Supabase and not in the Sheet, the sync reports *no longer in the sheet*
+and does nothing else. It is not deleted, not archived, not hidden. There is no delete or
+archive instruction anywhere in a sync plan.
+
+Reason:
+Orders placed last week point at that product and must never lose it. And a row can vanish
+for reasons that have nothing to do with intent: a bad sort, a filtered view, a row deleted
+by accident, a half-finished paste. Retiring a product is a deliberate act with a button in
+the Product editor.
+
+Alternatives:
+Archive automatically after N runs. Rejected: it is the same mistake with a delay, and the
+delay makes it harder to trace.
+
+Impact:
+A test asserts that the plan's own JSON contains no delete or archive verb, so the rule
+cannot be weakened by adding one later without the test noticing.
+
+---
+
+## 2026-09-09 — The service account gets one spreadsheet, not a Drive
+
+Decision:
+Authentication is a Google service account with the OAuth scope `spreadsheets` and nothing
+else. It reaches exactly one spreadsheet, because that spreadsheet is shared with its email
+address the way it would be shared with a colleague. No Drive scope is requested, so it
+cannot see, list or open anything else in Ibrahim's Drive.
+
+The JWT is signed by hand with `node:crypto` rather than by pulling in `googleapis`.
+
+Reason:
+Least privilege, and the ability to revoke access by un-sharing one file. Hand-writing the
+sixty lines of JWT and REST means the exact scope, the exact endpoints and the exact failure
+handling are readable on one screen — worth more, for the component that can rewrite the
+shop's prices, than the convenience of a package that carries every Google API there is.
+
+Alternatives:
+OAuth as Ibrahim's own account. Rejected: it would give the shop's server the same access
+Ibrahim has to everything, and it expires in a way a background job cannot fix.
+
+Impact:
+Setup is six human-only steps, listed in `GOOGLE_SHEET_SYNC.md`. All of them are free; no
+billing account is involved. A key-parsing failure is reported without the underlying
+exception, because a `node:crypto` key error can echo part of the key back.
+
+---
+
+## 2026-09-09 — The protected sync endpoint is closed when unconfigured
+
+Decision:
+`POST /api/sync/catalogue` requires `Authorization: Bearer <SHEET_SYNC_WEBHOOK_SECRET>`,
+compared in constant time. If the secret is unset — or shorter than 16 characters — the
+endpoint refuses **every** request.
+
+Reason:
+The common failure is not a wrong secret, it is a deployment where nobody set one. Defaulting
+to open in that case would put an anonymous catalogue-rewrite endpoint on the internet the
+first time someone deploys without reading the environment file. Closed-by-default costs a
+confusing 401 and prevents that.
+
+Alternatives:
+Allow it when unset, for convenience in development. Rejected: development is exactly where
+the omission would go unnoticed.
+
+Impact:
+Nothing schedules the endpoint. Build 09 ships manual "Sync now" only — no cron, no Apps
+Script poller, no paid scheduler — because the deployment architecture is unsettled and
+automation nobody watches is worse than a button somebody presses. The endpoint exists so
+that a schedule, when decided, has something already authorised and already audited to call.
+
+---
+
+## 2026-09-09 — The sync's own test runs are cleaned up by id
+
+Decision:
+`tests/db/10-sheet-sync.test.ts` collects the `sync_jobs` id of every run it starts and
+deletes exactly those ids afterwards, along with the `sync_events` for its own fixture SKU.
+
+Reason:
+A sync run is a real run and writes a real job row — which is the point. But it meant the
+tests left their own history in the development database permanently, and the Catalogue Sync
+screen reported a test as the shop's last sync. Seventy-six such rows had accumulated before
+this was noticed, and were removed by their own ids.
+
+Alternatives:
+Delete every `sync_jobs` row in teardown. Rejected for the reason Build 06 taught the hard
+way: teardown identifies rows by who made them, never by what they are. A rule that deletes
+"all sync jobs" would one day delete the shop's real sync history.
+
+Impact:
+The suite leaves all four sync tables exactly as it found them, and the admin screen's "last
+sync" means what it says.
