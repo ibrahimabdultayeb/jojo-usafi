@@ -2,10 +2,14 @@
 /**
  * OFFLINE schema check.
  *
- * No database is running. Docker Desktop cannot start on this laptop (WSL
- * returns Wsl/CallMsi/E_ACCESSDENIED) and no hosted Supabase project has been
- * created, so `supabase db reset` is not available and NOTHING here proves the
- * migrations execute.
+ * No database is contacted by THIS script, deliberately: it is the fast half of
+ * the gate, and it runs on a laptop where Docker Desktop cannot start (WSL
+ * returns Wsl/CallMsi/E_ACCESSDENIED). It reads the SQL and the TypeScript and
+ * proves they agree with each other.
+ *
+ * Proving that PostgreSQL accepts and enforces them is `npm run test:db`, which
+ * runs against the hosted development project. Since Build 06 that half exists,
+ * so a pass here is no longer the end of the story.
  *
  * What it does prove, statically:
  *
@@ -17,7 +21,8 @@
  *   6. the SQL and the TypeScript domain layer agree — the enum members, the
  *      SKU pattern, the phone pattern, the order-number pattern and the default
  *      delivery fee are defined twice by necessity, so they are compared here
- *   7. src/lib/supabase/types.ts lists exactly the tables the migrations create
+ *   7. src/lib/supabase/database.types.ts — GENERATED from the real database —
+ *      lists exactly the tables these migrations create
  *
  * A pass means the schema is internally consistent and matches the application.
  * It does not mean PostgreSQL has accepted it. That is Build 06.
@@ -338,11 +343,21 @@ if (!tsFee || !sqlFee) {
 
 /* ------------------------------- 7. the schema contract lists the same tables */
 
-const contract = readFileSync(join(ROOT, "src", "lib", "supabase", "types.ts"), "utf8");
-const contractTablesBlock = contract.match(/Tables:\s*\{([\s\S]*?)\n    \};/);
+/**
+ * Since Build 06 this file is GENERATED from the hosted development database by
+ * `npm run db:types`, so a mismatch here means something stronger than a typo:
+ * the migrations in this repository and the database the types were read from
+ * describe different schemas. `npm run db:types:check` catches the same drift
+ * from the other direction, by regenerating and comparing.
+ */
+const contract = readFileSync(join(ROOT, "src", "lib", "supabase", "database.types.ts"), "utf8");
+const contractTablesBlock = contract.match(/\n {4}Tables: \{\n([\s\S]*?)\n {4}\}\n {4}Views:/);
 
 if (!contractTablesBlock) {
-  fail("types", "src/lib/supabase/types.ts has no Tables block");
+  fail(
+    "types",
+    "src/lib/supabase/database.types.ts has no Tables block — regenerate it with `npm run db:types`",
+  );
 } else {
   const contractTables = new Set(
     [...contractTablesBlock[1].matchAll(/^\s{6}(\w+):/gm)].map((m) => m[1]),
@@ -385,5 +400,5 @@ console.log("  ✓ every table, enum and view reference resolves");
 console.log("  ✓ Row Level Security is enabled on every table");
 console.log("  ✓ every append-only ledger is protected by a trigger");
 console.log("  ✓ SQL and the TypeScript domain layer agree");
-console.log("  ✓ the schema contract lists exactly the tables the migrations create");
-console.log("\nPENDING: applying these migrations to PostgreSQL. Build 06.\n");
+console.log("  ✓ the generated database types list exactly the tables the migrations create");
+console.log("\nRuntime behaviour — constraints, triggers, RLS, Auth — is proved by `npm run test:db`.\n");

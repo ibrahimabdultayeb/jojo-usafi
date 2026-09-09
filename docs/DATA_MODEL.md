@@ -4,9 +4,14 @@ The **Supabase PostgreSQL** schema, authored as version-controlled migrations in
 `supabase/migrations/`. Firebase/Firestore is permanently unapproved — see `docs/DECISIONS.md`,
 2026-09-08.
 
-> **Status: authored, not yet applied.** No Supabase project exists and no migration has
-> been executed against PostgreSQL. Everything below has been verified only by static
-> inspection (`npm run schema:check`). Runtime verification is Build 06.
+> **Status: applied and verified.** All 15 migrations have been executed against the hosted
+> development project (*Jojo Usafi Dev*, `dyjhacbbedytcstxxjzl`, free tier). Everything below
+> is checked statically by `npm run schema:check` and — since Build 06 — proved at runtime by
+> `npm run test:db`, 109 tests against the real database, Supabase Auth and Supabase Storage.
+>
+> The database holds **no business data**: no products, no customers, no orders, no delivery
+> zones, no staff. Only the reference rows the migrations themselves insert — 2 locales,
+> 6 pack types, 2 option axes — because those are true of every environment.
 
 ## Design rules
 
@@ -35,6 +40,13 @@ The **Supabase PostgreSQL** schema, authored as version-controlled migrations in
 | `20260909090500_admin_and_audit.sql` | admin profiles and roles, `audit_events` |
 | `20260909090600_sync.sql` | sync jobs, events, state, conflicts; `analytics_events` |
 | `20260909090700_views_and_rls.sql` | `product_shelf`, `inventory_ledger_check`, RLS enabled on all 30 tables |
+| `20260909130000_auth_foundation.sql` | `auth.users` foreign keys, the role helper functions, the last-Owner guard |
+| `20260909130100_rls_policies.sql` | 95 Row Level Security policies |
+| `20260909130200_storage.sql` | three media buckets and their policies |
+| `20260909130300_owner_bootstrap.sql` | `jojo_owner_exists()`, `jojo_claim_first_owner()` |
+| `20260909130400_grants.sql` | which verbs and columns each role holds |
+| `20260909130500_function_hardening.sql` | yes/no functions that never return null; `next_order_number()` closed |
+| `20260909130600_function_grants_explicit.sql` | EXECUTE taken from `PUBLIC` and granted by name |
 
 `supabase/seed.sql` deliberately inserts **no business data** — see the file for why.
 
@@ -112,9 +124,15 @@ only in the direction its name claims:
 `correction`, `stock_count` and `damage_loss` additionally require a reason; the four
 order-driven kinds require an `order_id`.
 
-**Not built yet:** transactional reserve/release functions. They need real concurrency
-testing against a running PostgreSQL. `src/lib/domain/inventory.ts` computes what a
-movement *would* do and refuses the impossible; Build 06 makes it atomic.
+**Still not built:** transactional reserve/release functions. Build 06 was scoped to the
+database, Auth, Row Level Security and Storage, and these belong with the checkout that
+calls them — a reservation is one statement inside the same transaction that writes the
+order, so building it before the order-writing path exists would be building it twice.
+
+`src/lib/domain/inventory.ts` computes what a movement *would* do and refuses the impossible;
+the CHECK constraints refuse it again. What is still missing is atomicity under concurrency:
+two shoppers taking the last jerrycan at the same moment. The database now exists to test
+that against, which is the part that was blocking it.
 
 ## Orders
 
@@ -167,20 +185,116 @@ connected to Google in this build.
 
 ## Authorization
 
-Row Level Security is **enabled on all 30 tables with no policies**, which denies the `anon`
-and `authenticated` roles everything. That is the correct state at the end of Build 05:
-nothing in the application reads Supabase yet, so a closed door is right and an open table
-would be a silent hole.
+Two locks, with different jobs:
 
-Build 06 writes and tests the policies:
+```
+GRANT   decides which VERBS and which COLUMNS a role may ever touch
+POLICY  decides which ROWS it then sees or changes
+```
 
-- public read of `product_shelf` rows only
-- customers read and write only their own orders and addresses
-- admin access scoped by role — Owner / Manager / Order Staff
-- the sync worker writes through a dedicated, audited role
+Row Level Security is enabled on all 30 tables and there are **95 policies**. Every one is
+exercised by `tests/db/03-rls.test.ts` as a real signed-in session.
 
-The service-role key bypasses RLS entirely and is read only by `src/lib/supabase/admin.ts`,
-which is `server-only`.
+### Who may do what
+
+| | `anon` | signed in, not staff | Order staff | Manager | Owner |
+| --- | --- | --- | --- | --- | --- |
+| The shelf, brands, categories, zones | read | read | read | read | read |
+| Every product, including hidden ones | — | — | read | read + write | read + write |
+| Prices, stock, visibility, website content | — | — | read | write | write |
+| Suppliers | — | — | — | read + write | read + write |
+| Orders, lines, history | — | own, once accounts exist | read + advance | read + advance | read + advance |
+| Order money and customer snapshot | — | — | — | — | — (server only) |
+| Customers | — | own | read | read + write | read + write |
+| Stock ledger | — | — | read | + the four human movement kinds | same |
+| Audit, sync, analytics | insert measurement only | — | — | read | read |
+| Staff | — | own profile | own profile | read | read + write |
+| DELETE, anywhere | — | — | — | — | — |
+
+`service_role` bypasses RLS entirely and is read only by `src/lib/supabase/admin.ts`, which
+is `server-only`.
+
+### The parts that are not policies
+
+- **Column grants.** RLS decides rows, not columns. All three staff roles hold UPDATE on
+  `orders`, restricted by grant to `state`, the payment fields, the reason fields, the
+  lifecycle timestamps and `staff_note`. `anon` holds SELECT on exactly three columns of
+  `inventory` — `product_id`, `location_code`, `available` — and never learns `on_hand`.
+- **Table grants.** `anon` cannot name `orders`, `customers`, `suppliers`, `admin_profiles`,
+  `audit_events` or the sync tables at all; the request fails before a row is examined.
+- **No client writes to orders.** There is no INSERT policy on `orders`, `order_items` or
+  `customers` for anybody with a browser token. Checkout is a server action.
+- **`analytics_events` is the one exception**, and is an allow-list: a browser may insert
+  `page_view`, `product_impression`, `product_view`, `search`, `add_to_cart`,
+  `remove_from_cart`, `checkout_started` and `whatsapp_initiated`, with no `customer_id` and
+  no `order_id`. It may never read the table back.
+
+### Asking who the caller is
+
+RLS asks the same questions through one set of `SECURITY DEFINER`, `STABLE` functions with a
+fixed `search_path`, so "what counts as staff" has exactly one definition — an
+`admin_profiles` row, linked to this login, active:
+
+```
+jojo_admin_role()        owner | manager | order_staff | null
+jojo_admin_id()          the caller's admin_profiles.id
+jojo_is_staff()          jojo_is_owner()        jojo_manages_catalogue()
+jojo_customer_id()       jojo_owns_order(uuid)
+jojo_product_is_public(uuid)   jojo_family_is_public(uuid)   jojo_media_is_public(uuid)
+```
+
+The three visibility predicates repeat the `product_shelf` rule for the tables underneath it,
+minus the primary-image join — a policy on `product_media` cannot require the image to be
+visible already in order to make it visible.
+
+`jojo_is_owner()` and `jojo_manages_catalogue()` return **false, never null**, for a caller
+with no staff profile. They were three-valued until `npm run test:db` caught it; a NULL
+policy result denies the row correctly, but the dashboard asks these questions directly and
+`null` is not `false` in TypeScript either.
+
+### Supabase Auth
+
+`admin_profiles.auth_user_id` and `customers.auth_user_id` are real foreign keys to
+`auth.users`, both `on delete set null` — deleting a login must never delete the staff record
+the order timeline and the audit trail name as the actor.
+
+Guest checkout stays the default and creates no login, so in practice the only
+`authenticated` callers today are staff.
+
+**The first Owner.** Only an Owner may create staff, and a new shop has none.
+`jojo_claim_first_owner(text)` gives the Owner seat to the signed-in account if and only if no
+active Owner exists — under an advisory lock, writing an `audit_events` row, and raising for
+every caller afterwards. `jojo_owner_exists()` is readable before sign-in so the setup screen
+can choose which form to show. No password is ever typed into a file or a migration.
+
+A trigger then refuses to demote, deactivate or delete the last active Owner, including with
+the service-role key.
+
+## Storage
+
+| Bucket | Public read | Limit | Types | Written by |
+| --- | --- | --- | --- | --- |
+| `product-media` | yes | 5 MB | webp, png, jpeg, avif | Owner, Manager |
+| `brand-media` | yes | 2 MB | webp, png, svg | Owner, Manager |
+| `site-content` | yes | 5 MB | webp, png, jpeg, avif | Owner, Manager |
+
+Deleting is narrower than replacing: **only an Owner** may remove an object, because
+`product_media.media_id` is `on delete restrict` and the bytes under a live product page
+should be at least as hard to remove as the row pointing at them.
+
+Path convention, which is what makes `media_assets_path_unique` meaningful:
+
+```
+product-media/<SKU>/<sku>-<role>-<n>.webp      EP01-A02/ep01-a02-primary-1.webp
+brand-media/<brand-slug>/logo.webp
+site-content/<slot>/<name>.webp
+```
+
+SKU-first, because SKU is the stable identity: renaming a product never moves its
+photographs, and an orphaned folder reads immediately as a SKU that no longer exists.
+
+**The buckets are empty.** Build 06 established the architecture and its security; moving
+the 95 approved photographs out of `public/products/` is later work.
 
 ## Localisation
 
@@ -198,5 +312,13 @@ database required. `scripts/schema-check.mjs` compares the two sides (enum membe
 pattern, the phone pattern, the order-number pattern, the default delivery fee, the table
 list) and fails if they drift.
 
-`src/lib/supabase/types.ts` is a **hand-authored, unverified schema contract**. Build 06
-replaces it with `supabase gen types typescript` output from the real development database.
+`src/lib/supabase/database.types.ts` is **generated from the real database** by
+`npm run db:types` and is never hand-edited. `src/lib/supabase/types.ts` holds the friendly
+names — `ProductRow`, `OrderRow`, `AdminRoleValue` — as aliases into it, so a name here
+cannot describe a column that is not there. `npm run db:types:check` fails if the repository
+and the database have drifted apart.
+
+One caveat, found by testing rather than by reading: `supabase gen types` does not mark a
+`GENERATED ALWAYS` column as read-only, so `inventory.available` appears in the generated
+Insert and Update types and assigning to it compiles. PostgreSQL refuses it at runtime with
+`428C9`, and `tests/db/01-schema.test.ts` asserts that it does.

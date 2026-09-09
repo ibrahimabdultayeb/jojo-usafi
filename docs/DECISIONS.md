@@ -562,3 +562,249 @@ Impact:
 `npm run schema:check` compares the contract's table list and every enum against the SQL, so
 those two cannot drift silently. Individual column types are the part still awaiting
 generation, and Build 06 treats any difference as a bug in this file.
+
+---
+
+## 2026-09-09 — The development database is real, and the CLI points at one project only
+
+Decision:
+Build 06 links the Supabase CLI to the **Jojo Usafi Dev** project (`dyjhacbbedytcstxxjzl`,
+free tier, ap-south-1) and applies every migration to it. The linked ref is verified before
+any database operation, `db push --dry-run` is run before every real push, and
+`supabase db reset` is never used against a hosted project. `scripts/gen-types.mjs` pins the
+project ref rather than trusting whatever happens to be linked, and `tests/db/support.ts`
+refuses to run if the URL is not that project.
+
+Reason:
+The same Supabase account holds an unrelated project (`mushus-stock`). "Whatever is linked"
+is a fine default for a person at a terminal and a bad one for a script that disables
+triggers and deletes rows. A pinned ref that must match is cheap; the mistake it prevents is
+not recoverable.
+
+Alternatives:
+Read the ref from `supabase/.temp/project-ref`. Rejected: that file is exactly the thing
+that would be wrong. Trust the operator. Rejected: the operator is sometimes an agent.
+
+Impact:
+No billing is attached and no paid feature is enabled — the whole build cost TZS 0. The
+free tier's limits are not approached: 30 tables, no business data, three empty Storage
+buckets. Production will be a separate project, and the pinned refs are the reminder to
+change them deliberately.
+
+---
+
+## 2026-09-09 — Privileges are granted explicitly, because this project grants nothing
+
+Decision:
+`20260909130400_grants.sql` states, table by table, which verbs and columns `anon`,
+`authenticated` and `service_role` hold. Nothing relies on Supabase's default privileges.
+
+Reason:
+The first fixture insert of Build 06 failed with `permission denied for table suppliers` —
+using the **service-role key**. This project is provisioned from a hardened template: the
+default ACL for a new table in `public` is `Dxtm` (TRUNCATE, REFERENCES, TRIGGER, MAINTAIN)
+for all three API roles, and no SELECT, INSERT, UPDATE or DELETE for anybody. The same
+template installs an `ensure_rls` event trigger that switches RLS on for every new table.
+
+So the 95 policies written in `20260909130100` were necessary and not sufficient. Without
+grants the schema was, briefly, one that nothing at all could read or write. Most Supabase
+documentation describes the opposite default, which is why the migration that assumed it
+carries a correction note rather than being quietly rewritten.
+
+Alternatives:
+`grant all on all tables to anon, authenticated`. Rejected: it reproduces the permissive
+default the platform had deliberately removed, and throws away a free second lock.
+
+Impact:
+Two locks, with different jobs. **A grant decides which verbs and which columns; a policy
+decides which rows.** `anon` cannot even name `orders`, `customers`, `suppliers`,
+`admin_profiles`, `audit_events` or the sync tables — the request fails before a row is
+examined. Nobody holds DELETE except the server. A migration that adds a table must now do
+two jobs: grant it and give it a policy, or it is invisible.
+
+---
+
+## 2026-09-09 — The browser reads; the server writes
+
+Decision:
+There is no INSERT policy on `orders`, `order_items` or `customers` for `anon` or
+`authenticated`. Checkout is a server action holding the service-role key. Order tracking is
+a server lookup against an order number plus the phone that placed it, not an `anon` read
+policy. The single exception is `analytics_events`, where the browser may insert the
+browsing-side event kinds with no `customer_id` and no `order_id`.
+
+Reason:
+An order written by the browser is an order whose prices came from the request. Pricing the
+cart from the database, reserving the stock and writing the order with its first event has
+to happen in one transaction on the server, so the browser never needs the privilege. And a
+policy that lets a stranger read an order by knowing its number lets them read every order
+by counting.
+
+Alternatives:
+Let `anon` insert orders under a CHECK-heavy policy. Rejected: no policy can verify that a
+line's `unit_price_tzs` matches the catalogue, which is the only thing that matters.
+
+Impact:
+`src/lib/supabase/admin.ts` is the checkout path, and remains `server-only`. The analytics
+policy is written as an allow-list of event kinds, so a client cannot inflate the shop's
+figures by claiming orders were completed.
+
+---
+
+## 2026-09-09 — Order staff may advance an order; nobody may rewrite what it cost
+
+Decision:
+All three staff roles hold UPDATE on `orders` through RLS, and a column grant limits them to
+`state`, the payment fields, the reason fields, the lifecycle timestamps and `staff_note`.
+The money, the customer snapshot and the delivery snapshot are writable only by the server.
+
+Reason:
+RLS decides rows, not columns, and orders need both. `orders.advance`, `orders.cancel` and
+`orders.recordPayment` are exactly what Order staff exist to do, so withholding UPDATE would
+be wrong; but an order is the historical record of what was sold and for how much.
+
+Alternatives:
+Route every order change through a server action and give staff read-only RLS. Rejected as
+the *only* mechanism: it makes the dashboard the security boundary. The server action still
+exists and still validates the transition table — this is the layer underneath it.
+
+Impact:
+A staff token that tries to set `total_tzs` gets `42501` from PostgreSQL, not a friendly
+error from React. Proved in `tests/db/03-rls.test.ts`.
+
+---
+
+## 2026-09-09 — The first Owner claims the seat; there is no seeded account
+
+Decision:
+`public.jojo_claim_first_owner(text)` gives the Owner role to the signed-in account if and
+only if no active Owner exists, takes an advisory lock so two simultaneous callers cannot
+both succeed, writes an `audit_events` row, and raises for every caller afterwards.
+`public.jojo_owner_exists()` is readable by `anon` so the setup screen can choose between
+"claim" and "sign in". A trigger refuses to demote, deactivate or delete the last Owner.
+
+Reason:
+Only an Owner may create staff, and there was no Owner. Seeding one in SQL means a real
+person's email in a file that goes into Git and a password somewhere worse. A bootstrap
+script using the service-role key works, but makes the RLS-bypassing key a routine tool.
+
+Alternatives:
+Both of the above. Rejected for the reasons given.
+
+Impact:
+No password is ever typed into a file, a migration or a document. Nothing has to be deleted
+afterwards. **The real Owner account has not been created** — the mechanism is built and
+tested, and the two steps are in `docs/PROGRESS.md` for Ibrahim to run when he chooses.
+
+---
+
+## 2026-09-09 — Media buckets are public to read; a Manager replaces, only an Owner destroys
+
+Decision:
+`product-media`, `brand-media` and `site-content` are public for reading, screened by size
+and MIME type, writable by Owner and Manager, and deletable by an Owner alone.
+
+Reason:
+A product photograph is an advertisement: it is meant to be fetched by a stranger, cached by
+a CDN and shown in a WhatsApp preview. Signing every image URL would cost work and buy
+nothing. Deleting is narrower than replacing because `product_media.media_id` is
+`on delete restrict` — the schema already refuses to let a live product lose its photograph,
+and the bytes underneath should be at least as hard to remove.
+
+Alternatives:
+Private buckets with signed URLs. Rejected for public catalogue imagery. One bucket for
+everything. Rejected: the three differ in who writes to them and in what they accept.
+
+Impact:
+Nothing private lives in Storage. A bucket for customer documents or payment evidence would
+be created private with its own policies, never by relaxing one of these. **No product
+photography has been uploaded** — the 95 approved images are still committed build artifacts
+in `public/products/`.
+
+---
+
+## 2026-09-09 — `citext` stays in the `public` schema
+
+Decision:
+Supabase's security advisor flags `citext` as an extension installed in `public` and
+recommends moving it. It is deliberately left where it is, and the reason is recorded in
+`20260909130500_function_hardening.sql`.
+
+Reason:
+`anon`, `authenticated` and `service_role` have no `search_path` setting of their own, so
+they resolve names through the database default of `"$user", public`. `extensions` is on
+`postgres`'s path and nobody else's. Moving 47 citext functions out of `public` would risk
+every email comparison on `customers.email` and `admin_profiles.email` resolving to no
+operator — a real outage — to remove a small amount of published API surface.
+
+Alternatives:
+Move it now. Rejected: the failure mode is worse than the finding. Drop `citext` and use
+`lower(email)` with a unique index. Rejected as out of scope for Build 06, though it is the
+cleaner long-term answer.
+
+Impact:
+The advisory stays open, on purpose, with a written reason. The safe order — put `extensions`
+on the API roles' `search_path`, prove email lookups still work, then move the extension — is
+a change worth making on its own, with its own test.
+
+---
+
+## 2026-09-09 — Database types are generated and then aliased, never re-described
+
+Decision:
+`src/lib/supabase/database.types.ts` is generated by `npm run db:types` from the hosted
+development schema and is never hand-edited. `src/lib/supabase/types.ts` keeps the friendly
+names — `ProductRow`, `OrderRow`, `AdminRoleValue` — as aliases into it. Every hand-written
+row interface from Build 05 is gone. `npm run db:types:check` fails if the two have drifted.
+
+Reason:
+A hand-written `ProductRow` can disagree with the database and nothing notices until a query
+returns `undefined` at runtime. An alias cannot: delete a column, regenerate, and every use
+of it stops compiling. Build 05 said this file would be replaced and that any difference
+would be a bug in the hand-written version; this is that replacement.
+
+Alternatives:
+Keep both and compare them in `schema:check`. Rejected: two descriptions of one table is the
+drift, not the fix.
+
+Impact:
+The aliases are the only hand-written part and they cannot describe a column that is not
+there. One caveat found by testing: `supabase gen types` does NOT mark a `GENERATED ALWAYS`
+column as read-only, so `inventory.available` appears in the Insert and Update types and
+writing it compiles. The database refuses it with `428C9`, and a test asserts exactly that.
+
+---
+
+## 2026-09-09 — The two npm advisories are build-time only and are not force-fixed
+
+Decision:
+`npm audit` reports 2 vulnerabilities — 1 high, 1 moderate — both in `postcss@8.4.31`, the
+copy **bundled inside `next`** (`node_modules/next/node_modules/postcss`). No fix is applied.
+`npm audit fix --force` was not run.
+
+Reason:
+The only fix npm offers is `next@16.3.4`, a **semver-major** framework upgrade, to resolve
+advisories that cannot affect this application:
+
+- The four advisories (GHSA-qx2v-qp2m-jg93, GHSA-6g55-p6wh-862q, GHSA-fxqj-rqcc-2cmp,
+  GHSA-r28c-9q8g-f849) are path traversal via an attacker-controlled `sourceMappingURL`
+  comment, and XSS via an unescaped closing style tag in stringify output.
+- All of them require the attacker to control the **CSS being compiled**. This project's CSS
+  is `src/app/globals.css` plus Tailwind, authored in-repo and compiled at build time on a
+  developer machine and on Vercel. No user input reaches PostCSS, ever.
+- PostCSS is a **build-time devDependency**. It is not in the runtime bundle a shopper loads,
+  so no shopper is exposed under any configuration.
+
+The direct `postcss` devDependency is already `8.5.28`, which is unaffected. Only Next's own
+pinned nested copy is behind.
+
+Alternatives:
+`npm audit fix --force`. Rejected: explicitly forbidden, and a major framework upgrade to
+patch a build-time tool against an input this project does not have is a far larger risk than
+the finding. An `overrides` entry pinning Next's nested `postcss` to `^8.5.28`. Considered and
+rejected for now: it substitutes an untested minor version into Next's own CSS pipeline, which
+the QA gate would have to re-prove, for the same zero runtime exposure.
+
+Impact:
+Reassessed when Next 16 is adopted deliberately, which resolves it as a side effect. Recorded
+here so a later reader knows the finding was read rather than ignored.

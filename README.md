@@ -3,10 +3,16 @@
 Jojo Usafi is a scalable ecommerce retail store for Dar es Salaam. EcoPlus is the
 first brand catalogue it sells — not the whole store.
 
-**This repository currently contains a frontend-only storefront prototype**, in English
-and Kiswahili, built on the real Product Master and the approved product photography.
-There is no backend, no Google Sheet connection, no order backend and no payments. See
-[`PROTOTYPE_NOTES.md`](./PROTOTYPE_NOTES.md) for exactly what is real and what is mocked.
+**The storefront is a working prototype; the database behind it is real and the two are not
+connected yet.** The storefront and admin run in English and Kiswahili on the real Product
+Master and the approved photography, reading a committed catalogue artifact. Separately, a
+free Supabase development project holds the full schema with Row Level Security, Supabase
+Auth and the Storage buckets, proved by 109 tests against the live database.
+
+What does not exist yet: any page that reads Supabase, an order backend, payments, product
+images in Storage, and the Google Sheet connection. See
+[`PROTOTYPE_NOTES.md`](./PROTOTYPE_NOTES.md) for what is mocked in the UI and
+[`docs/PROGRESS.md`](./docs/PROGRESS.md) for exactly where the backend stands.
 
 ## Run it locally
 
@@ -59,7 +65,29 @@ Saved screenshots at every QA width, in both languages, are in
 | `npm run catalogue:build` | Rebuild the catalogue and photography from `imports/` |
 | `npm run catalogue:check` | Verify the committed catalogue still matches `imports/` |
 | `npm run i18n:check` | Verify English and Kiswahili carry the same copy keys |
+| `npm run test` | 156 domain unit tests — pure functions, **no database needed** |
+| `npm run schema:check` | Offline: the migrations are internally consistent and agree with the domain layer |
 | `npm run qa:screenshots` | Full QA gate — screenshots and behaviour checks at 390/430/768/1024/1440 in both languages (a server must be running; set `BASE_URL` for anything other than port 3000) |
+
+These need the hosted development project, and `.env.local`:
+
+| Command | What it does |
+| --- | --- |
+| `npm run db:types` | Regenerate `src/lib/supabase/database.types.ts` from the live schema |
+| `npm run db:types:check` | Fail if the committed types and the live schema have drifted |
+| `npm run test:db` | 109 tests against real PostgreSQL, Supabase Auth and Supabase Storage |
+
+### Connecting to the development database
+
+```bash
+npx supabase login                                    # once, if not already
+npx supabase link --project-ref dyjhacbbedytcstxxjzl  # Jojo Usafi Dev, free tier
+cp .env.example .env.local                            # then fill in the three values
+```
+
+`.env.local` is git-ignored and must never be committed. The migration path against a hosted
+project is always `npx supabase db push --dry-run`, read the plan, then `npx supabase db
+push` — `db reset` is never used on a hosted project.
 
 ### If `npm run dev` shows a 500 with "Cannot find module './933.js'"
 
@@ -94,12 +122,16 @@ src/components/home/      homepage sections
 src/components/product/   product card, product photo, add-to-cart controls
 src/components/cart/      cart drawer
 src/lib/catalogue/        catalogue types, generated data and the query layer
+src/lib/domain/           business rules as pure TypeScript, 156 unit tests, no I/O
+src/lib/supabase/         the three clients, generated types, environment validation
 src/lib/i18n/             locale config, dictionaries, client hook
 src/lib/                  cart state, formatting, site settings, colour tones
-scripts/                  catalogue build, i18n check, QA gate
+supabase/migrations/      the schema — 15 migrations, all applied to the dev project
+tests/db/                 109 tests against the real database, Auth and Storage
+scripts/                  catalogue build, i18n check, schema check, type generation, QA gate
 public/products/          approved product photography, one file per SKU
 preview/screenshots/      QA screenshots
-docs/                     constitution, architecture, catalogue, i18n, decisions, progress
+docs/                     constitution, architecture, data model, decisions, progress
 imports/                  restored source inputs — source-only, not in Git
 ```
 
@@ -111,6 +143,7 @@ That is the single seam where Supabase replaces the generated data later.
 Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · sharp for the
 catalogue image pipeline · Playwright for the QA gate.
 
-Approved backend direction (**not started**): Supabase PostgreSQL, Auth, Storage and Row
-Level Security, on Vercel, with a validated two-way Google Sheet ↔ Supabase sync.
-Firebase is permanently unapproved.
+Backend: Supabase PostgreSQL, Auth, Storage and Row Level Security — **provisioned and
+verified** on a free development project, not yet read by the application. Vercel for
+hosting and a validated two-way Google Sheet ↔ Supabase sync are still ahead. Firebase is
+permanently unapproved.
