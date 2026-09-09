@@ -19,7 +19,7 @@ and, since Build 06, the half that needs a real database:
 
 ```bash
 npm run db:types:check   # the generated types still match the live schema
-npm run test:db          # 129 tests against PostgreSQL, Supabase Auth and Storage
+npm run test:db          # 154 tests against PostgreSQL, Supabase Auth and Storage
 ```
 
 The two halves are deliberately separate. `npm run test` must keep working on a laptop with
@@ -71,7 +71,7 @@ types disagreeing with the live schema.
 
 ## Database, Auth, RLS and Storage tests
 
-`npm run test:db` — 129 tests against the hosted development project. Six files, run in
+`npm run test:db` — 154 tests against the hosted development project. Seven files, run in
 name order by a custom sequencer, sharing one database with `fileParallelism` off.
 
 | File | Tests | Proves |
@@ -81,6 +81,7 @@ name order by a custom sequencer, sharing one database with `fileParallelism` of
 | `03-rls.test.ts` | 39 | five callers — anonymous, signed-in stranger, Order staff, Manager, Owner — against every policy |
 | `04-storage.test.ts` | 10 | bucket configuration; who may upload, replace and delete |
 | `05-real-data-untouched.test.ts` | 6 | every real staff and audit row is byte-for-byte what it was before the suite ran |
+| `07-commerce.test.ts` | 25 | quoting is the database answer and not the browser one; reservation is atomic; the last unit cannot be sold twice (1-in-stock/2-orders and 3-in-stock/5-orders); a refused order leaves nothing behind; customer matching on phone; cancellation releases once and is idempotent; tracking needs the number AND the phone; the commerce path is closed to the browser |
 | `06-catalogue.test.ts` | 14 | the real catalogue as an anonymous shopper receives it: 95 on the shelf, 201 kept, EP01-A01 blocked, EP23-A02 not invented, photographs filed and fetchable, nothing newly readable or writable |
 
 ### Fixtures are scoped to one run
@@ -118,6 +119,16 @@ active Owner before it starts, nothing runs at all.
 
 Asserting an error where the answer is an empty result tests nothing.
 
+## Known gaps
+
+- **The ten admin dashboard screens have no visual QA.** They are behind the sign-in guard
+  since Build 08, so the gate reaches only `/admin/sign-in` and `/admin/setup` and asserts
+  that the other seven redirect. Closing this needs a seeded QA staff account whose session
+  the gate can carry.
+- **Track Order has no rate limit.** Guessing a six-digit order number and a nine-digit phone
+  together is not a realistic attack, but a determined script should still be slowed down.
+  That needs a shared counter, so it belongs with deployment.
+
 ## What is still NOT verified
 
 - **concurrent stock reservation** — the transactional reserve/release functions are not
@@ -151,7 +162,7 @@ Asserting an error where the answer is an empty result tests nothing.
 - a fixed-length shelf ending in a part-full row
 - **locale layout stability** — see below
 
-125 screenshots land in `preview/screenshots/`, named `page-locale-width.png` for the
+80 screenshots land in `preview/screenshots/`, named `page-locale-width.png` for the
 storefront and `page-width.png` for the English-only admin.
 
 ## Locale layout stability

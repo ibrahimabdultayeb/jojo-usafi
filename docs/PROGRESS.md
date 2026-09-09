@@ -7,7 +7,7 @@ product photography — and, since Build 06, a **real Supabase database behind i
 
 All 15 migrations are applied to a free hosted development project. The constraints fire,
 the triggers refuse, Row Level Security holds for each of the three staff roles, Supabase
-Auth works and the Storage buckets are secured — all proved by 129 tests against the actual
+Auth works and the Storage buckets are secured — all proved by 154 tests against the actual
 database rather than asserted in a document.
 
 Jojo Usafi has a real Owner — **Ibrahim Abdul Tayeb** — who signs in at `/admin/sign-in`.
@@ -18,9 +18,14 @@ public shelf, 95 photographs served from Supabase Storage, opening stock explain
 receipt movement per product. The admin's product screens read the real catalogue too, under
 the caller's own Row Level Security.
 
-What is still not true: no order has ever been placed, orders and customers in the admin are
-still mock, product writing is not enabled, the ten dashboard screens are not yet behind a
-sign-in guard, and nothing has talked to Google Sheets. That is Build 08 onward.
+The **commerce engine** is built and proved: stock reservation under a lock, server-authoritative
+quotation, atomic order creation, JU numbering, cancellation with release. Real-data admin
+routes are behind the sign-in guard.
+
+What is still not true: **the customer cannot reach any of it yet.** Checkout, the confirmation
+screen and Track Order are still Build 03 shells; the admin write screens do not call the
+functions that exist for them; no order has been placed through the website; and nothing has
+talked to Google Sheets.
 
 ## Completed
 
@@ -169,7 +174,7 @@ approved storefront and admin; nothing was redesigned.
 
 **Verified**
 `typecheck` · `lint` · `i18n:check` · `catalogue:check` · `build` (325 pages) ·
-`qa:screenshots` — 125 screenshots, all 15 locale-stability comparisons stable, no
+`qa:screenshots` — 80 screenshots, all 15 locale-stability comparisons stable, no
 overflow, console errors, broken images, small touch targets or floating-layer collisions.
 
 ### Build 05 — Supabase domain contracts, without a database runtime — 2026-09-09
@@ -215,7 +220,7 @@ overflow, console errors, broken images, small touch targets or floating-layer c
 
 **Verified offline**
 `typecheck` · `lint` · `test` (**156 domain tests**) · `schema:check` · `i18n:check` ·
-`catalogue:check` · `build` (325 pages) · `qa:screenshots` (125 screenshots, all 15
+`catalogue:check` · `build` (325 pages) · `qa:screenshots` (80 screenshots, all 15
 locale-stability comparisons stable). The approved storefront and admin UI are untouched.
 
 **Not verified — needs a real database**
@@ -371,7 +376,7 @@ column as read-only, so `inventory.available` appears in the generated Insert an
 types and assigning to it compiles. The database refuses it with `428C9`, and a test asserts
 that it does.
 
-#### 129 tests against the real database
+#### 154 tests against the real database
 
 `npm run test:db` — a second Vitest project, separate on purpose so `npm run test` keeps
 working with no network, no Docker and no Supabase project.
@@ -434,11 +439,11 @@ Run before and after. 19 findings remain, all `WARN`, all deliberate:
 
 Offline: `typecheck` · `lint` · `test` (156 domain tests) · `schema:check` (15 migrations,
 377 statements) · `i18n:check` (211 keys) · `catalogue:check` (95 publishable) · `build`
-(325 pages) · `qa:screenshots` (125 screenshots, all 15 locale-stability comparisons stable,
+(325 pages) · `qa:screenshots` (80 screenshots, all 15 locale-stability comparisons stable,
 no overflow, console errors, broken images, small touch targets, floating-layer collisions
 or wrong shelf columns).
 
-Against the real database: `db:types:check` · `test:db` (129 tests).
+Against the real database: `db:types:check` · `test:db` (154 tests).
 
 The approved storefront and admin UI are untouched. Not one component changed in this build.
 
@@ -782,6 +787,139 @@ re-import is visible on the storefront within five minutes, not immediately. A
 `revalidateTag('catalogue')` endpoint needs an authenticated caller to be safe, so it belongs
 with the admin write path rather than being bolted on here.
 
+
+### Build 08 — the reservation engine, proved — 2026-09-09 · **PARTIAL**
+
+The transaction that makes Jojo Usafi a shop rather than a catalogue is built,
+applied and proved against the real database, including the last-unit race. The
+customer-facing checkout screen that would drive it is **not** built. Cost: TZS 0.
+
+#### What the engine does
+
+One PostgreSQL function, one transaction, all of it or none of it:
+
+```
+lock the inventory rows (FOR UPDATE, in product-id order — no deadlock)
+  → price every line from the current rows
+  → check the shelf, the quantities and the availability
+  → upsert the customer on phone
+  → allocate JU-000123 from a sequence
+  → write the order, its snapshotted lines, the reservation,
+    two ledger movements and two order events
+```
+
+Fail anywhere and PostgreSQL unwinds the lot. **A cart reserves nothing** —
+stock is committed at exactly one moment, a successful order.
+
+#### The trust boundary
+
+The browser may say **which SKUs and how many**, and which delivery area. It may
+not say what anything costs: there is no parameter anywhere in
+`jojo_quote_order`, `jojo_place_order` or `src/lib/commerce/checkout.ts` for a
+price, a subtotal, a delivery fee or a total. A hostile request carrying its own
+figures changes nothing because there is nowhere to put them — asserted by a
+test that sends `unit_price: 1` and gets 10,000 back.
+
+`jojo_place_order` is granted to `service_role` **only**. An anonymous caller
+gets `42501` before the function body runs; the reachable path is a Next.js
+server action holding the key, which is where request shaping and, later, rate
+limiting belong.
+
+#### Concurrency, proved
+
+| Scenario | Result |
+| --- | --- |
+| 1 in stock, 2 simultaneous orders | exactly **1** succeeded, 1 refused |
+| 3 in stock, 5 simultaneous orders | exactly **3** succeeded, 3 distinct order numbers |
+| After each race | `available = 0`, `reserved <= on_hand`, never negative |
+| Refused attempt | no order, no lines, no events, stock untouched |
+| One bad line among several | **nothing** reserved |
+
+#### The rest of the engine
+
+- **Order numbers** come from a sequence via `next_order_number()`. Never derived
+  by counting rows; two simultaneous orders cannot collide.
+- **Customer matching** is on `phone_e164`, normalised in TypeScript (ten unit
+  tests) and re-validated by the column's own CHECK. A returning shopper updates
+  one row — and the ORDER keeps its own snapshot, so renaming a customer later
+  never rewrites what an old order said. Both asserted.
+- **Cancellation** releases the reservation, writes the movement and the events,
+  and is **idempotent**: `reservation_released_at` means a retry returns
+  `already: true` and gives nothing back twice.
+- **Track order** needs the order number **and** the phone. A right number with a
+  wrong phone is indistinguishable from a wrong number — otherwise every order
+  could be read by counting upward. The projection excludes staff notes, actor
+  identities, payment references and all audit/sync internals.
+- **Reservation expiry** has a home without an invented duration:
+  `shop_settings.reservation_warning_minutes` / `reservation_expiry_minutes` both
+  start **null** — undecided, not zero — and `jojo_stale_reservations()` can
+  already list what would qualify. No reservation can be held forever unfindable.
+- **Stock operations** are `jojo_add_stock` and `jojo_count_stock`. `on_hand` is
+  never overwritten bare: both write the number and its ledger movement in one
+  transaction, with the staff member's identity. A count that agrees writes
+  nothing; a count below what is already promised to orders is refused rather
+  than breaking `reserved <= on_hand`.
+
+#### A bug the tests caught
+
+`jojo_cancel_order` failed with `42804`. A bare `'system'` in a VALUES list is an
+UNKNOWN literal that PostgreSQL resolves to the target enum; wrap it in a CASE
+inside `INSERT … SELECT` and it is decided as `text` first, and there is no
+implicit cast from text to an enum. Fixed in migration 0017 — exactly the sort of
+thing a test against a real database catches and a careful reading does not.
+
+#### Admin routes are now guarded
+
+Build 06 deliberately left the dashboard open because it showed invented data.
+That reasoning expired when the screens got real prices, stock and orders. All
+seven real-data routes now redirect a signed-out visitor to `/admin/sign-in`,
+asserted by the QA gate. Middleware answers only "is anybody signed in"; whether
+that person is staff stays with Row Level Security, so there is one authority and
+not two.
+
+`revalidateCatalogue()` drops the five-minute storefront cache on demand and
+refuses anybody who is not active staff — an open version would be a cheap way to
+make the shop slow.
+
+#### NOT BUILT — the honest half
+
+The customer never sees any of this yet.
+
+- **No checkout screen.** `/checkout` is still the Build 03 visual shell. The
+  server action (`src/lib/commerce/actions.ts`), the quotation, the validation and
+  the order path behind it are written and tested; what is missing is the form —
+  a delivery-zone chooser, payment-preference options, and the bilingual copy for
+  all of it, since `i18n:check` requires English and Kiswahili parity.
+- **No confirmation screen**, **no wired Track Order page** — same reason.
+- **No admin write UI.** `jojo_add_stock`, `jojo_count_stock` and the RLS policies
+  for product and delivery-zone edits all exist and are tested; the Product editor
+  and Delivery Zones screens still do not call them.
+- **No admin order list on real data.**
+- **No amendment function.** The contract is documented; the code is not written.
+
+This was a scope call, not a discovery: the engine plus its concurrency proof
+took the build's time, and rushing a bilingual checkout rewrite of the approved
+storefront without room to verify it would have risked the one thing that is
+working. **Build 09 must finish this before Google Sheets.**
+
+#### Development delivery zones
+
+Checkout needs at least one active area, and the real list is Ibrahim's decision.
+`scripts/seed-dev-zones.mjs` writes four placeholders, each carrying a `notes`
+value that says in full that it is a development fixture awaiting the real list.
+They are not in `supabase/seed.sql` and must be replaced before launch.
+
+#### Verified
+
+`typecheck` · `lint` · `test` (156) · `schema:check` (18 migrations) ·
+`i18n:check` · `catalogue:check` · `db:types:check` · `build` (230 static pages) ·
+`qa:screenshots` (**80** screenshots; the admin guard asserted on all seven
+real-data routes) · `test:db` (**154** tests, 25 of them commerce).
+
+The QA gate lost the ten admin dashboard screenshots, because those screens now
+require a session. Closing that needs a seeded QA staff account — recorded in
+`docs/TESTING_REQUIREMENTS.md`.
+
 ## Next
 
 - Confirm the open business rules (delivery fee, free-delivery threshold, served areas,
@@ -798,14 +936,18 @@ with the admin write path rather than being bolted on here.
   them; the reason is under *Build 06 → One thing to be aware of*.
 - ~~**Build 07:** import the catalogue, move the photographs into Storage, wire the
   storefront to Supabase~~ — **done, 2026-09-09**
-- **Build 08 candidates**, in the order they unblock each other:
-  1. Transactional stock reservation, with real concurrency tests — it belongs with the
-     checkout that calls it
-  2. Checkout as a server action that prices the cart from the database and writes the order
-     **before** WhatsApp opens
-  3. Admin writes: product edits, stock counts, order state — with the sign-in guard that
-     belongs with them, and cache invalidation on save
-  4. The validated two-way Google Sheet ↔ Supabase synchronisation
+- ~~**Build 08:** reservation engine, quotation, atomic orders~~ — **engine done, UI not**
+- **Build 09**, in this order:
+  1. **Finish Build 08's customer path**: the checkout form (delivery zone, payment
+     preference, bilingual copy), the confirmation screen, and Track Order wired to
+     `trackOrderAction`
+  2. **Finish Build 08's admin path**: the Product editor and Delivery Zones screens calling
+     the writes that already exist, stock Add/Count calling `jojo_add_stock` /
+     `jojo_count_stock`, real orders in the admin list, and `revalidateCatalogue()` on save
+  3. A seeded QA staff account, to give the ten dashboard screens their visual QA back
+  4. Order amendment before dispatch, and the reservation-expiry scheduler once Ibrahim has
+     set the durations
+  5. **Then** the validated two-way Google Sheet ↔ Supabase synchronisation
 - Then: the validated two-way Google Sheet ↔ Supabase synchronisation
 
 Claude must update this file after meaningful milestones.

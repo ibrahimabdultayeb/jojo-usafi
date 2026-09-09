@@ -1145,3 +1145,203 @@ duplicate transformed asset on every run.
 Impact:
 2.6 MB in Storage, comfortably inside the free tier. `EP23-A02` — the orphan approved image —
 is **not** uploaded and exists only in the import report.
+
+---
+
+## 2026-09-09 — Stock is reserved inside one PostgreSQL transaction, not in TypeScript
+
+Decision:
+`jojo_place_order` locks the relevant `inventory` rows with `SELECT … FOR UPDATE`
+in product-id order, then prices, checks, reserves, writes the order, its lines, two ledger
+movements and two order events — all in one function, therefore one transaction. Carts
+reserve nothing; stock is committed at exactly one moment.
+
+Reason:
+Two shoppers can reach the last jerrycan in the same millisecond. Deciding "is there enough?"
+in application code and then writing the reservation is two round trips with a gap in the
+middle, and that gap is where overselling lives. Inside one function the second transaction
+waits for the first and then sees the truth.
+
+Locking in a deterministic order is not decoration: two orders containing the same two
+products in opposite order would otherwise deadlock each other.
+
+Alternatives:
+Check-then-write from a server action. Rejected — that is the bug. Optimistic concurrency with
+a version column and a retry loop. Rejected: more moving parts, and it still needs the
+database to arbitrate, so it is a lock with extra steps.
+
+Impact:
+Proved rather than asserted: 1 in stock with 2 simultaneous orders yields exactly 1 success;
+3 in stock with 5 yields exactly 3, with three distinct order numbers. A refused attempt
+leaves no order, no lines, no events and no stock movement, and one bad line among several
+reserves nothing at all.
+
+---
+
+## 2026-09-09 — The browser may say what it wants, never what it costs
+
+Decision:
+`jojo_quote_order` and `jojo_place_order` accept SKUs, quantities and a delivery-zone slug.
+There is no parameter — in the SQL, in `src/lib/commerce/checkout.ts`, or in the server
+action — for a unit price, an offer price, a subtotal, a delivery fee, a discount or a total.
+
+Reason:
+A trust boundary made of validation is a boundary you have to remember to defend. A trust
+boundary made of *absence* defends itself: a hostile request carrying its own figures changes
+nothing because there is nowhere to put them. A test sends `unit_price: 1` and gets 10,000
+back.
+
+The same reasoning puts `jojo_place_order` behind the service-role key alone. An anonymous
+caller receives `42501` before the function body runs; the reachable path is a server action,
+which is where request shaping and rate limiting belong.
+
+Alternatives:
+Accept a client total and verify it server-side. Rejected: it invites "verify" to drift into
+"trust", and there is no reason for the number to make the journey at all.
+
+Impact:
+Delivery fee comes from the zone row, and a zone marked `free_delivery` yields 0 whatever the
+stored fee says. Quotes are a snapshot and promise nothing — availability can change between
+quoting and ordering, which is why the order path checks again under the lock.
+
+---
+
+## 2026-09-09 — An order's initial state is `new`, not `awaiting_confirmation`
+
+Decision:
+`jojo_place_order` writes `state = 'new'` and one `order_created` event. It does not
+immediately transition to `awaiting_confirmation`.
+
+Reason:
+The architecture does not separate system receipt from a staff confirmation queue — `new` IS
+the queue. `NEXT_ACTION` in `src/lib/domain/orders.ts` already gives `new` the button
+"Confirm order", and `awaiting_confirmation` exists for the different situation where staff
+have contacted the customer and are waiting for them. Auto-advancing would mean every order
+claiming a conversation that has not happened.
+
+Alternatives:
+Create at `awaiting_confirmation`. Rejected: it would make the state a lie on arrival and
+leave the admin with two states that mean the same thing.
+
+Impact:
+The admin's "one obvious next action per stage" still holds: a new order's action is Confirm.
+Recorded here because it is the kind of decision that looks arbitrary later.
+
+---
+
+## 2026-09-09 — Cancellation is idempotent, and stock is never given back twice
+
+Decision:
+`jojo_cancel_order` is safe to call repeatedly. `orders.reservation_released_at` records that
+the release has happened; a second call returns `already: true` and releases nothing.
+
+Reason:
+Retries are ordinary — a dropped connection, a double tap on a phone, a queue redelivering.
+An operation that releases stock must be safe under all of them, or a cancelled order quietly
+inflates availability by however many times somebody pressed the button.
+
+Alternatives:
+Guard on `state = 'cancelled'` alone. Rejected: it conflates "is cancelled" with "has been
+released", and those come apart the moment cancellation is ever split across two steps.
+
+Impact:
+Also refuses cancellation of a completed or out-for-delivery order, and refuses any
+cancellation with no reason — the schema requires one and the function asks for it in words a
+person can act on.
+
+---
+
+## 2026-09-09 — Reservation expiry has a home, and no invented duration
+
+Decision:
+`shop_settings.reservation_warning_minutes` and `reservation_expiry_minutes` both start
+**null**. `orders.reservation_expires_at` is stamped only when the setting exists, and
+`jojo_stale_reservations()` lists what would qualify. No scheduler is built.
+
+Reason:
+How long an unconfirmed order may hold stock is a business decision, and a default would be a
+guess wearing the costume of a rule. Null means undecided; zero would mean "immediately",
+which is a different and wrong answer.
+
+What matters architecturally is that no reservation can be held forever with no way to find
+it — that question has an answer today even though nothing acts on it yet.
+
+Alternatives:
+Pick 24 hours. Rejected: inventing commercial policy. Leave the columns out. Rejected: it
+would make the eventual answer a migration and a code change rather than a row.
+
+Impact:
+Ibrahim sets the two durations; the scheduler is then a small job over a query that already
+exists.
+
+---
+
+## 2026-09-09 — Real-data admin routes are guarded, but middleware does not decide authorisation
+
+Decision:
+`src/middleware.ts` redirects a signed-out visitor from every `/admin` route except
+`/admin/sign-in` and `/admin/setup`. It checks only whether anybody is signed in. Whether that
+person is staff stays with Row Level Security and each page's own `getAdminSession()`.
+
+Reason:
+Build 06 left the dashboard open deliberately, because it showed invented data and there was
+nothing to protect. Real prices, stock and orders ended that.
+
+Splitting the two questions is the point: a middleware that decided authorisation would be a
+second opinion that could drift from the database's, and the database's is the one that
+actually governs the data. Middleware's job is to send a stranger somewhere useful instead of
+showing them an empty dashboard.
+
+Alternatives:
+Check the staff role in middleware too. Rejected for the drift above, and it would add a
+database round trip to every admin request to re-derive something RLS already knows.
+
+Impact:
+The QA gate asserts all seven real-data routes redirect. It also **lost** the ten dashboard
+screenshots, because those screens now need a session — a real gap, recorded in
+`docs/TESTING_REQUIREMENTS.md`, to be closed with a seeded QA staff account.
+
+---
+
+## 2026-09-09 — Cache invalidation is a staff-only server action
+
+Decision:
+`revalidateCatalogue()` calls `revalidateTag("catalogue")` and refuses anybody who is not
+active staff, using the same `getAdminSession()` the admin screens use.
+
+Reason:
+The storefront caches the shelf for five minutes, which is right for browsing and wrong for an
+Owner who has just changed a price. But an open invalidation endpoint is a cheap way to make a
+shop slow: call it in a loop and every request rebuilds. Reusing the existing session check
+means there is one answer to "is this person staff", not two.
+
+Alternatives:
+A secret-token webhook. Rejected: another credential to manage for something a session already
+answers. Shorter cache time. Rejected: it makes every shopper pay for an Owner's convenience.
+
+Impact:
+Not yet called from anywhere, because the admin write screens are not built — it is ready for
+the build that finishes them.
+
+---
+
+## 2026-09-09 — Development delivery zones exist, and say so in the data
+
+Decision:
+`scripts/seed-dev-zones.mjs` writes four placeholder zones. Every row carries a `notes` value
+stating it is a development fixture awaiting Ibrahim's real list and fees. They are not in
+`supabase/seed.sql`.
+
+Reason:
+Checkout cannot be exercised at all without one active delivery area, and the real list is a
+business decision that has not been made. The compromise is to make the placeholder impossible
+to mistake for a decision: the marker lives in the row, not only in a document.
+
+Alternatives:
+Seed nothing. Rejected: it makes the whole commerce path untestable in development. Seed them
+in `seed.sql`. Rejected: that file's entire premise is that it inserts no business data, and
+the prototype's illustrative zone names must never arrive looking like production truth.
+
+Impact:
+A production blocker, recorded with the others: the real zones and fees replace these before
+launch, through the admin Delivery Zones screen.

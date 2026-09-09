@@ -28,17 +28,21 @@ What is real and what is not:
 | | |
 | --- | --- |
 | Schema applied, constraints and triggers firing | **yes**, proved by `npm run test:db` |
-| Row Level Security enforcing, per role | **yes**, 129 tests against real sessions |
+| Row Level Security enforcing, per role | **yes**, 154 tests against real sessions |
 | Supabase Auth, staff roles, first-Owner bootstrap | **yes**, mechanism built and tested |
 | Storage buckets and their security | **yes** — and deliberately **empty** |
 | The real Owner account | **yes** — Ibrahim Abdul Tayeb, claimed 2026-09-09 |
 | Admin sign-in and session | **yes** — `/admin/sign-in`, `/admin/setup`, session middleware |
-| A sign-in guard on the ten dashboard screens | **not yet** — they show mock data; the guard lands with the data |
 | The 95 product photographs in Storage | **yes** — `product-media/<SKU>/` |
 | The catalogue in the database | **yes** — 201 products, 95 on the public shelf |
 | The application reading Supabase | **yes** — storefront and admin product screens |
 | Google Sheet synchronisation | **not connected** — Build 08 |
-| Orders, checkout, admin writes | **not built** — Build 08 onward |
+| The stock reservation engine | **yes** — one transaction, concurrency proved |
+| Server-authoritative quotation and order creation | **yes** |
+| Cancellation with reservation release | **yes** — idempotent |
+| A sign-in guard on the real-data admin routes | **yes** — all seven redirect |
+| The customer-facing checkout, confirmation and Track Order screens | **not built** — the engine has no UI yet |
+| Admin write screens (product, stock, zones, orders) | **not built** — the writes exist; the screens do not call them |
 
 See `docs/DATA_MODEL.md`, `docs/TESTING_REQUIREMENTS.md` and `docs/PROGRESS.md`.
 
@@ -81,7 +85,7 @@ src/lib/supabase/database.types.ts GENERATED from the real database — never ha
 src/lib/supabase/types.ts          friendly aliases into the generated types
 scripts/schema-check.mjs           offline: the SQL and the domain layer agree
 scripts/gen-types.mjs              generate / drift-check the types against the database
-tests/db/                          129 tests against the real database, Auth and Storage
+tests/db/                          154 tests against the real database, Auth and Storage
 scripts/import-catalogue.mjs       CSV artifact -> Supabase, idempotent, never deletes
 src/lib/catalogue/queries.ts       the storefront read: product_shelf, cached 5 minutes
 src/lib/catalogue/admin.ts         the admin read, under the CALLER's own RLS

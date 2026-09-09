@@ -85,22 +85,31 @@ const pages = [
 /**
  * The admin dashboard. English-only and outside the localized route tree, so it
  * is audited once per width rather than once per locale.
+ *
+ * Since Build 08 every real-data admin route is behind the Supabase Auth
+ * session, so a signed-out visitor is sent to the sign-in screen and there is
+ * nothing else to photograph. Only the two screens a person can legitimately
+ * reach without an account are captured here; `guardedAdminRoutes` below is
+ * asserted to redirect instead.
+ *
+ * KNOWN GAP: the ten dashboard screens no longer receive visual QA, because
+ * that now needs a signed-in staff session. Closing it needs a seeded QA staff
+ * account — recorded in docs/TESTING_REQUIREMENTS.md.
  */
 const adminPages = [
-  { name: "admin-home", path: "/admin", full: true },
-  { name: "admin-orders", path: "/admin/orders", full: true },
-  { name: "admin-order", path: "/admin/orders/2", full: true },
-  { name: "admin-products", path: "/admin/products", full: true },
-  { name: "admin-product", path: `/admin/products/${sampleProduct.sku}`, full: true },
-  { name: "admin-customers", path: "/admin/customers", full: true },
-  { name: "admin-customer", path: "/admin/customers/c1", full: true },
-  { name: "admin-more", path: "/admin/more", full: true },
-  { name: "admin-zones", path: "/admin/more/delivery-zones", full: true },
-  { name: "admin-website", path: "/admin/more/website", full: true },
-  // The one admin screen a person meets before they are anybody: two fields and
-  // a button, on a phone, in a shop. Held to the same touch-target bar as the
-  // rest even though it wears none of the dashboard's chrome.
   { name: "admin-sign-in", path: "/admin/sign-in", full: true },
+  { name: "admin-setup", path: "/admin/setup", full: true },
+];
+
+/** Real-data routes that must never render for somebody who is not signed in. */
+const guardedAdminRoutes = [
+  "/admin",
+  "/admin/orders",
+  "/admin/products",
+  `/admin/products/${sampleProduct.sku}`,
+  "/admin/customers",
+  "/admin/more",
+  "/admin/more/delivery-zones",
 ];
 
 const problems = [];
@@ -693,6 +702,14 @@ async function behaviourPass(browser) {
     });
     if (response && response.status() !== 404) {
       fail(`WITHHELD PRODUCT REACHABLE — ${hidden.sku} returned ${response.status()}`);
+    }
+
+    for (const route of guardedAdminRoutes) {
+      const response = await tab.goto(`${BASE_URL}${route}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      const landed = new URL(tab.url()).pathname;
+      if (!landed.startsWith("/admin/sign-in")) {
+        fail(`ADMIN ROUTE NOT GUARDED — ${route} rendered at ${landed} (${response?.status()})`);
+      }
     }
 
     await settle(tab, `${BASE_URL}/shop`);

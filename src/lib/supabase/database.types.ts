@@ -900,6 +900,8 @@ export type Database = {
           payment_status: Database["public"]["Enums"]["payment_status"]
           placed_at: string
           preparing_at: string | null
+          reservation_expires_at: string | null
+          reservation_released_at: string | null
           staff_note: string | null
           state: Database["public"]["Enums"]["order_state"]
           subtotal_tzs: number
@@ -940,6 +942,8 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["payment_status"]
           placed_at?: string
           preparing_at?: string | null
+          reservation_expires_at?: string | null
+          reservation_released_at?: string | null
           staff_note?: string | null
           state?: Database["public"]["Enums"]["order_state"]
           subtotal_tzs: number
@@ -980,6 +984,8 @@ export type Database = {
           payment_status?: Database["public"]["Enums"]["payment_status"]
           placed_at?: string
           preparing_at?: string | null
+          reservation_expires_at?: string | null
+          reservation_released_at?: string | null
           staff_note?: string | null
           state?: Database["public"]["Enums"]["order_state"]
           subtotal_tzs?: number
@@ -1468,6 +1474,30 @@ export type Database = {
           },
         ]
       }
+      shop_settings: {
+        Row: {
+          created_at: string
+          id: boolean
+          reservation_expiry_minutes: number | null
+          reservation_warning_minutes: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: boolean
+          reservation_expiry_minutes?: number | null
+          reservation_warning_minutes?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: boolean
+          reservation_expiry_minutes?: number | null
+          reservation_warning_minutes?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       suppliers: {
         Row: {
           active: boolean
@@ -1874,10 +1904,23 @@ export type Database = {
       }
     }
     Functions: {
+      jojo_add_stock: {
+        Args: { p_product_id: string; p_quantity: number; p_reference?: string }
+        Returns: Json
+      }
       jojo_admin_id: { Args: never; Returns: string }
       jojo_admin_role: {
         Args: never
         Returns: Database["public"]["Enums"]["admin_role"]
+      }
+      jojo_cancel_order: {
+        Args: {
+          p_actor_admin_id?: string
+          p_actor_label?: string
+          p_order_id: string
+          p_reason: string
+        }
+        Returns: Json
       }
       jojo_claim_first_owner: {
         Args: { p_full_name?: string }
@@ -1901,6 +1944,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      jojo_count_stock: {
+        Args: { p_counted: number; p_product_id: string; p_reason: string }
+        Returns: Json
+      }
       jojo_customer_id: { Args: never; Returns: string }
       jojo_family_is_public: { Args: { p_family_id: string }; Returns: boolean }
       jojo_is_owner: { Args: never; Returns: boolean }
@@ -1909,9 +1956,47 @@ export type Database = {
       jojo_media_is_public: { Args: { p_media_id: string }; Returns: boolean }
       jojo_owner_exists: { Args: never; Returns: boolean }
       jojo_owns_order: { Args: { p_order_id: string }; Returns: boolean }
+      jojo_place_order: {
+        Args: {
+          p_channel?: string
+          p_customer_email?: string
+          p_customer_name: string
+          p_customer_note?: string
+          p_customer_phone_display?: string
+          p_customer_phone_e164: string
+          p_delivery_address: string
+          p_delivery_instructions?: string
+          p_delivery_landmark?: string
+          p_items: Json
+          p_locale?: string
+          p_payment_preference: Database["public"]["Enums"]["payment_preference"]
+          p_zone_slug: string
+        }
+        Returns: Json
+      }
       jojo_product_is_public: {
         Args: { p_product_id: string }
         Returns: boolean
+      }
+      jojo_quote_order: {
+        Args: { p_items: Json; p_zone_slug?: string }
+        Returns: Json
+      }
+      jojo_resolve_lines: { Args: { p_items: Json }; Returns: Json }
+      jojo_stale_reservations: {
+        Args: never
+        Returns: {
+          order_id: string
+          order_number: string
+          placed_at: string
+          reservation_expires_at: string
+          state: Database["public"]["Enums"]["order_state"]
+          units: number
+        }[]
+      }
+      jojo_track_order: {
+        Args: { p_order_number: string; p_phone_e164: string }
+        Returns: Json
       }
       next_order_number: { Args: never; Returns: string }
     }

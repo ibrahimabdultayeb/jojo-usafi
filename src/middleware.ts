@@ -49,8 +49,33 @@ export async function middleware(request: NextRequest) {
 
   // `getUser()` rather than `getSession()`: it verifies the token with Supabase
   // instead of trusting whatever the cookie claims, and it is what triggers the
-  // refresh. The answer is deliberately discarded — pages ask for themselves.
-  await supabase.auth.getUser();
+  // refresh.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // THE GUARD.
+  //
+  // Build 06 deliberately left these screens open because they showed invented
+  // data and there was nothing to protect. Build 07 gave them real prices and
+  // stock, and Build 08 gives them real orders and real writes, so that
+  // reasoning has expired.
+  //
+  // This checks only "is anybody signed in". Whether that person is STAFF is
+  // decided by Row Level Security in the database and re-checked by each page,
+  // because a middleware that decided authorisation would be a second opinion
+  // that could drift from the first. Its job is to send a stranger somewhere
+  // useful instead of showing them an empty dashboard.
+  const path = request.nextUrl.pathname;
+  const isPublicAdminRoute =
+    path.startsWith("/admin/sign-in") || path.startsWith("/admin/setup");
+
+  if (!user && !isPublicAdminRoute) {
+    const signIn = request.nextUrl.clone();
+    signIn.pathname = "/admin/sign-in";
+    signIn.search = `?next=${encodeURIComponent(path)}`;
+    return NextResponse.redirect(signIn);
+  }
 
   return response;
 }
