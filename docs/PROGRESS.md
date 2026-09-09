@@ -7,7 +7,7 @@ product photography — and, since Build 06, a **real Supabase database behind i
 
 All 15 migrations are applied to a free hosted development project. The constraints fire,
 the triggers refuse, Row Level Security holds for each of the three staff roles, Supabase
-Auth works and the Storage buckets are secured — all proved by 154 tests against the actual
+Auth works and the Storage buckets are secured — all proved by 169 tests against the actual
 database rather than asserted in a document.
 
 Jojo Usafi has a real Owner — **Ibrahim Abdul Tayeb** — who signs in at `/admin/sign-in`.
@@ -22,10 +22,12 @@ The **commerce engine** is built and proved: stock reservation under a lock, ser
 quotation, atomic order creation, JU numbering, cancellation with release. Real-data admin
 routes are behind the sign-in guard.
 
-What is still not true: **the customer cannot reach any of it yet.** Checkout, the confirmation
-screen and Track Order are still Build 03 shells; the admin write screens do not call the
-functions that exist for them; no order has been placed through the website; and nothing has
-talked to Google Sheets.
+**A shopper can buy.** Checkout, the confirmation screen and Track Order are real and
+bilingual; guest orders reserve stock atomically and appear with a JU number.
+
+What is still not true: **the admin screens do not write.** Orders, product edits, stock
+operations and delivery zones are still mock in the UI, though every server operation behind
+them exists and is tested. Nothing has talked to Google Sheets.
 
 ## Completed
 
@@ -376,7 +378,7 @@ column as read-only, so `inventory.available` appears in the generated Insert an
 types and assigning to it compiles. The database refuses it with `428C9`, and a test asserts
 that it does.
 
-#### 154 tests against the real database
+#### 169 tests against the real database
 
 `npm run test:db` — a second Vitest project, separate on purpose so `npm run test` keeps
 working with no network, no Docker and no Supabase project.
@@ -443,7 +445,7 @@ Offline: `typecheck` · `lint` · `test` (156 domain tests) · `schema:check` (1
 no overflow, console errors, broken images, small touch targets, floating-layer collisions
 or wrong shelf columns).
 
-Against the real database: `db:types:check` · `test:db` (154 tests).
+Against the real database: `db:types:check` · `test:db` (169 tests).
 
 The approved storefront and admin UI are untouched. Not one component changed in this build.
 
@@ -919,6 +921,109 @@ real-data routes) · `test:db` (**154** tests, 25 of them commerce).
 The QA gate lost the ten admin dashboard screenshots, because those screens now
 require a session. Closing that needs a seeded QA staff account — recorded in
 `docs/TESTING_REQUIREMENTS.md`.
+
+
+### Build 08B — the customer can buy — 2026-09-09 · **PARTIAL**
+
+A shopper can now put something in a basket, check out as a guest, get a JU number and
+track the order. The staff-facing half of the same operations exists and is tested in the
+database, but the admin screens still do not call it. Cost: TZS 0.
+
+#### Checkout — real
+
+`/checkout` and `/sw/checkout` are working guest checkout, one page, mobile first, no account.
+
+**The money on that screen is not that screen's opinion.** The cart knows SKUs and quantities;
+every figure comes back from `jojo_quote_order`, which prices the basket inside PostgreSQL.
+The quote is re-requested whenever the basket or the delivery area changes, so a price that
+moved while the basket sat open is shown *before* the shopper commits, not after. A line that
+cannot be filled says so by name and by number — "Only 3 of Multix 5LT left" — with a link
+back to the basket, rather than a generic failure.
+
+Fields are as required: name, phone, optional email, active delivery area, address, optional
+notes, and a payment preference. Phone is normalised server-side by the domain layer's rule
+(ten unit tests) and re-validated by the column's own CHECK. A free-delivery zone shows
+**FREE**, not "TSh 0".
+
+Double submission is prevented by `useFormStatus` — the framework disables the button while
+the action is in flight, rather than a piece of state this component has to remember to reset.
+
+#### Confirmation and Track Order — real
+
+`OrderReceived` renders **after** the row exists in PostgreSQL: the order number, the items,
+subtotal, delivery, total, area, address and payment preference, then *Track my order* and a
+prefilled WhatsApp support link. WhatsApp is support, never the way to order.
+
+Track Order is wired to `jojo_track_order`. Both the order number **and** the phone are
+required, and a wrong phone is answered exactly like a wrong number — otherwise knowing that
+JU-000128 exists would be enough to read it and every order could be read by counting upward.
+Statuses are friendly, in both languages, from a new `orderStatus` dictionary.
+
+**267 i18n keys, EN and SW in sync**, and the locale layout-stability gate is still green.
+
+#### The middle of an order's life — new, and tested
+
+Build 08 built the two ends: created, and cancelled. Migration 0018 adds the moves between,
+each a single transaction:
+
+- **`jojo_advance_order`** — enforces the same transition table as
+  `src/lib/domain/orders.ts`, so a request that never touched the application still cannot
+  send a completed order back out for delivery. It is idempotent, and it refuses cancellation
+  and delivery-failure outright, pointing at the functions that handle their stock properly.
+- **Completion is where stock actually leaves the shop.** Until then nothing is deducted,
+  because until the customer has it, the shop still has it. Completing converts the
+  reservation into a `sale` (`on_hand -= n`, `reserved -= n`) and demands the payment: a
+  method always, and a transaction reference for digital.
+- **`jojo_fail_delivery`** asks the question the admin prototype always asked — *were the
+  items returned?* — and it has no default, because guessing corrupts the stock figures in one
+  direction or the other:
+  - **returned** → the goods are back and still promised to this order, which can be sent out
+    again. Nothing moves.
+  - **not returned** → `on_hand` falls, the reservation is released, and a `damage_loss`
+    movement records it with the reason. Two movements rather than one, because `damage_loss`
+    may only touch `on_hand` and a single row would have to lie about which column moved.
+
+#### End to end, proved
+
+`tests/db/08-order-lifecycle.test.ts` walks the whole journey against the real database:
+place → confirm → prepare → out for delivery → complete with payment, asserting at every step
+that `on_hand` has not moved and the reservation is still held, and that at completion —
+and only then — the stock is deducted and a `sale` movement written. Plus: completion refused
+without payment, digital refused without a reference, illegal transitions refused, both
+delivery-failure outcomes, and every order function closed to an anonymous caller.
+
+#### Two accessibility regressions the QA gate caught
+
+Both in the new checkout, both real:
+
+- the breadcrumb link was 44px tall and 25px wide — `min-w-11` restored;
+- the payment radios were 20×20. The input now covers the whole 56px card and the dot is
+  drawn with `peer-checked`, so what a thumb has to hit is the card while the control is
+  still a real radio with real focus.
+
+#### NOT BUILT — the admin half
+
+The staff-facing screens still show mock orders and still do not write:
+
+- **Admin Orders** list and detail are mock; real DEV orders do not appear.
+- **Next actions, payment completion, cancellation and delivery-failed dialogs** are not
+  wired — though every one of the server operations behind them now exists and is tested.
+- **Product writes, stock Add/Count, delivery-zone writes** are not wired;
+  `jojo_add_stock`, `jojo_count_stock` and the RLS policies are ready.
+- **`revalidateCatalogue()`** exists and refuses non-staff, but nothing calls it yet, because
+  nothing writes yet.
+- **No QA staff account** was seeded, so the ten dashboard screens still have no visual QA.
+
+Same reason as last time, stated plainly: the customer path plus the order-lifecycle engine
+took the build, and the admin wiring is a second build's worth of forms and dialogs. What is
+shipped works; what is missing is honestly missing.
+
+#### Verified
+
+`typecheck` · `lint` · `test` (156) · `schema:check` (19 migrations) · `i18n:check`
+(267 keys) · `catalogue:check` · `db:types:check` · `build` (230 static pages) ·
+`qa:screenshots` (80 screenshots, both languages at all five widths, admin guard asserted) ·
+`test:db` (**169** tests).
 
 ## Next
 

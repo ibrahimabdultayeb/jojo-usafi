@@ -28,7 +28,7 @@ What is real and what is not:
 | | |
 | --- | --- |
 | Schema applied, constraints and triggers firing | **yes**, proved by `npm run test:db` |
-| Row Level Security enforcing, per role | **yes**, 154 tests against real sessions |
+| Row Level Security enforcing, per role | **yes**, 169 tests against real sessions |
 | Supabase Auth, staff roles, first-Owner bootstrap | **yes**, mechanism built and tested |
 | Storage buckets and their security | **yes** — and deliberately **empty** |
 | The real Owner account | **yes** — Ibrahim Abdul Tayeb, claimed 2026-09-09 |
@@ -41,8 +41,9 @@ What is real and what is not:
 | Server-authoritative quotation and order creation | **yes** |
 | Cancellation with reservation release | **yes** — idempotent |
 | A sign-in guard on the real-data admin routes | **yes** — all seven redirect |
-| The customer-facing checkout, confirmation and Track Order screens | **not built** — the engine has no UI yet |
-| Admin write screens (product, stock, zones, orders) | **not built** — the writes exist; the screens do not call them |
+| The customer-facing checkout, confirmation and Track Order screens | **yes** — real, bilingual, guest checkout |
+| Order transitions, payment completion, delivery-failed | **yes** as server operations — no admin UI yet |
+| Admin write screens (orders, product, stock, zones) | **not built** — every server operation exists and is tested; the screens do not call them |
 
 See `docs/DATA_MODEL.md`, `docs/TESTING_REQUIREMENTS.md` and `docs/PROGRESS.md`.
 
@@ -85,7 +86,7 @@ src/lib/supabase/database.types.ts GENERATED from the real database — never ha
 src/lib/supabase/types.ts          friendly aliases into the generated types
 scripts/schema-check.mjs           offline: the SQL and the domain layer agree
 scripts/gen-types.mjs              generate / drift-check the types against the database
-tests/db/                          154 tests against the real database, Auth and Storage
+tests/db/                          169 tests against the real database, Auth and Storage
 scripts/import-catalogue.mjs       CSV artifact -> Supabase, idempotent, never deletes
 src/lib/catalogue/queries.ts       the storefront read: product_shelf, cached 5 minutes
 src/lib/catalogue/admin.ts         the admin read, under the CALLER's own RLS

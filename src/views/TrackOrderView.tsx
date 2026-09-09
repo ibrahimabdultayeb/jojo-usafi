@@ -1,28 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { useLocale } from "@/lib/i18n/client";
 import { whatsappLink } from "@/lib/site";
+import { formatPrice } from "@/lib/format";
+import { fill } from "@/lib/i18n";
+import { trackOrderAction } from "@/lib/commerce/actions";
+import { emptyTrackState } from "@/lib/commerce/state";
+import type { OrderState } from "@/lib/domain/orders";
 
 /**
- * VISUAL SHELL ONLY.
+ * Real order lookup.
  *
- * There is no order lookup in this prototype — submitting shows the state the
- * real page will use once orders exist in the database.
+ * The order number AND the phone that placed it are both required, and a
+ * mismatch is answered exactly like a wrong number — otherwise knowing that
+ * JU-000128 exists would be enough to read it, and every order in the shop
+ * could be read by counting upward. The projection the server returns carries
+ * nothing internal: no staff notes, no actor identities, no payment reference.
  */
 export function TrackOrderView() {
   const { t, path } = useLocale();
-  const [orderNumber, setOrderNumber] = useState("");
-  const [phone, setPhone] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-
-  function onSubmit(event: FormEvent) {
-    event.preventDefault();
-    setSubmitted(true);
-  }
+  const [state, formAction] = useActionState(trackOrderAction, emptyTrackState);
+  const order = state.order;
 
   const timeline: { icon: IconName; label: string; note: string }[] = [
     { icon: "check", label: t.track.stage1, note: t.track.stage1Note },
@@ -49,7 +52,7 @@ export function TrackOrderView() {
         </header>
 
         <form
-          onSubmit={onSubmit}
+          action={formAction}
           className="mt-8 space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-7"
         >
           <div>
@@ -58,8 +61,8 @@ export function TrackOrderView() {
             </label>
             <input
               id="order-number"
-              value={orderNumber}
-              onChange={(e) => setOrderNumber(e.target.value)}
+              name="orderNumber"
+              required
               inputMode="text"
               autoComplete="off"
               placeholder={t.track.orderNumberPlaceholder}
@@ -73,8 +76,8 @@ export function TrackOrderView() {
             </label>
             <input
               id="phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              name="phone"
+              required
               type="tel"
               inputMode="tel"
               autoComplete="tel"
@@ -84,23 +87,63 @@ export function TrackOrderView() {
             <p className="mt-1.5 text-xs font-medium text-slate-400">{t.track.phoneHelp}</p>
           </div>
 
-          <button
-            type="submit"
-            className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-6 font-display text-base font-bold text-white shadow-lg transition-colors hover:bg-brand-600"
-          >
-            {t.track.submit}
-            <Icon name="arrowRight" className="h-5 w-5" />
-          </button>
+          <TrackButton label={t.track.submit} checking={t.track.checking} />
 
-          {submitted && (
+          {state.error && (
             <div
-              role="status"
+              role="alert"
               className="fade-in rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900"
             >
-              {t.track.notConnected}
+              {state.error}
             </div>
           )}
         </form>
+
+        {order && (
+          <section
+            data-qa-anchor="track-result"
+            className="fade-in mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-7"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="font-display text-xl font-bold text-slate-900">
+                {fill(t.track.resultTitle, { order: order.order_number })}
+              </h2>
+              <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-black tracking-wide text-brand-700 uppercase">
+                {t.orderStatus[order.state as OrderState]}
+              </span>
+            </div>
+
+            <ul className="mt-5 space-y-2.5 border-b border-slate-100 pb-4">
+              {order.items.map((item) => (
+                <li key={item.sku} className="flex justify-between gap-3 text-sm">
+                  <span className="min-w-0 font-semibold text-slate-600">
+                    <span className="text-slate-900">{item.quantity}×</span> {item.product_name}{" "}
+                    <span className="text-slate-400">{item.pack_size}</span>
+                  </span>
+                  <span className="shrink-0 font-black whitespace-nowrap text-slate-900">
+                    {formatPrice(item.line_total_tzs)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <dl className="mt-4 space-y-2.5 text-sm">
+              <div className="flex justify-between gap-3 text-base">
+                <dt className="font-bold text-slate-900">{t.track.totalLabel}</dt>
+                <dd className="font-black text-slate-900">{formatPrice(order.total_tzs)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-bold text-slate-400">{t.track.deliveryLabel}</dt>
+                <dd className="font-bold text-slate-900">
+                  {order.delivery_zone_name}
+                  <span className="block font-semibold text-slate-600">
+                    {order.delivery_address}
+                  </span>
+                </dd>
+              </div>
+            </dl>
+          </section>
+        )}
 
         <section className="mt-10">
           <h2 className="font-display text-lg font-bold text-slate-900 md:text-xl">
@@ -147,5 +190,19 @@ export function TrackOrderView() {
         </p>
       </div>
     </div>
+  );
+}
+
+function TrackButton({ label, checking }: { label: string; checking: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-6 font-display text-base font-bold text-white shadow-lg transition-colors hover:bg-brand-600 disabled:opacity-60"
+    >
+      {pending ? checking : label}
+      {!pending && <Icon name="arrowRight" className="h-5 w-5" />}
+    </button>
   );
 }

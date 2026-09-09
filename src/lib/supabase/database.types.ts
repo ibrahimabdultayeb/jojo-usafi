@@ -1913,6 +1913,16 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["admin_role"]
       }
+      jojo_advance_order: {
+        Args: {
+          p_actor_admin_id?: string
+          p_order_id: string
+          p_payment_method?: Database["public"]["Enums"]["payment_method"]
+          p_payment_reference?: string
+          p_to_state: Database["public"]["Enums"]["order_state"]
+        }
+        Returns: Json
+      }
       jojo_cancel_order: {
         Args: {
           p_actor_admin_id?: string
@@ -1949,6 +1959,15 @@ export type Database = {
         Returns: Json
       }
       jojo_customer_id: { Args: never; Returns: string }
+      jojo_fail_delivery: {
+        Args: {
+          p_actor_admin_id?: string
+          p_items_returned: boolean
+          p_order_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       jojo_family_is_public: { Args: { p_family_id: string }; Returns: boolean }
       jojo_is_owner: { Args: never; Returns: boolean }
       jojo_is_staff: { Args: never; Returns: boolean }

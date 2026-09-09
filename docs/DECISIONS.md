@@ -1345,3 +1345,113 @@ the prototype's illustrative zone names must never arrive looking like productio
 Impact:
 A production blocker, recorded with the others: the real zones and fees replace these before
 launch, through the admin Delivery Zones screen.
+
+---
+
+## 2026-09-09 — Checkout re-prices on the server, and shows the result before the customer commits
+
+Decision:
+`CheckoutView` holds SKUs and quantities and nothing else. Every figure on the screen —
+line totals, subtotal, delivery fee, total — comes from `jojo_quote_order`, re-requested
+whenever the basket or the delivery area changes. The place-order action quotes again before
+writing.
+
+Reason:
+A basket can sit open for a day. A price can change, a product can be hidden, the last unit
+can sell. The shopper has to be shown today's figures *before* they agree to them, not
+discover at the confirmation screen that the total moved.
+
+Quoting on the server rather than trusting the cart is the same trust boundary Build 08 built
+into the SQL, carried up to the screen: there is no code path where a number the browser
+holds becomes a number the shop charges.
+
+Alternatives:
+Price from the cart and validate at submit. Rejected: the customer agrees to one number and is
+charged another, which is exactly the failure the boundary exists to prevent. Quote only at
+submit. Rejected: a stock problem then appears as a rejection rather than as something the
+shopper could have fixed.
+
+Impact:
+A line that cannot be filled is named and counted — "Only 3 of Multix 5LT left" — with a link
+back to the basket. Free-delivery zones show FREE rather than TSh 0. `useFormStatus` disables
+the button while the action is in flight, so a double tap cannot become a double order.
+
+---
+
+## 2026-09-09 — Stock leaves the shop at completion, not at dispatch
+
+Decision:
+`jojo_advance_order` deducts `on_hand` only on the move to `completed`, converting the
+reservation into a `sale` movement. Confirming, preparing and dispatching change the state and
+nothing else.
+
+Reason:
+Until the customer has the goods, the shop still has them. An order out for delivery can come
+back — and does, which is why `delivery_failed` exists and is not terminal. Deducting at
+dispatch would mean every failed delivery needed a compensating receipt to undo a sale that
+never happened, and every one of those is a chance to get the arithmetic wrong.
+
+Keeping the deduction at the single moment the goods actually change hands means a
+cancellation at any earlier stage is a pure release, with nothing to reverse.
+
+Alternatives:
+Deduct at dispatch. Rejected for the reason above. Deduct at reservation. Rejected: it makes
+`available` and `on_hand` the same number and throws away the distinction the whole schema is
+built on.
+
+Impact:
+Completion demands the money in the same transaction — a method always, and a transaction
+reference for digital — because an order marked complete with no payment recorded is a hole in
+the books. The schema's `orders_completed_is_paid` constraint is the backstop; the function
+refuses first, in words a person can act on.
+
+---
+
+## 2026-09-09 — A failed delivery must say where the goods are
+
+Decision:
+`jojo_fail_delivery` takes `p_items_returned` as a required boolean with no default.
+Returned means the stock is untouched and still promised to the order, which can be sent out
+again. Not returned means `on_hand` falls, the reservation is released, and a `damage_loss`
+movement records it with the reason.
+
+Reason:
+This is not paperwork. It is the only question that decides what the shop can sell tomorrow,
+and either default is a way of silently corrupting the stock figures — assuming "returned"
+inflates what is on the shelf, assuming "not returned" writes off goods that are sitting in
+the back of a van. The admin prototype always asked it with no default; this is that promise
+kept in the database.
+
+Alternatives:
+Default to returned as the common case. Rejected: the common case being wrong is worse than
+being asked, and the operator is standing there anyway.
+
+Impact:
+The write-off is two movements, not one: `damage_loss` may only touch `on_hand`, so combining
+it with the release would require a row that lies about which column moved. An order whose
+items came back can be dispatched again — proved by a test.
+
+---
+
+## 2026-09-09 — The payment radio's touch target is the whole card
+
+Decision:
+The payment-preference inputs are `absolute inset-0 opacity-0` over their label, with the
+visible dot drawn by a sibling using `peer-checked`.
+
+Reason:
+The QA gate found them at 20×20 — a real finding, not a technicality. A 20px target on a
+390px phone held one-handed is a mis-tap, and mis-tapping this control changes how somebody
+pays. The card is 56px.
+
+It stays a real `<input type="radio">`: keyboard focus, form semantics and required-validation
+all still work, and the browser still owns the state. Only the hit area changed.
+
+Alternatives:
+`sr-only` on the input and a styled span. Rejected: the input's box then measures zero, which
+is the same problem with better-looking CSS. Make the dot bigger. Rejected: it would redesign
+an approved control to satisfy a measurement.
+
+Impact:
+The breadcrumb link was the same class of bug — 44px tall, 25px wide — and got its `min-w-11`
+back. Both were caught by the gate rather than by review.

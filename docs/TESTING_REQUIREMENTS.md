@@ -19,7 +19,7 @@ and, since Build 06, the half that needs a real database:
 
 ```bash
 npm run db:types:check   # the generated types still match the live schema
-npm run test:db          # 154 tests against PostgreSQL, Supabase Auth and Storage
+npm run test:db          # 169 tests against PostgreSQL, Supabase Auth and Storage
 ```
 
 The two halves are deliberately separate. `npm run test` must keep working on a laptop with
@@ -71,7 +71,7 @@ types disagreeing with the live schema.
 
 ## Database, Auth, RLS and Storage tests
 
-`npm run test:db` — 154 tests against the hosted development project. Seven files, run in
+`npm run test:db` — 169 tests against the hosted development project. Eight files, run in
 name order by a custom sequencer, sharing one database with `fileParallelism` off.
 
 | File | Tests | Proves |
@@ -81,6 +81,7 @@ name order by a custom sequencer, sharing one database with `fileParallelism` of
 | `03-rls.test.ts` | 39 | five callers — anonymous, signed-in stranger, Order staff, Manager, Owner — against every policy |
 | `04-storage.test.ts` | 10 | bucket configuration; who may upload, replace and delete |
 | `05-real-data-untouched.test.ts` | 6 | every real staff and audit row is byte-for-byte what it was before the suite ran |
+| `08-order-lifecycle.test.ts` | 15 | the whole journey — place, confirm, prepare, dispatch, complete with payment — asserting that stock leaves only at completion; completion refuses without payment and digital without a reference; illegal transitions refused; both delivery-failure outcomes; every order function closed to the browser |
 | `07-commerce.test.ts` | 25 | quoting is the database answer and not the browser one; reservation is atomic; the last unit cannot be sold twice (1-in-stock/2-orders and 3-in-stock/5-orders); a refused order leaves nothing behind; customer matching on phone; cancellation releases once and is idempotent; tracking needs the number AND the phone; the commerce path is closed to the browser |
 | `06-catalogue.test.ts` | 14 | the real catalogue as an anonymous shopper receives it: 95 on the shelf, 201 kept, EP01-A01 blocked, EP23-A02 not invented, photographs filed and fetchable, nothing newly readable or writable |
 

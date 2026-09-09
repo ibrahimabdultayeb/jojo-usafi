@@ -5,7 +5,7 @@ first brand catalogue it sells — not the whole store.
 
 **The storefront runs on Supabase.** English and Kiswahili, on the real Product Master and
 the approved photography: 201 products imported, 95 on the public shelf, photographs served
-from Supabase Storage, and 154 tests proving the database, Auth, Row Level Security and
+from Supabase Storage, and 169 tests proving the database, Auth, Row Level Security and
 Storage behave as claimed.
 
 What does not exist yet: an order backend, payments, admin writes, and the Google Sheet
@@ -78,7 +78,7 @@ These need the hosted development project, and `.env.local`:
 | --- | --- |
 | `npm run db:types` | Regenerate `src/lib/supabase/database.types.ts` from the live schema |
 | `npm run db:types:check` | Fail if the committed types and the live schema have drifted |
-| `npm run test:db` | 154 tests against real PostgreSQL, Supabase Auth and Supabase Storage |
+| `npm run test:db` | 169 tests against real PostgreSQL, Supabase Auth and Supabase Storage |
 
 ### Connecting to the development database
 
@@ -133,7 +133,7 @@ src/lib/supabase/         the three clients, generated types, environment valida
 src/lib/i18n/             locale config, dictionaries, client hook
 src/lib/                  cart state, formatting, site settings, colour tones
 supabase/migrations/      the schema — 15 migrations, all applied to the dev project
-tests/db/                 154 tests against the real database, Auth and Storage
+tests/db/                 169 tests against the real database, Auth and Storage
 scripts/                  catalogue build, i18n check, schema check, type generation, QA gate
 public/products/          approved product photography, one file per SKU
 preview/screenshots/      QA screenshots
