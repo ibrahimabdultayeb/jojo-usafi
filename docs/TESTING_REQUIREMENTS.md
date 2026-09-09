@@ -19,7 +19,7 @@ and, since Build 06, the half that needs a real database:
 
 ```bash
 npm run db:types:check   # the generated types still match the live schema
-npm run test:db          # 109 tests against PostgreSQL, Supabase Auth and Storage
+npm run test:db          # 110 tests against PostgreSQL, Supabase Auth and Storage
 ```
 
 The two halves are deliberately separate. `npm run test` must keep working on a laptop with
@@ -71,14 +71,14 @@ types disagreeing with the live schema.
 
 ## Database, Auth, RLS and Storage tests
 
-`npm run test:db` — 109 tests against the hosted development project. Four files, run in
+`npm run test:db` — 110 tests against the hosted development project. Four files, run in
 name order by a custom sequencer, sharing one database with `fileParallelism` off.
 
 | File | Tests | Proves |
 | --- | --- | --- |
 | `01-schema.test.ts` | 43 | CHECK constraints refuse; the append-only triggers refuse; `updated_at` moves; SKU immutability; `inventory.available` is computed by the database; `product_shelf` and `inventory_ledger_check` mean what they say |
 | `02-auth.test.ts` | 18 | the three roles resolve from `admin_profiles`; the first-Owner bootstrap works once and never again; the last Owner cannot be demoted, deactivated or deleted; deleting a login leaves the staff record behind |
-| `03-rls.test.ts` | 38 | four callers — anonymous, signed-in stranger, Order staff, Manager, Owner — against every policy |
+| `03-rls.test.ts` | 39 | five callers — anonymous, signed-in stranger, Order staff, Manager, Owner — against every policy |
 | `04-storage.test.ts` | 10 | bucket configuration; who may upload, replace and delete |
 
 Fixtures are fake, marked `ZZTEST` / `zztest` / `aa000000-`, and removed afterwards. Nothing
@@ -167,7 +167,7 @@ nothing at all: the reserved widths and this comparison both read `locales`.
 - ~~unit tests~~ — done for the domain layer; still needed for components
 - ~~integration tests **against a real database**~~ — done, `npm run test:db`
 - Playwright user-journey tests (only the QA gate exists today)
-- ~~**Supabase Row Level Security policies tested**~~ — done, 38 tests as five callers
+- ~~**Supabase Row Level Security policies tested**~~ — done, 39 tests as five callers
 - Google Sheet ↔ Supabase synchronization tested end to end. The rules are unit-tested
   (loop, echo, stale write, conflict, retry, duplicate SKU, invalid value); what remains is
   the same handling against a live Sheet and a live database, including partial failures

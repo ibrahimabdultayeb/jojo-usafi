@@ -7,7 +7,7 @@ The **Supabase PostgreSQL** schema, authored as version-controlled migrations in
 > **Status: applied and verified.** All 15 migrations have been executed against the hosted
 > development project (*Jojo Usafi Dev*, `dyjhacbbedytcstxxjzl`, free tier). Everything below
 > is checked statically by `npm run schema:check` and — since Build 06 — proved at runtime by
-> `npm run test:db`, 109 tests against the real database, Supabase Auth and Supabase Storage.
+> `npm run test:db`, 110 tests against the real database, Supabase Auth and Supabase Storage.
 >
 > The database holds **no business data**: no products, no customers, no orders, no delivery
 > zones, no staff. Only the reference rows the migrations themselves insert — 2 locales,

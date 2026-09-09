@@ -7,7 +7,7 @@ product photography — and, since Build 06, a **real Supabase database behind i
 
 All 15 migrations are applied to a free hosted development project. The constraints fire,
 the triggers refuse, Row Level Security holds for each of the three staff roles, Supabase
-Auth works and the Storage buckets are secured — all proved by 109 tests against the actual
+Auth works and the Storage buckets are secured — all proved by 110 tests against the actual
 database rather than asserted in a document.
 
 What is not yet true: **the application still does not read Supabase.** The storefront reads
@@ -361,7 +361,7 @@ column as read-only, so `inventory.available` appears in the generated Insert an
 types and assigning to it compiles. The database refuses it with `428C9`, and a test asserts
 that it does.
 
-#### 109 tests against the real database
+#### 110 tests against the real database
 
 `npm run test:db` — a second Vitest project, separate on purpose so `npm run test` keeps
 working with no network, no Docker and no Supabase project.
@@ -370,7 +370,7 @@ working with no network, no Docker and no Supabase project.
 | --- | --- | --- |
 | `01-schema.test.ts` | 43 | constraints refuse, triggers refuse, `available` is computed, the views mean what they say |
 | `02-auth.test.ts` | 18 | the three roles, the bootstrap once and never again, the last-Owner guard |
-| `03-rls.test.ts` | 38 | five callers against every policy |
+| `03-rls.test.ts` | 39 | five callers against every policy |
 | `04-storage.test.ts` | 10 | bucket configuration and who may write |
 
 Fixtures are fake and obviously so (`ZZTEST`, `zztest`, `aa000000-`), and are removed
@@ -428,7 +428,7 @@ Offline: `typecheck` · `lint` · `test` (156 domain tests) · `schema:check` (1
 no overflow, console errors, broken images, small touch targets, floating-layer collisions
 or wrong shelf columns).
 
-Against the real database: `db:types:check` · `test:db` (109 tests).
+Against the real database: `db:types:check` · `test:db` (110 tests).
 
 The approved storefront and admin UI are untouched. Not one component changed in this build.
 

@@ -28,7 +28,7 @@ What is real and what is not:
 | | |
 | --- | --- |
 | Schema applied, constraints and triggers firing | **yes**, proved by `npm run test:db` |
-| Row Level Security enforcing, per role | **yes**, 109 tests against real sessions |
+| Row Level Security enforcing, per role | **yes**, 110 tests against real sessions |
 | Supabase Auth, staff roles, first-Owner bootstrap | **yes**, mechanism built and tested |
 | Storage buckets and their security | **yes** — and deliberately **empty** |
 | The real Owner account | **not created** — two steps, in `docs/PROGRESS.md` |
@@ -78,7 +78,7 @@ src/lib/supabase/database.types.ts GENERATED from the real database — never ha
 src/lib/supabase/types.ts          friendly aliases into the generated types
 scripts/schema-check.mjs           offline: the SQL and the domain layer agree
 scripts/gen-types.mjs              generate / drift-check the types against the database
-tests/db/                          109 tests against the real database, Auth and Storage
+tests/db/                          110 tests against the real database, Auth and Storage
 ```
 
 ## Authorization: two locks, with different jobs
