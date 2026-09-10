@@ -2478,3 +2478,132 @@ Impact:
 **This blocks every staff account except Ibrahim's own**, which was claimed
 through the one-time Owner bootstrap. It is recorded as a launch blocker in
 `docs/STAGING.md` §8 and is the first item of Build 12.
+
+---
+
+## 2026-09-11 — An email link arrives in three shapes, and only one reaches a server
+
+Decision:
+The password flow is three routes. `/admin/forgot-password` asks for a link,
+`/admin/auth/callback` handles `?code=` and `?token_hash=`, and
+`/admin/set-password` handles the URL **fragment** in the browser. All three are
+in the middleware's public allow-list.
+
+Reason:
+Supabase delivers an admin-generated link's session as `#access_token=…`. A
+fragment is never transmitted to a server — that is what a fragment is — so no
+route handler, server component or server action can ever see an invitation's
+tokens. Only the browser can.
+
+And the browser does not do it for free: `@supabase/ssr` builds its client with
+`flowType: "pkce"`, and a PKCE client's own URL detection looks for `?code=` and
+ignores hash tokens entirely. So the fragment is parsed by hand and handed to
+`setSession`.
+
+The callback forwards anything it does not recognise to the set-password screen
+rather than refusing it, because "no query parameters" and "tokens in a fragment
+I cannot see" are indistinguishable from the server, and refusing would throw
+away a perfectly good invitation.
+
+Alternatives:
+Change Supabase's email template to a `token_hash` link so everything is
+server-side. Cleaner in one way, but it is a dashboard change that has to be made
+and remembered per project, and it fails silently back to the fragment shape if
+anybody restores the default template. Handling both costs one `useEffect`.
+
+Impact:
+Found by driving a real browser through a real link. Every server-side test in
+`tests/db/15-password-links.test.ts` passed — links mint, verify once, and the
+session sets a working password — while a person still landed on a page saying
+their link was broken. `npm run verify:password-link` now drives the whole
+journey, including a fixture that is switched off afterwards and must be shut out.
+
+---
+
+## 2026-09-11 — Signed in is not the same as staff
+
+Decision:
+The admin middleware now checks that the signed-in account has an **active staff
+profile**, not merely that somebody is signed in. Anybody else is sent to the
+sign-in screen, which already explains both cases — not staff at all, or switched
+off.
+
+Reason:
+A Supabase account that had never been added to the shop reached `/admin` and was
+shown the dashboard frame: the greeting, the navigation, the search box, the
+counts drawn from the public shelf. Row Level Security held — every order,
+customer and staff row came back empty — so it was not a data breach. It was
+worse in a quieter way: the application told somebody they were in the back
+office when they were not, and the sign-in screen's carefully written "No access"
+panel was unreachable, because signing in redirects to `/admin` and nothing sent
+them back.
+
+The check costs one query, on admin routes only, and `admin_profiles_self_read`
+is what makes it answerable: a person may always read the row that says who they
+are, including the row that says they have been switched off.
+
+Alternatives:
+Refuse in the admin layout instead. Rejected: the layout also wraps sign-in,
+setup and the password screens, and a layout cannot see the path it is rendering,
+so it would need an allow-list of its own beside the one middleware already has.
+
+Impact:
+This is still not the authorization boundary — RLS decides what may be read, per
+query, and `authorize()` re-checks every write. What it stops is a stranger being
+handed the furniture. Proved in a browser by `npm run verify:password-link`.
+
+---
+
+## 2026-09-11 — Staging is a Preview deployment, and Production is left empty
+
+Decision:
+The Vercel project `ecoplus/jojo-usafi` serves staging from its **Preview**
+environment, aliased to a stable `jojo-usafi-staging.vercel.app`. The
+**Production** environment has no variables set at all.
+
+Reason:
+Production being empty is the point. A deployment that reached it would fail its
+build with the name of the missing variable, loudly, rather than quietly serving
+the development database to the public as the real shop. The first accidental
+deployment of this project did exactly that and failed exactly that way, which is
+the behaviour working.
+
+A stable alias rather than a per-deployment URL because the URL is written into
+`NEXT_PUBLIC_SITE_URL`, into Supabase's redirect allow-list, and into anything
+Ibrahim opens on his phone. A URL that changes on every deployment cannot be any
+of those.
+
+Alternatives:
+Deploy staging to Production and rely on `APP_ENV` alone to keep it out of
+Google. Rejected: it spends the one environment that should stay pristine until
+there is a real shop, and it removes the empty-production tripwire.
+
+Impact:
+Free tier throughout, no billing attached. The two Supabase keys were moved from
+the Supabase CLI into Vercel through a pipe, so neither value was displayed,
+logged or written to disk.
+
+---
+
+## 2026-09-11 — The key names are historical; the keys are not
+
+Decision:
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` now carries the **publishable** key
+(`sb_publishable_…`) and `SUPABASE_SERVICE_ROLE_KEY` carries the **secret** key
+(`sb_secret_…`). The variable names were not changed.
+
+Reason:
+The development project's legacy JWT keys are disabled — a tidy-up Ibrahim was
+asked to do in Build 06 and did. The first staging deployment used the legacy
+anon key, compiled cleanly, and then failed with "Could not read the shelf:
+Legacy API keys are disabled". The error is precise; the variable name is what
+misleads.
+
+Renaming the variables would touch every environment, every document and
+`.env.example` at once for no functional gain, and would itself be a migration
+with a window in which half the places say one thing. A table in
+`docs/STAGING.md` §3 costs nothing and stops the next person guessing.
+
+Impact:
+Worth knowing before creating the production project: it will be issued
+new-format keys only, so there is no legacy variant to get wrong there.

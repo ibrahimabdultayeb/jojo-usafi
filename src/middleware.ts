@@ -67,14 +67,75 @@ export async function middleware(request: NextRequest) {
   // that could drift from the first. Its job is to send a stranger somewhere
   // useful instead of showing them an empty dashboard.
   const path = request.nextUrl.pathname;
+
+  /**
+   * The routes a person must reach WITHOUT a session, because reaching them is
+   * how they get one.
+   *
+   * The last three are Build 11's and each would be broken by the redirect
+   * below in a different way:
+   *
+   *   forgot-password  the person cannot sign in — that is why they are here
+   *   auth/callback    carries the one-time code; a redirect spends it for
+   *                    nothing and the link cannot be used twice
+   *   set-password     an invitation link delivers its tokens in the URL
+   *                    FRAGMENT, which never reaches a server. Redirecting
+   *                    loses it silently, and the person is bounced to a
+   *                    sign-in form for an account with no password yet
+   */
   const isPublicAdminRoute =
-    path.startsWith("/admin/sign-in") || path.startsWith("/admin/setup");
+    path.startsWith("/admin/sign-in") ||
+    path.startsWith("/admin/setup") ||
+    path.startsWith("/admin/forgot-password") ||
+    path.startsWith("/admin/auth/") ||
+    path.startsWith("/admin/set-password");
 
   if (!user && !isPublicAdminRoute) {
     const signIn = request.nextUrl.clone();
     signIn.pathname = "/admin/sign-in";
     signIn.search = `?next=${encodeURIComponent(path)}`;
     return NextResponse.redirect(signIn);
+  }
+
+  /*
+   * SIGNED IN IS NOT THE SAME AS STAFF, and until Build 11 this file treated
+   * them as if they were.
+   *
+   * A Supabase account that has never been added to the shop reached `/admin`
+   * and was shown the dashboard frame: the greeting, the navigation, the search
+   * box, and the counts that come from the public shelf. Row Level Security
+   * held — every order, customer and staff row came back empty — so it was not
+   * a data breach. It was worse in a quieter way: the application told somebody
+   * they were in the back office when they were not, and the sign-in screen's
+   * carefully written "No access" panel was never reached, because signing in
+   * redirects to `/admin` and nothing sent them back.
+   *
+   * So the check happens here, where "is anybody signed in" already happens.
+   * It costs one query on admin routes only, and `admin_profiles_self_read` is
+   * what makes it answerable: a person may always read the row that says who
+   * they are, including the row that says they have been switched off.
+   *
+   * THIS IS STILL NOT THE AUTHORIZATION BOUNDARY. It decides who is shown a
+   * dashboard, not what that dashboard may read — Row Level Security decides
+   * that, per query, and `authorize()` re-checks every write. What this stops
+   * is a stranger being handed the furniture.
+   */
+  if (user && !isPublicAdminRoute) {
+    const { data: profile } = await supabase
+      .from("admin_profiles")
+      .select("active")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+
+    if (!profile?.active) {
+      const signIn = request.nextUrl.clone();
+      signIn.pathname = "/admin/sign-in";
+      // No `next`: sending them back to a page they may not have is a loop
+      // dressed up as helpfulness. The sign-in screen explains which of the two
+      // situations this is — not staff at all, or switched off.
+      signIn.search = "";
+      return NextResponse.redirect(signIn);
+    }
   }
 
   return response;

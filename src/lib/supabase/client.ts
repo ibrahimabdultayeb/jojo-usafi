@@ -6,8 +6,15 @@
  * key, which is public by design; Row Level Security is what decides what that
  * key can actually see.
  *
- * NOT USED YET. No Supabase project exists; the storefront still reads the
- * committed catalogue artifact through `src/lib/catalogue/queries.ts`.
+ * IN USE BY ONE SCREEN, AND FOR A SPECIFIC REASON. `/admin/set-password`
+ * needs it, because an invitation link delivers its session in the URL
+ * **fragment** — which is never sent to a server, so no server component or
+ * action can ever see it. `createBrowserClient` reads that fragment and writes
+ * the session to cookies, which is what lets the rest of the dashboard, all of
+ * which reads on the server, work afterwards.
+ *
+ * Everywhere else still signs in through a server action, so the access token
+ * is never handed to JavaScript running in the page.
  */
 
 "use client";

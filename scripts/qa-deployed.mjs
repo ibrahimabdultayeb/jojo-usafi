@@ -146,6 +146,45 @@ for (const path of ["/admin", "/admin/orders", "/admin/products", "/admin/more/s
   }
 }
 
+/* --------------------------- 4b. the way IN is not shut by accident */
+
+head("SOMEBODY WITH NO PASSWORD CAN STILL GET ONE");
+
+/*
+ * The mirror image of the block above, and just as important. These three
+ * routes must be reachable WITHOUT a session, because reaching them is how a
+ * person gets one. They sit behind the same middleware that guards the rest of
+ * /admin, so an allow-list that is right locally and wrong on a deployment
+ * locks every invited staff member out with no way back.
+ */
+for (const path of ["/admin/forgot-password", "/admin/set-password"]) {
+  const response = await get(path, { redirect: "manual" });
+  if (response.status === 200) ok(`${path} → 200 without signing in`);
+  else bad(`${path} → ${response.status}`, `location: ${response.headers.get("location") ?? "none"}`);
+}
+
+const callback = await get("/admin/auth/callback", { redirect: "manual" });
+const callbackTo = callback.headers.get("location") ?? "";
+if (callback.status >= 300 && callback.status < 400 && callbackTo.includes("/admin/set-password")) {
+  ok("/admin/auth/callback forwards to set-password, fragment and all");
+} else {
+  bad(`/admin/auth/callback → ${callback.status}`, `location: ${callbackTo || "none"}`);
+}
+
+const badCode = await get("/admin/auth/callback?code=not-a-real-code", { redirect: "manual" });
+const badTo = badCode.headers.get("location") ?? "";
+if (badTo.includes("/admin/forgot-password")) {
+  ok("a bad code is refused and sent somewhere useful");
+} else {
+  bad("a bad code was not refused", `location: ${badTo || "none"}`);
+}
+
+if (/Set or reset your password/.test(String((await get("/admin/sign-in")).body))) {
+  ok("the sign-in screen offers a way to set a password");
+} else {
+  bad("the sign-in screen has no way to set a password");
+}
+
 /* ------------------------------------- 5. the machine endpoints are shut */
 
 head("THE JOB ENDPOINTS REFUSE A STRANGER");

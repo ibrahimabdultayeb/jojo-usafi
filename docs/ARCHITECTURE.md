@@ -338,6 +338,30 @@ supabase/                     config, migrations, seed
 scripts/                      catalogue build, i18n parity check, schema check, QA gate
 ```
 
+## Signing in, and getting a password (Build 11)
+
+```
+/admin/sign-in           email + password, through a server action
+/admin/forgot-password   asks Supabase to email a link
+/admin/auth/callback     ?code= and ?token_hash=  → server side
+/admin/set-password      #access_token=…          → browser side, by necessity
+```
+
+The split is forced by how Supabase delivers a link. An admin-generated
+invitation puts the session in the URL **fragment**, which is never transmitted
+to a server, so only the browser can read it — and `@supabase/ssr`'s PKCE client
+will not do it unprompted, because PKCE detection looks for `?code=` and ignores
+hash tokens. The fragment is therefore parsed by hand.
+
+All four are in the middleware's public allow-list, because reaching them is how
+somebody with no password gets one.
+
+**The middleware also checks staff, not just sign-in.** A Supabase account that
+had never been added to the shop used to reach the dashboard frame; RLS kept
+every row empty, but the application was still telling a stranger they were in
+the back office. It now asks for an active `admin_profiles` row and sends anybody
+else to the sign-in screen, which explains both cases.
+
 ## Deployment (Build 11)
 
 Full detail in [`STAGING.md`](./STAGING.md). The shape:
@@ -345,9 +369,15 @@ Full detail in [`STAGING.md`](./STAGING.md). The shape:
 ```
 GitHub  ibrahimabdultayeb/jojo-usafi
    ↓
-Vercel  staging  →  Supabase  Jojo Usafi Dev (dyjhacbbedytcstxxjzl)
-        production  →  a separate Supabase project, NOT created
+Vercel  ecoplus/jojo-usafi
+          Preview      →  Supabase  Jojo Usafi Dev (dyjhacbbedytcstxxjzl)
+                          https://jojo-usafi-staging.vercel.app
+          Production   →  no variables set, deliberately
 ```
+
+Production is left empty so that a deployment reaching it fails its build with
+the name of the missing variable, rather than quietly serving the development
+database to the public as the real shop.
 
 **Staging is the production build against the development database.** That is
 what makes it worth having: the remaining class of defect this project cannot

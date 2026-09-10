@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { authorize } from "./authorize";
 import { getServiceRoleSupabase } from "@/lib/supabase/admin";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { site } from "@/lib/site";
 import type { Role } from "./permissions";
 import type { BusinessSettings, ReservationSettings, WebsiteContent } from "./settings";
 
@@ -37,10 +38,13 @@ const ROLE_LABEL: Record<Role, string> = {
  * Invite somebody.
  *
  * Supabase sends the email and owns the credential; nothing here ever sees or
- * sets a password, and none is displayed. If email is not configured on the
- * project the invitation still creates the staff record, and the report says
- * plainly that the person cannot sign in yet — a half-done job described
- * accurately beats a whole one claimed falsely.
+ * sets a password, and none is displayed. The link comes back to
+ * `/admin/set-password`, which is the screen that finishes the job.
+ *
+ * If email is not configured on the project the invitation still creates the
+ * staff record, and the report says so — the person can then ask for their own
+ * link from the sign-in screen, which reaches exactly the same place. A
+ * half-done job described accurately beats a whole one claimed falsely.
  */
 export async function inviteStaffAction(
   name: string,
@@ -84,6 +88,10 @@ export async function inviteStaffAction(
 
   const invited = await db.auth.admin.inviteUserByEmail(cleanEmail, {
     data: { invited_as: role, invited_by: auth.staff.name },
+    // Where the link in the email comes back to. Without it Supabase uses the
+    // project's Site URL, which is whatever was configured last — and on a
+    // deployment that is usually still somebody's laptop.
+    redirectTo: `${site.url}/admin/set-password`,
   });
 
   if (invited.data?.user) {
@@ -114,19 +122,17 @@ export async function inviteStaffAction(
 
   revalidatePath("/admin/more/staff");
 
-  // WHAT THIS SAYS IS WHAT ACTUALLY HAPPENS.
+  // Both halves of this are true, and they are different situations.
   //
-  // The invitation email carries a link back to this website, and nothing here
-  // answers that link yet: there is no screen for setting a password and no
-  // "Forgot password" on the sign-in form. Build 10 promised both, which was
-  // wrong — a message pointing at a control that does not exist sends somebody
-  // looking for it. Until that screen exists, the person is added and cannot
-  // sign in on their own, and the Owner needs to know that now rather than
-  // discover it when the new staff member cannot get in.
+  // The email went: the person follows the link and chooses a password. The
+  // email did not go — most often because this Supabase project has no email
+  // sender configured — and the account still exists, so they can ask for a
+  // link themselves from the sign-in screen. Saying which happened is the
+  // difference between the Owner waiting and the Owner making a phone call.
   return done(
-    `${cleanName} has been added as ${ROLE_LABEL[role]}.${
-      emailed ? " An invitation email has been sent." : ""
-    } They cannot set a password yet — that screen is still to be built, so tell them to wait.`,
+    emailed
+      ? `${cleanName} has been invited as ${ROLE_LABEL[role]}. They will get an email with a link to choose a password.`
+      : `${cleanName} has been added as ${ROLE_LABEL[role]}, but no email could be sent. Ask them to open the sign-in page and use "Set or reset your password".`,
   );
 }
 

@@ -123,9 +123,9 @@ export function StaffManager({
 
       <p className="flex items-start gap-2 rounded-xl bg-slate-100 p-3 text-xs font-medium text-slate-600">
         <Icon name="shield" className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-        Nobody can sign up on their own — an account exists only because you added it, and no
-        password is ever shown here. Setting one is not built yet: somebody you add today cannot
-        sign in until that screen exists.
+        Nobody can sign up on their own — an account exists only because you added it. Each
+        person chooses their own password through a link sent to their email, and no password is
+        ever shown here or known to you.
       </p>
 
       <InviteSheet

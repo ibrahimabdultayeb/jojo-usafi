@@ -62,3 +62,12 @@ tests/db/.run/
 
 # Development QA staff record — machine-generated, holds no passwords, never committed
 .qa-staff.local.json
+
+# Vercel CLI — the project link, and any environment file it pulls down.
+#
+# `vercel link` appends a bare `.env*` here. That is too broad: it also matches
+# `.env.example`, which is tracked on purpose and is the only record of which
+# variables this application needs. The named secret files are already listed
+# above; these two cover what the CLI itself creates.
+.vercel
+.env*.tmp

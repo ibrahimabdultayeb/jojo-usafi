@@ -14,6 +14,7 @@ npm run catalogue:check  # committed catalogue still matches imports/
 npm run build            # production build
 npm run qa:screenshots   # needs a running server (npm run start)
 npm run qa:deployed      # only meaningful against a real deployment — see below
+npm run verify:password-link  # drives a real emailed link through a real browser
 npm run verify:cache     # a price saved in the editor reaches the shop immediately
 ```
 
@@ -21,7 +22,7 @@ and, since Build 06, the half that needs a real database:
 
 ```bash
 npm run db:types:check   # the generated types still match the live schema
-npm run test:db          # 255 tests against PostgreSQL, Supabase Auth and Storage
+npm run test:db          # 260 tests against PostgreSQL, Supabase Auth and Storage
 ```
 
 The two halves are deliberately separate. `npm run test` must keep working on a laptop with
@@ -81,7 +82,7 @@ types disagreeing with the live schema.
 
 ## Database, Auth, RLS and Storage tests
 
-`npm run test:db` — 255 tests against the hosted development project. Twelve files, run in
+`npm run test:db` — 260 tests against the hosted development project. Thirteen files, run in
 name order by a custom sequencer, sharing one database with `fileParallelism` off. (Two more
 files exist and are skipped by default; they open the real spreadsheet — see below.)
 
@@ -98,6 +99,7 @@ files exist and are skipped by default; they open the real spreadsheet — see b
 | `10-sheet-sync.test.ts` | 22 | the catalogue sync against the real database and an in-memory spreadsheet: both directions applied, a `STOCK QTY` of 999,999 moving nothing and writing no ledger row, conflicts recorded and not re-raised, a deleted sheet row leaving the product alone, a second run writing nothing, Google being down leaving checkout working, and orders, ledgers and staff rows untouched |
 | `13-operations.test.ts` | 25 | Build 10's three operations: a Sheet row becomes a draft nobody can reach, with zero stock, and is refused outright for a duplicate SKU, an implausible price or a brand, category or family that does not resolve; an order amended before dispatch moves the reservation both ways, re-prices from the catalogue, refuses to oversell, demands a reason and is refused once out for delivery; two amendments race for the last unit and exactly one wins; expiry does nothing while unconfigured and releases exactly once when it is |
 | `14-website-and-safety.test.ts` | 15 | the shop's settings row: readable by a shopper because the storefront is built from it, writable by nobody but the Owner — not a Manager, not Order staff, not a browser; a phone without its country code and a hero button pointing off-site are refused by CHECK constraints; and the seat itself — Order staff and Managers cannot promote themselves, Order staff cannot switch a colleague off, and somebody who has been switched off can still read the row that says so and can do nothing else. The whole `shop_settings` row is snapshotted before and restored afterwards, and the restore is asserted |
+| `15-password-links.test.ts` | 5 | the links Supabase actually mints: an invitation verifies to a real session and **cannot be used twice**; a recovery link's session sets a password that then really signs in; a token one character wrong is refused; and asking for a link says nothing about whether the address has an account. No email is sent — `generateLink` returns the same token the email would carry |
 | `09-admin-operations.test.ts` | 24 | the dashboard's operations run as the people who use them: Order staff refused pricing, stock, zones and self-promotion; Manager allowed all four but refused Owner and refused to rewrite what an order sold for; stock moved only through the ledger, with an actor and a reason; the whole staff journey to Completed with cash and with a digital reference; cancellation and both delivery-failure answers; what each screen can read |
 
 ### The real spreadsheet is never opened by the gate
@@ -281,6 +283,27 @@ check in this repository is bypassed.
 `QA_ONLY=admin npm run qa:screenshots` runs only the admin passes — about four minutes
 rather than twenty-five, which is what makes re-checking a dialog cheap enough to actually
 do.
+
+## The password-link gate
+
+`npm run verify:password-link` — needs a running server, and takes `BASE_URL`.
+
+It exists because `15-password-links.test.ts` proves Supabase's half and touches
+no browser, **and the browser is where this flow was broken**. An invitation
+delivers its session in the URL fragment, which never reaches a server, so every
+server-side test can pass while a real person lands on a page that does nothing.
+
+So it drives the whole journey: create a throwaway account, add it to the shop as
+Order staff, mint a real link, open it as a person would, find a form rather than
+a redirect, choose a password, reach the dashboard, sign out, sign in again with
+that password — and then switch the staff record off and confirm the same account
+is shut out and told why. Everything it created is deleted by exact id, including
+when it fails.
+
+Two false positives were found writing it, both worth remembering: waiting on
+`networkidle` after submitting a form catches the button still saying
+"Signing in…" and reads as a pass; and waiting for the URL to become `/admin`
+resolves instantly when you are already on `/admin/set-password`.
 
 ## The deployed gate
 

@@ -11,7 +11,9 @@
  * separate files on purpose: reaching for the powerful one has to be a
  * deliberate act with a different import.
  *
- * NOT USED YET. No Supabase project exists.
+ * This is the client almost everything uses: every admin screen, the
+ * storefront's session-dependent reads, the sign-in action and the email-link
+ * callback.
  */
 
 import "server-only";

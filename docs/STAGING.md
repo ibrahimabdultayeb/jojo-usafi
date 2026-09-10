@@ -55,10 +55,10 @@ These names are read from the source, not invented — `grep -r "process.env"`.
 | Variable | Scope | Secret | What it is |
 | --- | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Preview + Production | no | the project's API URL; reaches the browser by design |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Preview + Production | no | the public key; RLS is what protects the data, not this |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Preview + Production | no | the **publishable** key (`sb_publishable_…`); RLS is what protects the data, not this |
 | `NEXT_PUBLIC_SITE_URL` | Preview + Production | no | absolute base for canonical and `hreflang` URLs — **the deployment's own URL** |
 | `APP_ENV` | Preview + Production | no | `staging` on staging. Only `production` disables the noindex |
-| `SUPABASE_SERVICE_ROLE_KEY` | Preview + Production | **yes** | server-only; bypasses RLS entirely |
+| `SUPABASE_SERVICE_ROLE_KEY` | Preview + Production | **yes** | the **secret** key (`sb_secret_…`); server-only, bypasses RLS entirely |
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Preview + Production | no, but not public | which service account the Sheet is shared with |
 | `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | Preview + Production | **yes** | the PEM. Never printed, never logged, never in a bundle |
 | `GOOGLE_SHEETS_SPREADSHEET_ID` | Preview + Production | no, but not public | the one approved spreadsheet |
@@ -69,6 +69,24 @@ These names are read from the source, not invented — `grep -r "process.env"`.
 **Nothing server-side may ever be given a `NEXT_PUBLIC_` name.** That prefix is
 an instruction to Next.js to inline the value into the JavaScript bundle. The
 deployed check in §5 looks for exactly that mistake.
+
+### The key names are historical — the keys are not
+
+The two variable names say `ANON_KEY` and `SERVICE_ROLE_KEY` because that is what
+they were called when this project started. **The development project's legacy
+JWT keys have since been disabled**, on purpose, and the values these variables
+must now carry are the new-format ones:
+
+| Variable | Value it must hold | Supabase calls it |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `sb_publishable_…` | publishable |
+| `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_…` | secret |
+
+Putting a legacy key in either one produces a build that compiles and then fails
+with **"Could not read the shelf: Legacy API keys are disabled"** — which is
+exactly what the first staging deployment did. The variables were not renamed
+because renaming them touches every environment at once for no functional gain;
+this table is the note that stops the next person guessing.
 
 ### They are needed at BUILD time, not only at runtime
 
@@ -110,26 +128,41 @@ not typed into a terminal, not passed as CLI flags, and never sent to Claude.
 `signInWithPassword`, which is a direct API call with no redirect, so it works
 from any origin the moment the two `NEXT_PUBLIC_SUPABASE_*` variables are set.
 
-**Invitations and password resets are a different matter, and are not finished.**
-`inviteUserByEmail` sends a link back to the project's **Site URL**, and this
-application has no route that answers such a link — there is no
-`/auth/callback`, no set-password screen and no "Forgot password" on the sign-in
-form. So an invited person receives an email, follows it, lands on the
-storefront homepage and nothing happens.
+**Invitations and password resets are built, as of Build 11.** Three routes, and
+each exists because a link can arrive in more than one shape:
 
-That is recorded as a launch blocker in §8 rather than papered over, and the
-messages in the dashboard were corrected in Build 11 to say so: Build 10 told
-the Owner to send people to "Forgot password", a control that does not exist.
+| Route | Handles |
+| --- | --- |
+| `/admin/forgot-password` | asks Supabase to email a link. One screen for "I forgot mine" and "I never had one", because those are our words for the same need |
+| `/admin/auth/callback` | the `?code=` shape (PKCE, when the flow started in this browser) and the `?token_hash=&type=` shape. Anything else it forwards, because the tokens may be in a fragment it cannot see |
+| `/admin/set-password` | the **fragment** shape, read in the browser, which is the only place it exists |
 
-When that screen is built, the Supabase configuration it needs is:
+That last one is the subtle half. Supabase delivers an admin-generated link's
+session as `#access_token=…`, a fragment is never transmitted to a server, and
+`@supabase/ssr` builds its browser client with `flowType: "pkce"` — whose own URL
+detection looks for `?code=` and **ignores hash tokens entirely**. So the
+fragment is parsed by hand and handed to `setSession`. Every server-side test
+passed while a real person still landed on a page that said their link was
+broken; it took driving a real browser to find.
+
+All three are in the middleware's public allow-list, because reaching them is how
+somebody with no password gets one. `npm run qa:deployed` asserts that on the
+deployment, since an allow-list that is right locally and wrong in production
+locks out every invited staff member with no way back.
+
+### What Supabase needs configuring
 
 - **Authentication → URL Configuration → Site URL**: the staging URL
-- **Redirect URLs**: only the exact callback path on the staging origin, e.g.
-  `https://<staging-host>/admin/set-password`
+- **Redirect URLs**, these two exact paths and no wildcard:
+  - `https://<staging-host>/admin/set-password`
+  - `https://<staging-host>/admin/auth/callback`
 
 A wildcard such as `https://*.vercel.app/**` would let any deployment on the
-whole of Vercel receive a token minted for this project. Add the exact hosts
-that need it, one line each.
+whole of Vercel receive a token minted for this project. Add the exact hosts that
+need it, one line each.
+
+Until it is set, a link emailed from the deployed site points at whatever the
+Site URL currently says — which is still somebody's laptop.
 
 ## 5. Proving a deployment
 
@@ -298,10 +331,10 @@ timing is confirmed with the order.*
 
 ### Needs building — engineering
 
-1. **Setting a password.** An invited staff member cannot sign in. Needs a
-   callback route, a set-password screen, "Forgot password" on the sign-in form,
-   and the Supabase redirect configuration in §4. **This blocks every staff
-   account except Ibrahim's own.**
+1. ~~**Setting a password.**~~ **Done in Build 11.** An invited staff member can
+   now choose a password and sign in, proved end to end in a real browser by
+   `npm run verify:password-link`. It still needs the Supabase redirect
+   configuration in §4 before it works on the deployment.
 2. **Uploading a logo and product photographs** from the dashboard
 3. **A sitemap**, with the production domain
 4. **A Content-Security-Policy**, measured
@@ -317,23 +350,76 @@ commit, and the outcome of both gates against it.*
 
 | | |
 | --- | --- |
-| Vercel project | not created yet — needs `vercel login` (§10) |
-| Staging URL | — |
-| Commit deployed | — |
-| `qa:deployed` | rehearsed locally: 32 checks, 0 failures |
-| `qa:screenshots` against the URL | — |
+| Vercel project | `ecoplus/jojo-usafi`, created 2026-09-11, GitHub connected |
+| Staging URL | **https://jojo-usafi-staging.vercel.app** (a stable alias onto the latest preview deployment) |
+| Vercel environment | **Preview**. Production is deliberately left with no variables at all, so an accidental production deploy fails the build loudly instead of quietly serving the development database as the real shop |
+| Build | **succeeds** — 217 static pages, 95 product pages per language, read from the real catalogue at build time |
+| `qa:deployed` | **blocked** — see §11 |
+| `qa:screenshots` against the URL | **blocked** — see §11 |
+
+### Variables set so far
+
+`NEXT_PUBLIC_SUPABASE_URL` · `NEXT_PUBLIC_SUPABASE_ANON_KEY` ·
+`NEXT_PUBLIC_SITE_URL` · `APP_ENV=staging` · `SUPABASE_SERVICE_ROLE_KEY` ·
+`GOOGLE_SHEETS_SPREADSHEET_ID` · `GOOGLE_SHEETS_TAB`
+
+The two Supabase keys were moved directly from the Supabase CLI into Vercel
+through a pipe, so neither value was ever displayed, logged or written to disk.
+The spreadsheet id and tab were already committed in this repository.
+
+**Still unset, and each has a consequence:**
+
+| Variable | What does not work without it |
+| --- | --- |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | the Catalogue Sync screen reports Google as not configured |
+| `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | the same — no sync in either direction |
+| `SHEET_SYNC_WEBHOOK_SECRET` | `/api/sync/catalogue` refuses every request, which is the correct closed state until something is scheduled |
+| `RESERVATION_EXPIRY_JOB_SECRET` | `/api/jobs/expire-reservations` likewise |
+
+The two Google values exist only in Ibrahim's `.env.local` and cannot be read
+from here. The two job secrets are deliberately left unset: nothing schedules
+either endpoint, and an endpoint with no secret is shut.
+
+## 11. What is blocking the deployed verification
+
+**Vercel Deployment Protection.** Every route on the staging URL answers with a
+302 to `vercel.com/sso-api`, including the storefront. The application is fine —
+the build succeeded and prerendered the whole catalogue — but nothing is reachable
+without a Vercel login, so neither gate can run and no customer flow can be
+tested.
+
+This is Vercel's default for preview deployments on a team, and as a posture for
+an unfinished shop full of development data it is a reasonable one. There are two
+ways forward and they are a genuine choice:
+
+**Either — make staging publicly reachable.** Project Settings → Deployment
+Protection → turn **Vercel Authentication** off for Preview. Staging is then a
+public HTTPS site, protected from search engines by the three mechanisms in §2 but
+readable by anybody with the link. This is what "prove the full system from the
+public HTTPS deployment" assumes, and it is the only way Ibrahim can open the site
+on a phone that is not logged into Vercel, or show it to anybody else.
+
+**Or — keep it private and let automation through.** Project Settings →
+Deployment Protection → **Protection Bypass for Automation** → generate a secret.
+Both gates then send it as `x-vercel-protection-bypass`. Staging stays invisible
+to everybody without a Vercel account, and the automated checks still run.
+
+Nothing else in this build can proceed until one of the two is chosen.
 
 ## 10. What only Ibrahim can do
 
-The Vercel CLI on this machine is **logged out**, and logging in requires a
-browser and an account choice. Nothing about the deployment can proceed without
-it.
+1. **Choose one of the two options in §11** — deployment protection off, or a
+   bypass secret for automation.
+2. **Add the two Google variables** to the Preview environment, from his own
+   `.env.local`: `GOOGLE_SERVICE_ACCOUNT_EMAIL` and
+   `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`. Vercel's environment screen accepts a
+   pasted `.env` block. They are never sent to Claude.
+3. **Supabase Auth → URL Configuration**, once the staging URL is settled:
+   - **Site URL**: `https://jojo-usafi-staging.vercel.app`
+   - **Redirect URLs**: add `https://jojo-usafi-staging.vercel.app/admin/set-password`
+     and `https://jojo-usafi-staging.vercel.app/admin/auth/callback` — those two
+     exact paths, not a wildcard. A wildcard such as `https://*.vercel.app/**`
+     would let any deployment on Vercel receive a token minted for this project.
 
-```bash
-vercel login
-```
-
-Then either connect `ibrahimabdultayeb/jojo-usafi` from the Vercel dashboard, or
-say so and the rest — linking, the non-secret variables, the deployment and both
-gates — is done from here. The secret values are pasted by Ibrahim into the
-Vercel dashboard and are never sent to Claude.
+   Until this is done, an invitation or reset email sent from the deployed site
+   still carries a link back to `http://localhost:3000`.

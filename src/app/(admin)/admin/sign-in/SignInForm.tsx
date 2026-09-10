@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
+import Link from "next/link";
 import { signInAction, type SignInState } from "./actions";
 
 /**
@@ -77,6 +78,18 @@ export function SignInForm() {
       </div>
 
       <SubmitButton />
+
+      {/*
+        Below the button, not beside the password field. Somebody who knows
+        their password should reach the button first; somebody who does not
+        will look past it. It says "Set" rather than "Reset" because a person
+        who has just been added to the shop never had one to reset.
+      */}
+      <p className="pt-1 text-center text-sm text-slate-500">
+        <Link href="/admin/forgot-password" className="font-bold text-slate-700 underline">
+          Set or reset your password
+        </Link>
+      </p>
     </form>
   );
 }

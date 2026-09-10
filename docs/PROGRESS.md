@@ -1776,6 +1776,81 @@ Then the linking, the non-secret variables, the deployment and both gates are
 done from here. The secret values are pasted by Ibrahim into the Vercel dashboard
 and never sent to Claude.
 
+## Build 11 continued — the deployment exists — 2026-09-11
+
+Vercel authentication done from a normal terminal, so the rest followed.
+
+### Staff can finally get in
+
+An invited staff member could not sign in at all: `inviteUserByEmail` sends a
+link back to the site's own URL and nothing answered one. Three routes now do —
+`/admin/forgot-password`, `/admin/auth/callback`, `/admin/set-password` — and all
+three are in the middleware's public allow-list, because reaching them is how
+somebody with no password gets one.
+
+The subtle half is the fragment. Supabase delivers an admin-generated link's
+session as `#access_token=…`, which is never transmitted to a server, and
+`@supabase/ssr`'s PKCE client ignores hash tokens because PKCE detection looks
+for `?code=`. So it is parsed by hand. **Every server-side test passed while a
+real person still landed on a page saying their link was broken** — it took
+driving a browser to find, which is now `npm run verify:password-link`.
+
+### And a stranger no longer gets the furniture
+
+Found in the same browser run: a Supabase account that had never been added to
+the shop reached `/admin` and was shown the dashboard frame — greeting,
+navigation, search box, shelf counts. Row Level Security held, so every order,
+customer and staff row came back empty and no data leaked. But the application
+was telling somebody they were in the back office when they were not, and the
+sign-in screen's "No access" panel was unreachable because signing in redirects
+to `/admin` and nothing sent them back.
+
+The middleware now asks for an **active staff profile**, not just a session.
+
+### The deployment
+
+| | |
+| --- | --- |
+| Project | `ecoplus/jojo-usafi`, created today, GitHub connected |
+| Staging | **https://jojo-usafi-staging.vercel.app** |
+| Environment | **Preview**. Production deliberately has no variables |
+| Build | 217 static pages, 95 products per language, read from the real catalogue |
+| Cost | free tier, no billing attached |
+
+Two things worth recording from getting there.
+
+**Production being empty is a tripwire, not an omission.** The first deployment
+went to Production by accident and failed its build naming the missing variable —
+which is the behaviour working. A deployment that reached Production and
+*succeeded* would be the development database served to the public as the real
+shop.
+
+**The key names lie and the keys do not.** The development project's legacy JWT
+keys are disabled, so `NEXT_PUBLIC_SUPABASE_ANON_KEY` must carry the
+`sb_publishable_…` key and `SUPABASE_SERVICE_ROLE_KEY` the `sb_secret_…` one.
+Using the legacy anon key compiles cleanly and then fails with "Legacy API keys
+are disabled". Both were moved from the Supabase CLI into Vercel through a pipe,
+so neither value was displayed, logged or written to disk.
+
+### Where it stopped
+
+**Vercel Deployment Protection.** Every route on the staging URL answers 302 to
+`vercel.com/sso-api`, storefront included. The application is fine — the build
+prerendered the whole catalogue — but nothing is reachable without a Vercel
+login, so neither gate can run and no customer flow can be tested. Two ways
+forward, and it is a real choice: make staging public, or generate a Protection
+Bypass secret so automation can reach it while it stays private.
+`docs/STAGING.md` §11 has both.
+
+### Gates
+
+```
+typecheck · lint · test 203 · schema · i18n · catalogue · db:types · build
+test:db                 260 passing, 3 skipped
+qa:deployed             37 checks against the local production build
+verify:password-link    the whole journey, in a real browser
+```
+
 ## Next
 
 - Confirm the open business rules (delivery fee, served areas, retail prices). A global
