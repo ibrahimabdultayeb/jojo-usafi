@@ -1596,6 +1596,105 @@ changes nothing still writes 201 cells. It is correct and harmless — the colum
 cannot feed the comparison — but it is noise in the sheet's revision history and
 work nobody needs. Worth narrowing to rows that actually changed, in a later build.
 
+## Build 10 — operational completeness — 2026-09-10
+
+The build that closes the gaps between "the shop works" and "the shop could open".
+Three migrations, four new screens' worth of real data, two new operations in the
+database, and the end of `src/mocks/`.
+
+### What was built
+
+**Order amendment before dispatch.** Staff can change what is in an order while it
+is still in the shop: quantities up or down, a line removed, another product added.
+The screen sends the FULL final list and the database works out the difference —
+never a delta, because two people amending from two phones would each compute a
+delta from a different starting point and both would apply. `jojo_amend_order` locks
+every product either side mentions, in id order, checks each increase against real
+availability before anything moves, re-prices the order from the catalogue and
+writes the movements to the ledger. Two amendments racing for the last unit: exactly
+one wins, and the other is told how many are left. After `out_for_delivery` the
+control is gone and the screen says why.
+
+**New products from the Google Sheet.** A row the shop has never seen becomes an
+internal draft — `lifecycle = draft`, not visible, an inventory row at zero —
+whatever the sheet says about status or stock. Brand, category, family and supplier
+must resolve to exactly one existing row after normalising case and punctuation:
+zero matches or two matches both refuse the row rather than guess. A duplicate SKU,
+a price at or below zero, a price below TSh 1,000 and an offer price that is not
+lower are each refused with the shop's own sentence.
+
+**The Website, Settings and Staff screens, all real.** The last three screens
+reading invented data now read `shop_settings` and `admin_profiles`. `src/mocks/`
+was deleted; `src/` holds only `app`, `components`, `lib`, `views`, `types` and the
+middleware.
+
+**The words on the website reach the website.** Announcement, hero, promotion band
+and eight section switches, per language, read by the storefront through one cached
+function. Every text field is an override: clearing it restores the copy the site
+was designed with, in the right language. Turning something off is always a switch,
+which is why migration 0022 gives the announcement strip one of its own.
+
+**And the shop's own details reach the shop.** The storefront read
+`255700000000` from `src/lib/site.ts` in six places. It now reads
+`shop_settings` and falls back to that placeholder only while the value is
+unset — so the number Ibrahim types on the Settings screen is the number
+customers reach, everywhere, immediately. The old `whatsappLink()` helper was
+removed rather than repointed: a helper that silently reads a placeholder looks
+correct in review and is wrong in production.
+
+**Owner safety.** The Staff screen draws no controls at all on the last active Owner
+or on your own account — the database refuses both regardless, and offering a button
+that will be refused is a trap rather than a rule. An Owner is never created by
+invitation. No password is ever seen or shown: Supabase sends the invitation and
+owns the credential.
+
+**Reservation expiry, configurable and unscheduled.** Two durations in
+`shop_settings`, both null, and null means nothing expires. `jojo_expire_reservations`
+cancels through the ordinary path so the release is written once. The protected
+endpoint exists; nothing calls it.
+
+### Two faults worth recording
+
+**The Owner could not save their own settings.** Migration 0018 wrote the Owner
+UPDATE policy on `shop_settings` and granted only SELECT. The grant decides the
+verb and the policy decides the row, and a missing grant refuses before any policy
+is consulted — so the screen would have failed for the one person allowed to use
+it. Fixed in 0021.
+
+**`42804`, again.** `jojo_amend_order` chose its movement kind with a `CASE` over
+string literals inside an `INSERT ... SELECT`, which PostgreSQL resolves as `text`
+before it meets the enum column. Exactly the trap migration 0017 hit. Fixed by
+hoisting the value into a typed variable — written down twice now because it is
+genuinely surprising: the same literal in `VALUES` coerces quite happily.
+
+### And one piece of noise, removed
+
+`SYSTEM LAST SYNCED` was written on every row of every run, because its value is
+`now` and therefore always differed from the sheet. A sync that changed nothing
+rewrote 201 cells, which buried real edits in Google's revision history. It is now
+stamped when the shop actually wrote to that row, or when a row has never carried
+one. A recheck afterwards reported **0 rows to write back**. The column is a report
+column — never read as input, never in a fingerprint, never in a base — so this
+cannot disturb the merge, which was the condition attached to touching it at all.
+
+### Where it stands
+
+- Migrations: **21 applied**, types regenerated and checked
+- `npm run test`: **203 passing**
+- `npm run test:db`: **255 passing**, 3 skipped (the two real-spreadsheet files)
+- Real Sheet: **201 data rows, 0 problems, 0 rows to write back**
+- The shop after every real-Sheet operation: 201 products, 95 on the shelf, 3 orders,
+  208 movements — byte for byte what it was before
+
+### One thing Ibrahim decides
+
+The Settings screen lists what is still missing before the shop can open, computed
+from what the database actually holds rather than from a checklist: the WhatsApp
+number, phone, email, address, logo, and how long an unconfirmed order may hold
+stock. Every one starts empty and says "Not set yet", because a plausible-looking
+placeholder phone number is worse than a visibly missing one — the missing one gets
+fixed before launch and the plausible one gets discovered by a customer.
+
 ## Next
 
 - Confirm the open business rules (delivery fee, served areas, retail prices). A global
@@ -1628,18 +1727,24 @@ work nobody needs. Worth narrowing to rows that actually changed, in a later bui
   2026-09-10.** Connected, read and checked; no sync run yet.
 - ~~**Ibrahim, the catalogue sync decision**~~ — **done, 2026-09-10.** Visibility intent and
   display order applied; the EP10-A02 description held for content review.
-- **Ibrahim, one small thing:** the held description for **EP10-A02 (Shower Gel Bubblegum)**
-  calls the product *Bubbles* and makes germ-killing claims. Confirm the wording and whether
-  those claims are safe to publish, and the next sync will carry it across.
-- **Build 10**, in this order:
-  1. **The first real sync** — 905 system-column cells, then a second dry run to review the
-     105 visibility edits the sheet is asking for
-  2. Creating products from the Sheet: brand, category and family resolution, and what happens
-     when they do not resolve
-  3. The **Website** screen wired to `shop_settings` — the last screen reading the mocks file
-  4. **Order amendment** before dispatch, and the **reservation-expiry scheduler** once
-     Ibrahim has set `reservation_warning_minutes` and `reservation_expiry_minutes`
-  5. **Staff management** for the Owner — invite, deactivate, change role
-  6. A **schedule** for the sync, once the deployment architecture is settled
+- ~~**Ibrahim, the EP10-A02 description**~~ — **done, 2026-09-10.** Replacement copy approved
+  and written to both sides. It remains the only product in the catalogue with a description.
+- ~~**Build 10:** operational completeness — order amendment, new products from the Sheet,
+  the Website / Settings / Staff screens on real data, Owner safety, reservation expiry~~ —
+  **done, 2026-09-10.**
+- **Ibrahim, before the shop opens** — all of it on **More → Settings**, which lists what is
+  still missing:
+  1. The real **WhatsApp number, phone, email and address**
+  2. The **logo** (the screen says where it will go; uploading arrives with the media screen)
+  3. **How long an unconfirmed order holds stock** — until this is set, nothing expires and
+     stock is released only by cancellation
+  4. The real **delivery areas and fees**, replacing the four development placeholders
+- **Build 11**, in whatever order Ibrahim wants them:
+  1. **Reports** — the last "Coming soon" screen, waiting on real orders to report on
+  2. **Media** — uploading and replacing a product photograph, and the logo
+  3. A **schedule** for the sync and for reservation expiry, once the deployment
+     architecture is settled. Both endpoints already exist and are protected.
+  4. **Kiswahili product content** — `product_content` is per-locale; the master has one
+     language
 
 Claude must update this file after meaningful milestones.

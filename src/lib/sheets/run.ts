@@ -6,6 +6,7 @@ import { GoogleUnavailable, googleSheetGateway, googleStatus, type SheetGateway 
 import { KNOWN_HEADERS, type CatalogueFields } from "./columns";
 import { toSnapshot, type SheetSnapshot } from "./rows";
 import { planSync, reportCells, sheetCellsFor, type DbProduct, type SyncPlan } from "./plan";
+import { createNewProducts } from "./create";
 
 /**
  * One synchronisation run, start to finish.
@@ -50,6 +51,12 @@ export interface RunOptions {
    * offered rather than quietly disappearing.
    */
   readonly applyFields?: readonly (keyof CatalogueFields)[];
+  /**
+   * Create products for SKUs the shop has never seen. Off by default: a new
+   * product is a catalogue decision, and a sync that quietly invents them is a
+   * sync nobody can review. Created products are always drafts, never public.
+   */
+  readonly createNew?: boolean;
 }
 
 export interface RunReport {
@@ -437,6 +444,46 @@ export async function runCatalogueSync(options: RunOptions): Promise<RunReport> 
       before: change.before,
       fingerprintValue: change.fingerprint,
     });
+  }
+
+  /* ---------------------------------------------------- new products */
+
+  let created = 0;
+  if (options.createNew && plan.newProducts.length > 0) {
+    const outcomes = await createNewProducts(db, plan.newProducts);
+
+    for (const outcome of outcomes) {
+      if (outcome.ok) {
+        created += 1;
+        await recordEvent(db, jobId, {
+          sku: outcome.sku,
+          row: plan.newProducts.find((p) => p.sku === outcome.sku)?.row ?? 1,
+          operation: "insert",
+          direction: "sheet_to_db",
+          status: "applied",
+          fields: { created: true, lifecycle: "draft", storefrontVisible: false },
+          fingerprintValue: fingerprint({ sku: outcome.sku, created: true }),
+        });
+      } else {
+        notes.push(`${outcome.sku}: ${outcome.problem}`);
+        await recordEvent(db, jobId, {
+          sku: outcome.sku,
+          row: plan.newProducts.find((p) => p.sku === outcome.sku)?.row ?? 1,
+          operation: "insert",
+          direction: "sheet_to_db",
+          status: "failed",
+          fields: {},
+          fingerprintValue: fingerprint({ sku: outcome.sku, blocked: true }),
+          errorMessage: outcome.problem,
+        });
+      }
+    }
+
+    if (created > 0) {
+      notes.push(
+        `${created} new product(s) added as drafts. Each needs an approved photograph before it can go on the website.`,
+      );
+    }
   }
 
   /* ------------------------------------------------ conflicts, recorded */

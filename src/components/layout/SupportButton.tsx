@@ -3,7 +3,8 @@
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { useCart } from "@/lib/cart";
 import { useLocale } from "@/lib/i18n/client";
-import { site, whatsappLink } from "@/lib/site";
+import { site } from "@/lib/site";
+import { useWhatsAppLink } from "@/lib/ContactContext";
 
 /**
  * WhatsApp is a SUPPORT channel, not the checkout. This button asks a question;
@@ -18,11 +19,12 @@ import { site, whatsappLink } from "@/lib/site";
 export function SupportButton() {
   const { count, hydrated } = useCart();
   const { t } = useLocale();
+  const href = useWhatsAppLink(t.support.message);
   const liftedByDock = hydrated && count > 0;
 
   return (
     <a
-      href={whatsappLink(t.support.message)}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
       data-qa="support-button"

@@ -33,6 +33,16 @@ export const site = {
   serviceArea: "selected Dar es Salaam areas",
 } as const;
 
-export function whatsappLink(message: string): string {
-  return `https://wa.me/${site.whatsappNumber}?text=${encodeURIComponent(message)}`;
-}
+/**
+ * The four contact values above are FALLBACKS, not the shop's details.
+ *
+ * Since Build 10 the real WhatsApp number, phone, email and address live in
+ * `shop_settings` and are entered by the Owner on More → Settings. Read them
+ * through `src/lib/contact.ts`, which falls back to the values above for as
+ * long as any of them is unset, and builds WhatsApp links with `whatsappHref`.
+ *
+ * The `whatsappLink()` that used to live here was removed rather than kept as a
+ * convenience: it read the placeholder unconditionally, so any component that
+ * called it would show `255700000000` to a customer for as long as nobody
+ * noticed. A missing export is noticed immediately.
+ */

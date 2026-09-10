@@ -104,6 +104,9 @@ src/lib/admin/orders.ts       the READS: orders, timeline, home snapshot, custom
 src/lib/admin/authorize.ts    the GATE: signed in? active staff? does the role allow it?
 src/lib/admin/actions.ts      the WRITES: one server action per operation
 src/lib/admin/permissions.ts  the capability matrix, read by both the screens and the gate
+src/lib/admin/settings.ts     the READS for the shop's own settings, and what is still missing
+src/lib/admin/staff.ts        the READS for the roster, including "is this the only Owner?"
+src/lib/admin/owner-actions.ts the WRITES only an Owner may make: staff, settings, the website
 ```
 
 **Reads go through the caller's own session.** `orders.ts` deliberately does not import the
@@ -119,6 +122,9 @@ not as a leak.
 | Add stock, count stock | caller's session | `jojo_add_stock` / `jojo_count_stock` re-ask `jojo_manages_catalogue()` themselves |
 | Delivery zones | caller's session | same |
 | Advance, complete, cancel, delivery-failed | service role, behind `authorize()` | one transaction spans `orders`, `inventory`, `order_events` and `inventory_movements` |
+| Amend an order | service role, behind `authorize()` | `jojo_amend_order` is one transaction over four tables, and locks every product either side mentions |
+| Website words, shop details, reservation times | caller's session | `shop_settings` admits only an Owner by policy; the grant was added in 0021 |
+| Invite a staff member | service role (Auth admin) | only the Auth admin API can send an invitation, and nothing here ever sees a password |
 | Audit rows | service role | `audit_events` has no INSERT policy for anybody holding a browser token |
 
 The service-role path is never reachable without passing `authorize()` first, and
@@ -130,6 +136,51 @@ boundary; it decides what is worth rendering.
 and the delivery quote all live in SQL functions proved in Build 08. The actions translate a
 refusal into a sentence and revalidate the screens that have gone stale. `orderTotals()` in
 `model.ts` re-adds the lines for display and is the only sum in the dashboard.
+
+## Settings reach the storefront (Build 10)
+
+The Owner's Website screen writes `shop_settings`; the storefront reads it through one
+cached function and treats every text field as an **override**.
+
+```
+src/lib/site-content.ts       one cached read + resolveContent(), the pure rule
+src/lib/contact.ts            the same for the shop's own telephone, email, address
+src/lib/ContactContext.tsx    those details handed to the four client components
+   ↓
+StorefrontLayout             the announcement strip, and whether it appears at all
+HomeView                     the promotion band and which sections are drawn
+Hero                         headline, supporting line, button words, button link
+Footer / ContactView         the shop's real details, or the placeholders
+```
+
+Three properties, in order of how much trouble each avoids:
+
+1. **Blank means the site's own wording.** Not "say nothing". Until somebody opens that
+   screen every column is null, so the other rule would have emptied the homepage the moment
+   the screen was wired up. Turning something off is always a switch.
+2. **One query, cached for five minutes under the `catalogue` tag** — the same tag the shelf
+   uses, so an Owner saving a change drops both and sees the result immediately, while an
+   ordinary visitor costs nothing.
+3. **The rule is a pure function.** `resolveContent()` takes a row and a locale and returns
+   what to render, so both languages and every fallback are proved offline in
+   `src/lib/site-content.test.ts` without a database.
+
+## Jobs: written, protected, and scheduled by nothing (Build 10)
+
+```
+POST /api/sync/catalogue              run the catalogue sync
+POST /api/jobs/expire-reservations    release stock held by unconfirmed orders
+```
+
+Both share `src/lib/jobs/authorise.ts`, which is **closed by default**: a missing or short
+secret means every request is refused, so a deployment that forgets to configure one is shut
+rather than open. The comparison is constant-time, and a wrong secret is answered exactly like
+an unconfigured one — telling a caller which it is tells them how close they are.
+
+**Nothing schedules either of them.** No cron entry, no Vercel schedule, no Supabase job, no
+paid scheduler. They exist so that when a schedule is decided it calls something already
+written, authorised, audited and proven idempotent. The expiry job additionally does nothing
+today even if called, because `reservation_expiry_minutes` is null.
 
 ## The Google Sheet sync (Build 09)
 

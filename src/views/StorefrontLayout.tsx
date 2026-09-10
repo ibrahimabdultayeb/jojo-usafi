@@ -12,9 +12,12 @@ import { SupportButton } from "@/components/layout/SupportButton";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { CartProvider } from "@/lib/cart";
 import { CatalogueProvider } from "@/lib/catalogue/CatalogueContext";
+import { ContactProvider } from "@/lib/ContactContext";
+import { getContact } from "@/lib/contact";
 import { getCatalogue } from "@/lib/catalogue/queries";
 import { LocaleProvider } from "@/lib/i18n/client";
 import { getDictionary, localeAlternates, localeTag, type Locale } from "@/lib/i18n";
+import { getSiteContent } from "@/lib/site-content";
 import { site } from "@/lib/site";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -65,12 +68,19 @@ export async function StorefrontLayout({
   // client components that need to turn a SKU back into a product.
   const catalogue = await getCatalogue();
   const t = getDictionary(locale);
+  // What the Owner has decided about the words and the switches. One cached
+  // read for the whole page; blank fields mean the wording below stands.
+  const content = await getSiteContent(locale);
+  // The shop's own telephone number and address, or the placeholders in
+  // `site.ts` while Ibrahim has not provided them.
+  const contact = await getContact();
 
   return (
     <html lang={localeTag[locale]} className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <body className="min-h-screen bg-slate-50 font-sans antialiased selection:bg-brand-100">
         <LocaleProvider locale={locale}>
           <CatalogueProvider catalogue={catalogue}>
+          <ContactProvider contact={contact}>
           <CartProvider>
             <a
               href="#main"
@@ -78,17 +88,18 @@ export async function StorefrontLayout({
             >
               {t.skipToContent}
             </a>
-            <AnnouncementBar />
+            {content.showAnnouncement && <AnnouncementBar override={content.announcement} />}
             <Header />
             <main id="main" className="relative z-0 flex w-full flex-col bg-white">
               {children}
             </main>
-            <Footer locale={locale} />
+            <Footer locale={locale} contact={contact} />
             <MobileDock />
             <SupportButton />
             <CartDrawer />
             <LanguageGate />
           </CartProvider>
+          </ContactProvider>
           </CatalogueProvider>
         </LocaleProvider>
       </body>

@@ -58,7 +58,6 @@ const ITEMS: {
     hint: "Who can use this dashboard",
     icon: "shield",
     capability: "staff.manage",
-    soon: true,
   },
   {
     href: "/admin/more/settings",
@@ -66,7 +65,6 @@ const ITEMS: {
     hint: "Shop details and preferences",
     icon: "wallet",
     capability: "settings.manage",
-    soon: true,
   },
 ];
 

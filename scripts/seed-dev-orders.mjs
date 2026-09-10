@@ -51,15 +51,32 @@ if (!URL_.includes(PROJECT_REF)) {
 
 const db = createClient(URL_, KEY, { auth: { persistSession: false } });
 
-/* Already done? Then stop — this must never pile up orders on every run. */
+/*
+ * Already done? Then stop — this must never pile up orders on every run.
+ *
+ * "Done" means there is a development order that can still be AMENDED — one of
+ * the four states before dispatch. That is a stricter test than "not finished",
+ * and deliberately so: an amendable order carries every control the dashboard
+ * has (the next action, the two things-went-wrong dialogs, and the amendment
+ * sheet), so one of them is enough for the QA gate to photograph all of them.
+ *
+ * Build 10's QA found this the hard way. A development order was still open —
+ * but it was out for delivery, which has no amendment and no cancellation, so
+ * the gate correctly reported that it had nothing left to audit.
+ */
+const AMENDABLE_STATES = ["new", "awaiting_confirmation", "confirmed", "preparing"];
+
 const { data: existing } = await db
   .from("orders")
-  .select("order_number")
+  .select("order_number, state")
   .eq("customer_note", MARKER)
+  .in("state", AMENDABLE_STATES)
   .limit(1);
 
 if (existing && existing.length > 0) {
-  console.log(`\n  Development orders already exist (${existing[0].order_number}). Nothing to do.\n`);
+  console.log(
+    `\n  A development order can still be amended (${existing[0].order_number} — ${existing[0].state}). Nothing to do.\n`,
+  );
   process.exit(0);
 }
 

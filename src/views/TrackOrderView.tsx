@@ -6,7 +6,7 @@ import { useFormStatus } from "react-dom";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { useLocale } from "@/lib/i18n/client";
-import { whatsappLink } from "@/lib/site";
+import { useWhatsAppLink } from "@/lib/ContactContext";
 import { formatPrice } from "@/lib/format";
 import { fill } from "@/lib/i18n";
 import { trackOrderAction } from "@/lib/commerce/actions";
@@ -24,6 +24,7 @@ import type { OrderState } from "@/lib/domain/orders";
  */
 export function TrackOrderView() {
   const { t, path } = useLocale();
+  const helpHref = useWhatsAppLink(t.support.trackHelpMessage);
   const [state, formAction] = useActionState(trackOrderAction, emptyTrackState);
   const order = state.order;
 
@@ -173,7 +174,7 @@ export function TrackOrderView() {
         <div className="mt-8 flex flex-col gap-3 rounded-3xl bg-slate-50 p-5 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
           <p className="text-sm font-semibold text-slate-600">{t.track.helpText}</p>
           <a
-            href={whatsappLink(t.support.trackHelpMessage)}
+            href={helpHref}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-[#25D366] px-5 text-sm font-bold text-white transition-[filter] hover:brightness-95"

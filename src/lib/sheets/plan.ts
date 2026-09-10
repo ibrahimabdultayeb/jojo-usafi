@@ -117,6 +117,12 @@ export interface SyncPlan {
 
 /* ------------------------------------------------------------- reporting */
 
+/**
+ * The one report column whose value is the current time, and therefore the one
+ * that must not be allowed to make a row look changed.
+ */
+export const STAMP = "SYSTEM LAST SYNCED";
+
 /** The read-only cells the database owns in the Sheet, for one product. */
 export function reportCells(product: DbProduct, when: string): Record<string, string | number> {
   return {
@@ -372,8 +378,26 @@ export function planSync(input: PlanInput): SyncPlan {
     const rowCells = input.snapshot.rows.find((r) => r.rowNumber === row.row)?.cells ?? {};
     const needed: Record<string, string | number> = {};
     for (const [header, value] of Object.entries(cells)) {
+      // The timestamp is excluded from this comparison ON PURPOSE. It differs
+      // on every single run — it is `now` — so including it made every row a
+      // row that "changed", and a sync where nothing at all happened still
+      // rewrote 201 cells. That is noise in somebody's spreadsheet, it makes
+      // Google's version history useless for spotting a real edit, and it
+      // spends quota to say nothing.
+      if (header === STAMP) continue;
       if (String(rowCells[header] ?? "").trim() !== String(value).trim()) needed[header] = value;
     }
+
+    // So the row is stamped when the shop actually wrote something to it, and
+    // when it has never been stamped at all. Nothing else re-stamps it.
+    //
+    // THIS CANNOT DISTURB THE MERGE. `SYSTEM LAST SYNCED` is a report column:
+    // it is never read as input, never part of `CatalogueFields`, never in a
+    // fingerprint and never in a recorded base — Build 09 proved that when it
+    // showed the column cannot cause a sync loop. What changes here is only how
+    // often the shop writes it.
+    const stamped = String(rowCells[STAMP] ?? "").trim() !== "";
+    if (Object.keys(needed).length > 0 || !stamped) needed[STAMP] = now;
 
     if (Object.keys(needed).length > 0) {
       plan.toSheet.push({

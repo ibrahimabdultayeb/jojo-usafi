@@ -112,12 +112,15 @@ text is a note, a price, a stock count and a zone name.
 | --- | --- |
 | **Home** | Attention cards first (counts, tappable straight to the filtered list), then today's sales/orders/average, then recent orders and activity. A single "All clear" line collapses everything at zero, so the screen shrinks on a good day. |
 | **Orders** | Cards on phones, never a table. Order number, customer, short phone, zone, total, item count, friendly status, Open order. Filters: All · New · Confirm · Preparing · Delivery · Completed · Problems, each with a live count. Search by order number, name or phone. |
-| **Order detail** | Next action at the top, then customer with WhatsApp and Call as full-width buttons, delivery, items, totals, payment (preference vs actually received), and a timeline of what has happened. |
+| **Order detail** | Next action at the top, then **Change what is in this order** as a secondary action while the order is still in the shop, then customer with WhatsApp and Call as full-width buttons, delivery, items, totals, payment (preference vs actually received), and a timeline of what has happened. |
+| **Amend order** | A sheet: one row per item with minus, the number, plus and remove, and a search to add another product. Before saving it says in words what is changing — "Multix 5LT: 2 → 3", "Handwash removed" — and shows the new total as an **estimate**, because the shop works out the real figure. A reason is required. Once the order is out for delivery the control is gone and a line says why. |
 | **Products** | Rows with photo, name, brand, size, SKU, price and stock. Badges: Low stock · Out of stock · Hidden · Missing image. Stock is **available** stock — what can actually be sold — so the list agrees with the storefront and the home counts. Filters include "Needs attention". Search covers name, SKU, barcode and brand. |
 | **Product editor** | Six everyday controls above the fold — price, offer price, stock, show on website, featured, best seller. Everything else is folded into "More product details", read-only until the Sheet sync exists. SKU is shown locked with the reason. Archiving also takes the product off the website, and is reversible; there is no delete. |
 | **Customers** | List with name, phone, order count, total spend, last order. Detail adds addresses, order history and WhatsApp/Call. Deliberately not a CRM. |
 | **Delivery zones** | Zone cards with fee or Free delivery, active state and display order. New zones default to **TSh 4,000**. Development placeholders are badged "Example area — replace" rather than passed off as real. Turning on Free delivery **visibly disables** the fee field rather than hiding it, so it is obvious the fee is ignored rather than lost. |
-| **Website** | Named slots only, no page builder: announcement bar, homepage banner, promotion banner, and which homepage sections show and in what order. Every customer-facing field is bilingual with an EN/SW tab; an empty Kiswahili field is marked with a dot and says it will fall back to English. |
+| **Website** | Named slots only, no page builder: announcement strip, hero, promotion band, and which homepage sections appear. Every customer-facing field is bilingual — English and Kiswahili **side by side**, not behind a tab, because an empty translation is invisible behind a tab and obvious beside its English. A field left empty in both shows the wording the site was designed with; turning something off is always a switch. |
+| **Settings** | The shop’s own WhatsApp number, phone, email and address, and how long an unconfirmed order holds stock. Every one starts empty and says "Not set yet" — a placeholder number that reaches nobody is worse than a visibly missing one. Badges at the top list what is still needed before the shop opens, computed from what the database holds. |
+| **Staff** | Owner only, and it says so to anyone else rather than showing controls that will all be refused. Add someone by email; Supabase sends the invitation and owns the password, which this screen never sees. The last active Owner and your own account are drawn **without controls** — the database refuses both regardless, and offering a button that will be refused is a trap rather than a rule. |
 
 ---
 
@@ -129,8 +132,10 @@ every product's price, offer, stock, visibility and photograph. All of it comes 
 development Supabase project, read under the caller's own Row Level Security, and every
 control writes it.
 
-**Mock, and only `src/mocks/admin/data.ts`:** the Website screen's draft content. That screen
-genuinely does not save yet and says so on its face. It is the last thing in that file.
+**Nothing is mock, since Build 10.** The Website, Settings and Staff screens were the last
+three reading invented data; they now read `shop_settings` and `admin_profiles`, and
+`src/mocks/` was deleted rather than emptied. Only **Reports** is still "Coming soon", and it
+says why: there are no real orders yet to report on.
 
 The invented orders, customers, zones, sales figures and activity are **deleted**, not kept
 behind a flag. A dashboard that can fall back to plausible fiction is a dashboard that can

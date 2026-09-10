@@ -6,7 +6,7 @@ import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { formatPrice } from "@/lib/format";
 import { fill } from "@/lib/i18n";
 import { useLocale } from "@/lib/i18n/client";
-import { whatsappLink } from "@/lib/site";
+import { useWhatsAppLink } from "@/lib/ContactContext";
 import type { PlacedOrderSummary } from "@/lib/commerce/state";
 
 /**
@@ -19,6 +19,7 @@ import type { PlacedOrderSummary } from "@/lib/commerce/state";
  */
 export function OrderReceived({ order }: { order: PlacedOrderSummary }) {
   const { t, path } = useLocale();
+  const helpHref = useWhatsAppLink(fill(t.confirmation.whatsappMessage, { order: order.orderNumber }));
 
   const payingBy =
     order.paymentPreference === "digital_on_delivery"
@@ -117,7 +118,7 @@ export function OrderReceived({ order }: { order: PlacedOrderSummary }) {
           </Link>
 
           <a
-            href={whatsappLink(fill(t.confirmation.whatsappMessage, { order: order.orderNumber }))}
+            href={helpHref}
             target="_blank"
             rel="noopener noreferrer"
             className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full border border-slate-300 px-6 text-base font-bold text-slate-700 transition hover:bg-slate-100"

@@ -67,16 +67,19 @@ on the reference green, exposed as Tailwind `brand-*` tokens, so a rebrand is on
 | **Checkout** | **Real.** Guest checkout prices the basket on the server, reserves the stock and writes the order in one transaction. |
 | **Track order** | **Real.** Needs the order number *and* the phone; a wrong phone is answered exactly like a wrong number. |
 | **Online payment** | Not built. The customer chooses cash or digital **on delivery**, and staff record what was actually collected. |
-| **Admin dashboard** | **Real**, except the Website screen — Reports, Staff and Settings are marked "Coming soon". |
-| **Google Sheet sync** | Not connected. The product editor says so rather than showing a "Synced" badge. |
-| **WhatsApp number** | `255700000000` placeholder in `src/lib/site.ts`. |
-| **Phone / email / address** | Placeholders in `src/lib/site.ts`. |
-| **Logo** | Typographic lockup ("J" tile + JOJO USAFI wordmark) standing in for a real mark. |
+| **Admin dashboard** | **Real.** Every screen reads and writes the database; `src/mocks/` no longer exists. Only **Reports** is still "Coming soon", waiting on real orders to report on. |
+| **Google Sheet sync** | **Connected and used.** Two-way, validated, manual. Nothing schedules it. |
+| **WhatsApp number** | Placeholder `255700000000` **until Ibrahim enters the real one** on More → Settings, which the storefront then uses everywhere. |
+| **Phone / email / address** | Same: `shop_settings` when set, the `src/lib/site.ts` placeholder while not. |
+| **Logo** | Typographic lockup ("J" tile + JOJO USAFI wordmark) standing in for a real mark. `shop_settings.logo_media_id` exists; uploading arrives with the media screen. |
 | **Search** | Client-side substring match over the local catalogue. |
 | **Site URL** | `NEXT_PUBLIC_SITE_URL`, falling back to the dev server. No production domain has been chosen, so none is invented. |
 
-Every placeholder is in `src/lib/site.ts`. There are no hard-coded phone numbers or prices
-scattered through components.
+Every placeholder is in `src/lib/site.ts`, and since Build 10 it is only a FALLBACK: the
+storefront reads the shop’s real details from `shop_settings` through `src/lib/contact.ts` and
+falls back to the placeholder for as long as a value is unset. There are no hard-coded phone
+numbers or prices scattered through components, and no component can reach the placeholder
+number directly — the old `whatsappLink()` helper was removed for exactly that reason.
 
 ---
 

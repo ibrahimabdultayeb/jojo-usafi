@@ -42,6 +42,7 @@ const paths = {
   leaf: ["M4 20c0-8 6-14 16-14 0 10-6 15-13 15", "M4 20c3-4 6-6 10-8"],
   wallet: ["M3 7h15a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z", "M3 7a2 2 0 0 1 2-2h11", "M16 13h2"],
   message: ["M21 12a8 8 0 0 1-11.9 7L4 20l1.1-3.9A8 8 0 1 1 21 12Z"],
+  pencil: ["M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z", "m14 6 4 4"],
 } as const;
 
 export type IconName = keyof typeof paths;

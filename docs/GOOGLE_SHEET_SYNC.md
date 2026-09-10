@@ -134,11 +134,40 @@ products with one code, and neither can be applied.
 
 ## New rows
 
-A SKU the shop has never seen is **reported**, not silently created. When creation is turned
-on it will produce an internal, non-public record — `lifecycle = draft`, not visible, no
-stock — and the existing publishability rules decide when it can be sold. A product with no
-approved photograph, no valid price or missing identity data can never reach the storefront,
-because `product_shelf` requires all three regardless of how the row got there.
+A SKU the shop has never seen is **reported**, not silently created. Creation happens only
+when a run is explicitly asked for it (`createNew`), because a new product is a catalogue
+decision and a sync that quietly invents them is a sync nobody can review.
+
+When it does run, the product arrives as an internal, non-public record and the existing
+publishability rules decide when it can be sold:
+
+| What the sheet says | What is created |
+| --- | --- |
+| `PRODUCT STATUS` = anything | `lifecycle = draft` |
+| `WEBSITE STATUS` = Show | `storefront_visible = false` |
+| `STOCK QTY` = anything | an `inventory` row at **0** |
+
+None of those three is negotiable. A sheet cannot publish a product it has just invented,
+and it cannot create stock — the same rule that holds for products that already exist.
+
+**Relationships resolve; they are never created.** `PRODUCT BRAND`, `CATEGORY`,
+`SUPPLIER` and `FAMILY CODE` are matched against rows that already exist, after
+normalising case, punctuation and curly quotes. The match must be **exactly one**:
+
+- no match → the row is refused and the reason is reported
+- more than one match → the row is refused, because an ambiguity is not a coin toss
+
+A brand typed as `multix` therefore finds `Multix` and does **not** create a second brand
+beside it. Creating a brand, a category or a supplier is a deliberate act elsewhere.
+
+**A row is refused rather than half-created** when the SKU already exists, the price is zero
+or negative, the price is below the implausible-price floor (TSh 1,000), the offer price is
+not below the price, or any relationship fails to resolve. The refusal is written into the
+sync log with the shop's own sentence; nothing partial is left behind.
+
+A product with no approved photograph, no valid price or missing identity data can never
+reach the storefront, because `product_shelf` requires all three regardless of how the row
+got there.
 
 **`EP23-A02` stays an orphan.** An approved photograph exists in Storage with no Product
 Master row. An image does not create a product. It needs a real master row first.
@@ -399,6 +428,56 @@ must have changed to the same value.
 
 Throughout: shelf 95, stock ledger 204 movements, orders and customers untouched.
 
+### Step G — the held description, once it was approved — 2026-09-10
+
+The one field Build 09 deliberately did not apply. Ibrahim supplied replacement copy
+in Build 10; Step G wrote it to both sides through the normal mechanism and recorded
+the agreed base, so the run afterwards proposes nothing.
+
+    SYNC_STEP_G=1 npm run sync:op -- tools/sync/g-description.op.ts
+
+    Matches the approval        true
+    Products with a description 1
+    Shelf 95 · movements 208 · orders 3 — unchanged
+    A check afterwards proposes 0 change(s)
+
+It is still the only product in the catalogue carrying a description. See
+[The one held description](#the-one-held-description--settled-2026-09-10).
+
+### Step H — a new product, typed into the real sheet — 2026-09-10
+
+Everything above proves what happens to products the shop already has. Step H proves
+the other half, with two rows appended below the operator's 201 and cleared again
+afterwards. Both carried `ZZ`-prefixed SKUs that match no real product.
+
+| Row | What it was | What happened |
+| --- | --- | --- |
+| 203 | a complete product at 12,500/= | created |
+| 204 | the same, priced at 40/= | refused, and the reason reported |
+
+What the created product looked like, which is the whole point of the step:
+
+    Status           draft
+    On the website   false
+    Price            12,500/=
+    Stock            on hand 0 · available 0
+    On the shelf     no — it has no photograph
+
+The sheet said `WEBSITE STATUS = Show` and `PRODUCT STATUS = Active`. Neither
+reached the product. A second identical run created nothing further: one product
+carried that SKU before and one after.
+
+Then everything was undone — both products, their inventory rows, their sync state
+and events, and both sheet rows blanked. The step ends by re-reading the shop and
+requiring it to be identical to the snapshot taken before it started: 201 products,
+3 orders, 208 movements, every inventory row byte for byte. It was.
+
+    SYNC_STEP_H=1 npm run sync:op -- tools/sync/h-new-product.op.ts
+
+A recheck afterwards reported 201 data rows, 0 problems, and — with the new stamping
+rule in place — **0 rows to write back to the sheet**, where every previous run would
+have rewritten all 201.
+
 ## Two faults the first real run found
 
 **Google refuses a write past the edge of the grid.** The tab is exactly 39 columns wide, so
@@ -420,19 +499,22 @@ The agreement that the broken run recorded was removed, and its `sync_jobs` row 
 from `applied` to `failed` with an explanation. The record of the run stays — it happened —
 but it no longer claims to have succeeded.
 
-## The one held description
+## The one held description — settled 2026-09-10
 
-**`EP10-A02` — Shower Gel Bubblegum.** Held out of the sync at Ibrahim's
-instruction, pending content review.
+**`EP10-A02` — Shower Gel Bubblegum.** Held out of the sync through Build 09
+pending content review, and replaced in Build 10 with copy Ibrahim approved:
 
-| | |
-| --- | --- |
-| Currently public | **yes** — it has a photograph, is active, and says Show |
-| Description in Supabase | **none.** `product_content` has no row for it at all |
-| Displayed anywhere | **no.** The product page shows no description, because there is none to show |
-| In the Google Sheet | preserved exactly as written, untouched by every run |
+> Shower Gel Bubblegum is a refreshing body wash with a sweet bubblegum-inspired
+> fragrance. It creates a rich lather to cleanse the skin and leave it feeling
+> fresh and comfortable after washing. Suitable for everyday use.
 
-The sheet's text, kept verbatim and not imported:
+Written to both sides through the normal mechanism, with the agreed base recorded,
+so the run afterwards proposes nothing. It remains **the only product in the
+catalogue with a description**; no similar copy was written for any other product,
+because inventing product descriptions is not something a sync may do.
+
+What was held, and why it was not simply imported — the sheet's original text, kept
+here as the record:
 
 > Bubbles hydrating shower gel awakens your senses as you take your shower with a
 > refreshing formula. Its rich lathering, moisturizing and cleaning properties
@@ -444,12 +526,10 @@ The sheet's text, kept verbatim and not imported:
 > and at the end of a long day, before a truly restful night's sleep to soothe and
 > calm your senses.
 
-Worth noticing before it is approved: the copy calls the product *Bubbles*, while
-the catalogue name is *Shower Gel Bubblegum*. It also makes germ-killing claims,
-which are a regulatory question rather than a stylistic one.
-
-Every sync reports it as one outstanding change and applies nothing. It will keep
-being offered until somebody decides, which is what holding a field is for.
+Two things made it unsafe to import: the copy calls the product *Bubbles* while the
+catalogue name is *Shower Gel Bubblegum*, and it makes germ-killing claims, which
+are a regulatory question rather than a stylistic one. Both are why a sync holds a
+field for a person instead of resolving it.
 
 ## Conflicts
 
@@ -537,6 +617,12 @@ reassuring "Synced".
 - **One** batched write for every changed cell, per run — never a call per cell.
 - Only cells whose value actually differs are written; the operator's own columns are never
   rewritten with values they already hold.
+- **`SYSTEM LAST SYNCED` is stamped when something happened** — when the shop wrote to that
+  row, or when the row has never carried a stamp. Its value is `now`, so treating it like any
+  other cell made every row differ on every run and rewrote all 201 to say nothing. A run that
+  changes nothing now writes nothing at all. The column is a report column — never read as
+  input, never in a fingerprint, never in a base — so this cannot disturb the merge. "When did
+  the shop last check the sheet" is a fact about the run, and the Sync Now screen says it.
 - The report columns are **appended** to the right of the existing layout, never inserted,
   never reordering anything.
 - The access token is minted once per run and cached.
@@ -611,9 +697,8 @@ gitignored; `.env.example` holds names and placeholders only.
 
 ## Future work
 
-- **Creating products from the Sheet.** Reported today; the writing half needs brand, category
-  and family to resolve to existing rows, and a decision about what happens when they do not.
-- **A schedule.** The endpoint is ready; the deployment architecture is not.
+- **A schedule.** Both endpoints are ready; the deployment architecture is not. Nothing in
+  this repository schedules anything.
 - **Kiswahili product content.** `product_content` is per-locale; the master has one language.
 - **Media.** Images stay matched on exact SKU in Supabase Storage. A Sheet image URL never
   becomes a product photograph — the workflow for changing a photo is a separate, deliberate

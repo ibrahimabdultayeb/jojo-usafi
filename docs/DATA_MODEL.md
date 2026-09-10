@@ -57,6 +57,9 @@ The **Supabase PostgreSQL** schema, authored as version-controlled migrations in
 | `20260909140000_commerce.sql` | `shop_settings`, reservation columns, `jojo_quote_order`, `jojo_place_order`, `jojo_cancel_order`, `jojo_track_order`, `jojo_add_stock`, `jojo_count_stock` |
 | `20260909140100_cancel_actor_cast.sql` | fixes a `42804` in `jojo_cancel_order` — an enum literal decided as `text` inside a `CASE` |
 | `20260909150000_order_operations.sql` | `jojo_advance_order`, `jojo_fail_delivery` — the middle of an order's life |
+| `20260910120000_operations.sql` | website and contact columns on `shop_settings`, the missing UPDATE grant, `jojo_amend_order`, `jojo_expire_reservations` |
+| `20260910130000_amend_kind_cast.sql` | fixes a `42804` in `jojo_amend_order` — the same enum-in-a-`CASE` trap as 0017 |
+| `20260910140000_announcement_visibility.sql` | `show_announcement`: the announcement strip's own switch |
 
 `supabase/seed.sql` deliberately inserts **no business data** — see the file for why.
 
@@ -81,6 +84,33 @@ The **Supabase PostgreSQL** schema, authored as version-controlled migrations in
 **Views** — `product_shelf` (the one definition of "a customer may see this") ·
 `inventory_ledger_check` (does the running total match the ledger?). Both are
 `security_invoker = on`, so they enforce the caller's policies rather than bypassing them.
+
+## Shop settings — one row, and what lives in it
+
+`shop_settings` has a single row (`id` is a boolean, always true). Three groups live there,
+and they are different in kind:
+
+**The words on the website.** `announcement_*`, `hero_*`, `promo_banner_*` — each stored per
+language, `_en` and `_sw`. Every one is an **override**: null means the site shows the copy it
+was designed with, in the language being read. Null is therefore the normal, correct state,
+not a gap. `hero_cta_href` is constrained to a path on this website, so the hero button cannot
+be pointed off-site from a settings form.
+
+**Which parts of the homepage appear.** `show_announcement`, `promo_banner_visible` and eight
+`show_*` flags, all defaulting to true. Switching a section off is always a switch — never an
+empty text box — because a blank box means "use the site's own wording". `category_order`
+holds category slugs; null means the catalogue's own order, which is a real answer.
+
+**The shop's own details, and how long stock is held.** `whatsapp_e164`, `phone_e164`,
+`contact_email`, `address_line`, `logo_media_id`, `reservation_warning_minutes`,
+`reservation_expiry_minutes`. **All null until Ibrahim provides them.** The two phone columns
+are constrained to E.164 shape, so a number that cannot be dialled cannot be stored.
+
+The row is **readable by anybody** — the storefront is built from it — and **writable only by
+an Owner**. Both locks are needed and neither is enough alone: migration 0018 wrote the Owner
+UPDATE policy but granted only SELECT, so the Owner's own save was refused by the grant before
+any policy was consulted. 0021 adds `grant update on public.shop_settings to authenticated`,
+and the policy remains what decides the row.
 
 ## The product model
 

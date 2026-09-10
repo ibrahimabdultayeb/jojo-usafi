@@ -655,3 +655,69 @@ describe("the header row is checked before any row is read", () => {
     expect(plan.toDatabase[0].changes).toEqual({ priceTzs: 36000 });
   });
 });
+
+/* --------------------------------------------------- the last-synced stamp */
+
+describe("the SYSTEM LAST SYNCED stamp", () => {
+  /**
+   * Before this rule the stamp was `now` on every run, so every row differed
+   * from what the sheet held and every sync rewrote all 201 of them. The
+   * spreadsheet's own version history then showed a wall of changes with a real
+   * edit hidden somewhere inside it.
+   */
+  const stampedRow = (over: Record<string, string | number> = {}) =>
+    sheetRow({
+      "SYSTEM AVAILABLE STOCK": 448,
+      "SYSTEM IMAGE": "Photo on file",
+      "SYSTEM ON WEBSITE": "On the website",
+      "SYSTEM BLOCKED REASON": "",
+      "SYSTEM LAST SYNCED": "2026-09-01 08:00",
+      ...over,
+    });
+
+  it("is not re-written when a row has nothing else to say", () => {
+    const plan = planSync(
+      makeInput({
+        rows: [stampedRow()],
+        base: new Map([["EP01-A02", DB_FIELDS]]),
+      }),
+    );
+
+    expect(plan.toSheet, "a run that changes nothing must write nothing").toHaveLength(0);
+    expect(plan.unchanged).toBe(1);
+  });
+
+  it("rides along when the row is being written for another reason", () => {
+    // The shop's stock moved, so the row is written anyway — and then the
+    // stamp is true, because the shop really did just write to this row.
+    const moved: DbProduct = { ...dbProduct(), report: { ...dbProduct().report, availableStock: 12 } };
+
+    const plan = planSync(
+      makeInput({
+        rows: [stampedRow()],
+        products: [moved],
+        base: new Map([["EP01-A02", DB_FIELDS]]),
+      }),
+    );
+
+    expect(plan.toSheet).toHaveLength(1);
+    expect(plan.toSheet[0].cells["SYSTEM AVAILABLE STOCK"]).toBe(12);
+    expect(plan.toSheet[0].cells["SYSTEM LAST SYNCED"]).toBeDefined();
+  });
+
+  it("is written the first time, on a row that has never carried one", () => {
+    const plan = planSync(
+      makeInput({
+        rows: [stampedRow({ "SYSTEM LAST SYNCED": "" })],
+        base: new Map([["EP01-A02", DB_FIELDS]]),
+      }),
+    );
+
+    expect(plan.toSheet).toHaveLength(1);
+    expect(plan.toSheet[0].cells["SYSTEM LAST SYNCED"]).toBeDefined();
+    expect(
+      plan.toSheet[0].fields,
+      "and it carries no catalogue field with it",
+    ).toEqual([]);
+  });
+});

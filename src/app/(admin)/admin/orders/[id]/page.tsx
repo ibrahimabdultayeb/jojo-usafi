@@ -6,7 +6,7 @@ import { formatTsh } from "@/lib/admin/format";
 import { Icon } from "@/components/ui/Icon";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { orderTotals, STAGE_LABEL, STAGE_TONE } from "@/lib/admin/model";
-import { getAdminOrder, getOrderTimeline } from "@/lib/admin/orders";
+import { getAdminOrder, getAmendableProducts, getOrderTimeline } from "@/lib/admin/orders";
 import { currentStaff } from "@/lib/admin/authorize";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -21,6 +21,12 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
   if (!order) notFound();
 
   const [totals, timeline, staff] = [orderTotals(order), await getOrderTimeline(order.id), await currentStaff()];
+
+  // The shelf is only read when the order can still be changed. A completed or
+  // cancelled order has no use for a product picker, and loading one would be
+  // 95 rows of catalogue sent to a screen that cannot act on them.
+  const amendable = ["new", "awaiting_confirmation", "confirmed", "preparing"].includes(order.stage);
+  const catalogue = amendable ? await getAmendableProducts() : [];
   const digits = order.customer.phone.replace(/[^0-9]/g, "");
   const telHref = "tel:" + order.customer.phone.replace(/\s/g, "");
   const waText = encodeURIComponent(
@@ -37,7 +43,7 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
     >
       {/* The next action sits at the top: it is why the screen was opened. */}
       <div className="mb-5">
-        <OrderActions order={order} role={staff?.role ?? "order_staff"} />
+        <OrderActions order={order} role={staff?.role ?? "order_staff"} catalogue={catalogue} />
       </div>
 
       <SectionTitle>Customer</SectionTitle>

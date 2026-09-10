@@ -648,13 +648,50 @@ async function staffPass(browser, credentials) {
     // The order dialogs need a real order. There may not be one on a fresh
     // database, and that is not a failure — it is an empty shop.
     await settle(tab, `${BASE_URL}/admin/orders`);
-    const firstOrder = tab.locator('a:has-text("Open order")').first();
-    if (await firstOrder.count()) {
-      await firstOrder.click();
-      // Wait for the ROUTE, not for a guessed number of milliseconds. Reading
-      // `tab.url()` too early returns the list, and every audit below would then
-      // run against the wrong page and quietly find nothing.
-      await tab.waitForURL(/\/admin\/orders\/[^/]+$/, { timeout: 60_000 }).catch(() => {});
+    const orderLinks = await tab
+      .locator('a:has-text("Open order")')
+      .evaluateAll((links) => links.map((link) => link.getAttribute("href")).filter(Boolean));
+
+    if (orderLinks.length > 0) {
+      // Pick the order that carries the MOST controls, rather than whichever
+      // happens to be first. Every dialog below exists only while an order is
+      // open, so landing on a completed one means they all report "not audited"
+      // and the phone-sized sheets go unphotographed — which is how two of them
+      // went unaudited once already.
+      //
+      // An amendable order (before dispatch) carries all four. One that is out
+      // for delivery carries only Complete order. A closed one carries none, and
+      // is the fallback so that a shop whose orders are all finished still has
+      // its order screen checked.
+      let best = { href: orderLinks[0], score: -1 };
+      // The payment sheet lives on the OTHER side of dispatch from the other
+      // three, so no single order can show all of them. This remembers where it
+      // is, and it is audited on its own order at the end.
+      let payableHref = null;
+
+      for (const href of orderLinks.slice(0, 8)) {
+        await settle(tab, new URL(href, BASE_URL).toString());
+        await loadEverything(tab);
+
+        const amendable = await tab
+          .locator('button:has-text("Change what is in this order")')
+          .count();
+        const payable = await tab.locator('button:has-text("Complete order")').count();
+        if (payable && !payableHref) payableHref = href;
+
+        const score = amendable ? 2 : payable ? 1 : 0;
+        if (score > best.score) best = { href, score };
+        if (score === 2 && payableHref) break;
+      }
+
+      if (best.score < 2) {
+        console.log(
+          best.score === 1
+            ? "  (no order can still be amended — only the payment dialog is auditable)"
+            : "  (every order is finished — the order dialogs cannot be audited)",
+        );
+      }
+      await settle(tab, new URL(best.href, BASE_URL).toString());
       await loadEverything(tab);
 
       const label = `admin-order @ ${viewport.width}px`;
@@ -684,7 +721,21 @@ async function staffPass(browser, credentials) {
       await tab.waitForTimeout(250);
       await auditDialog(tab, label, 'button:has-text("Delivery failed")', viewport, "admin-delivery-failed");
 
+      // Build 10's amendment sheet: a row per item with minus, plus and remove,
+      // which makes it the densest thing on the dashboard at 390px.
       await settle(tab, orderUrl);
+      await auditDialog(
+        tab,
+        label,
+        'button:has-text("Change what is in this order")',
+        viewport,
+        "admin-amend-order",
+      );
+
+      // And the payment sheet, on whichever order is far enough along to have
+      // one — the only dialog that cannot share an order with the other three.
+      await settle(tab, new URL(payableHref ?? orderUrl, BASE_URL).toString());
+      await loadEverything(tab);
       await auditDialog(tab, label, 'button:has-text("Complete order")', viewport, "admin-record-payment");
     } else {
       console.log(`  (no orders on the development database — order dialogs not audited)`);

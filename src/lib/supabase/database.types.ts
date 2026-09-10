@@ -1476,27 +1476,116 @@ export type Database = {
       }
       shop_settings: {
         Row: {
+          address_line: string | null
+          announcement_en: string | null
+          announcement_sw: string | null
+          category_order: string[] | null
+          contact_email: string | null
           created_at: string
+          hero_cta_href: string | null
+          hero_cta_label_en: string | null
+          hero_cta_label_sw: string | null
+          hero_heading_en: string | null
+          hero_heading_sw: string | null
+          hero_sub_en: string | null
+          hero_sub_sw: string | null
           id: boolean
+          logo_media_id: string | null
+          phone_e164: string | null
+          promo_banner_en: string | null
+          promo_banner_sw: string | null
+          promo_banner_visible: boolean
           reservation_expiry_minutes: number | null
           reservation_warning_minutes: number | null
+          show_announcement: boolean
+          show_best_sellers: boolean
+          show_brands: boolean
+          show_categories: boolean
+          show_category_grids: boolean
+          show_delivery_banner: boolean
+          show_featured: boolean
+          show_how_it_works: boolean
+          show_trust: boolean
           updated_at: string
+          whatsapp_e164: string | null
         }
         Insert: {
+          address_line?: string | null
+          announcement_en?: string | null
+          announcement_sw?: string | null
+          category_order?: string[] | null
+          contact_email?: string | null
           created_at?: string
+          hero_cta_href?: string | null
+          hero_cta_label_en?: string | null
+          hero_cta_label_sw?: string | null
+          hero_heading_en?: string | null
+          hero_heading_sw?: string | null
+          hero_sub_en?: string | null
+          hero_sub_sw?: string | null
           id?: boolean
+          logo_media_id?: string | null
+          phone_e164?: string | null
+          promo_banner_en?: string | null
+          promo_banner_sw?: string | null
+          promo_banner_visible?: boolean
           reservation_expiry_minutes?: number | null
           reservation_warning_minutes?: number | null
+          show_announcement?: boolean
+          show_best_sellers?: boolean
+          show_brands?: boolean
+          show_categories?: boolean
+          show_category_grids?: boolean
+          show_delivery_banner?: boolean
+          show_featured?: boolean
+          show_how_it_works?: boolean
+          show_trust?: boolean
           updated_at?: string
+          whatsapp_e164?: string | null
         }
         Update: {
+          address_line?: string | null
+          announcement_en?: string | null
+          announcement_sw?: string | null
+          category_order?: string[] | null
+          contact_email?: string | null
           created_at?: string
+          hero_cta_href?: string | null
+          hero_cta_label_en?: string | null
+          hero_cta_label_sw?: string | null
+          hero_heading_en?: string | null
+          hero_heading_sw?: string | null
+          hero_sub_en?: string | null
+          hero_sub_sw?: string | null
           id?: boolean
+          logo_media_id?: string | null
+          phone_e164?: string | null
+          promo_banner_en?: string | null
+          promo_banner_sw?: string | null
+          promo_banner_visible?: boolean
           reservation_expiry_minutes?: number | null
           reservation_warning_minutes?: number | null
+          show_announcement?: boolean
+          show_best_sellers?: boolean
+          show_brands?: boolean
+          show_categories?: boolean
+          show_category_grids?: boolean
+          show_delivery_banner?: boolean
+          show_featured?: boolean
+          show_how_it_works?: boolean
+          show_trust?: boolean
           updated_at?: string
+          whatsapp_e164?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "shop_settings_logo_fk"
+            columns: ["logo_media_id"]
+            isOneToOne: false
+            referencedRelation: "media_assets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       suppliers: {
         Row: {
@@ -1923,6 +2012,15 @@ export type Database = {
         }
         Returns: Json
       }
+      jojo_amend_order: {
+        Args: {
+          p_actor_admin_id?: string
+          p_items: Json
+          p_order_id: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       jojo_cancel_order: {
         Args: {
           p_actor_admin_id?: string
@@ -1959,6 +2057,7 @@ export type Database = {
         Returns: Json
       }
       jojo_customer_id: { Args: never; Returns: string }
+      jojo_expire_reservations: { Args: { p_limit?: number }; Returns: Json }
       jojo_fail_delivery: {
         Args: {
           p_actor_admin_id?: string

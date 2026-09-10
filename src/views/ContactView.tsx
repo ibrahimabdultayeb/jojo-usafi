@@ -1,10 +1,14 @@
 import { Icon } from "@/components/ui/Icon";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { fill, getDictionary, type Locale } from "@/lib/i18n";
-import { site, whatsappLink } from "@/lib/site";
+import { site } from "@/lib/site";
+import { getContact, whatsappHref } from "@/lib/contact";
 
-export function ContactView({ locale }: { locale: Locale }) {
+export async function ContactView({ locale }: { locale: Locale }) {
   const t = getDictionary(locale);
+  // The shop’s own details when Ibrahim has provided them, the placeholders
+  // in `site.ts` while he has not. One cached read, shared with the layout.
+  const reach = await getContact();
 
   const channels = [
     {
@@ -13,7 +17,7 @@ export function ContactView({ locale }: { locale: Locale }) {
       body: t.contact.whatsappBody,
       action: {
         label: t.contact.whatsappCta,
-        href: whatsappLink(t.support.questionMessage),
+        href: whatsappHref(reach.whatsappNumber, t.support.questionMessage),
         external: true,
       },
     },
@@ -22,8 +26,8 @@ export function ContactView({ locale }: { locale: Locale }) {
       title: t.contact.callTitle,
       body: site.hours,
       action: {
-        label: site.phone,
-        href: `tel:${site.phone.replace(/\s/g, "")}`,
+        label: reach.phone,
+        href: `tel:${reach.phone.replace(/\s/g, "")}`,
         external: false,
       },
     },
@@ -31,7 +35,7 @@ export function ContactView({ locale }: { locale: Locale }) {
       key: "mail",
       title: t.contact.emailTitle,
       body: t.contact.emailBody,
-      action: { label: site.email, href: `mailto:${site.email}`, external: false },
+      action: { label: reach.email, href: `mailto:${reach.email}`, external: false },
     },
   ];
 
@@ -86,7 +90,7 @@ export function ContactView({ locale }: { locale: Locale }) {
           </p>
           <p className="mt-4 flex items-center gap-2 text-sm font-bold text-slate-700">
             <Icon name="mapPin" className="h-4 w-4 text-brand-600" />
-            {site.addressLine}
+            {reach.addressLine}
           </p>
         </section>
       </div>

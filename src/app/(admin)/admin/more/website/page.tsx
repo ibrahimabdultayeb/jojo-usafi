@@ -1,16 +1,20 @@
 import { AdminPage } from "@/components/admin/AdminShell";
-import { WebsiteEditor } from "@/components/admin/website/WebsiteEditor";
+import { WebsiteSettings } from "@/components/admin/website/WebsiteSettings";
+import { getShopSettings } from "@/lib/admin/settings";
+import { currentStaff } from "@/lib/admin/authorize";
 
 export const metadata = { title: "Website" };
 
-export default function AdminWebsitePage() {
+export default async function AdminWebsitePage() {
+  const [settings, staff] = await Promise.all([getShopSettings(), currentStaff()]);
+
   return (
     <AdminPage
       title="Website"
-      subtitle="Change what the shop says, in English and Kiswahili."
+      subtitle="The words customers read, in both languages."
       back={{ href: "/admin/more", label: "More" }}
     >
-      <WebsiteEditor />
+      <WebsiteSettings content={settings.website} role={staff?.role ?? "order_staff"} />
     </AdminPage>
   );
 }

@@ -9,7 +9,8 @@ import { Logo } from "@/components/layout/Logo";
 import { useCategories } from "@/lib/catalogue/CatalogueContext";
 import { useLocale } from "@/lib/i18n/client";
 import { fill } from "@/lib/i18n";
-import { site, whatsappLink } from "@/lib/site";
+import { site } from "@/lib/site";
+import { useWhatsAppLink } from "@/lib/ContactContext";
 import { toneSet } from "@/lib/tones";
 
 interface MobileMenuProps {
@@ -20,6 +21,7 @@ interface MobileMenuProps {
 /** Floating layer: `z-60` — a modal surface, above the header and the dock. */
 export function MobileMenu({ open, onClose }: MobileMenuProps) {
   const { t, path } = useLocale();
+  const helpHref = useWhatsAppLink(t.support.orderHelpMessage);
 
   useEffect(() => {
     if (!open) return;
@@ -136,7 +138,7 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
 
         <div className="shrink-0 border-t border-slate-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <a
-            href={whatsappLink(t.support.orderHelpMessage)}
+            href={helpHref}
             target="_blank"
             rel="noopener noreferrer"
             className="flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#25D366] px-6 font-display text-base font-bold text-white transition-colors hover:brightness-95"

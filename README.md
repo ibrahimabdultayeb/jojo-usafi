@@ -79,7 +79,7 @@ Saved screenshots at every QA width, in both languages, are in
 | `npm run catalogue:build` | Rebuild the catalogue and photography from `imports/` |
 | `npm run catalogue:check` | Verify the committed catalogue still matches `imports/` |
 | `npm run i18n:check` | Verify English and Kiswahili carry the same copy keys |
-| `npm run test` | 190 unit tests — pure functions, **no database needed** |
+| `npm run test` | 203 unit tests — pure functions, **no database needed** |
 | `npm run schema:check` | Offline: the migrations are internally consistent and agree with the domain layer |
 | `npm run qa:screenshots` | Full QA gate — screenshots and behaviour checks at 390/430/768/1024/1440 in both languages, plus the signed-in admin dashboard and its dialogs (a server must be running; set `BASE_URL` for anything other than port 3000) |
 
@@ -89,7 +89,7 @@ These need the hosted development project, and `.env.local`:
 | --- | --- |
 | `npm run db:types` | Regenerate `src/lib/supabase/database.types.ts` from the live schema |
 | `npm run db:types:check` | Fail if the committed types and the live schema have drifted |
-| `npm run test:db` | 215 tests against real PostgreSQL, Supabase Auth and Supabase Storage |
+| `npm run test:db` | 255 tests against real PostgreSQL, Supabase Auth and Supabase Storage |
 | `npm run qa:staff create` | A development Manager and Order staff login for dashboard QA. Prints one password and stores none. `status` and `remove` complete the set |
 | `npm run dev:zones` | Four placeholder delivery areas, each marked as a development fixture |
 | `npm run dev:orders` | Two development orders, placed through the real `jojo_place_order` |
@@ -106,6 +106,23 @@ cp .env.example .env.local                            # then fill in the three v
 `.env.local` is git-ignored and must never be committed. The migration path against a hosted
 project is always `npx supabase db push --dry-run`, read the plan, then `npx supabase db
 push` — `db reset` is never used on a hosted project.
+
+### The two protected job endpoints
+
+```
+POST /api/sync/catalogue              SHEET_SYNC_WEBHOOK_SECRET
+POST /api/jobs/expire-reservations    RESERVATION_EXPIRY_JOB_SECRET
+```
+
+Both are **closed until their secret is set**: a missing or short (under 16 character) value
+means every request is refused, so a deployment that forgets one is shut rather than open.
+The bearer comparison is constant-time and a wrong secret is answered exactly like an
+unconfigured one.
+
+**Nothing schedules either of them.** No cron entry, no Vercel schedule, no Supabase job, no
+paid scheduler exists in this repository. They are here so that when a schedule is decided it
+calls something already written and proven. Expiry additionally does nothing at all until
+`reservation_expiry_minutes` is set on **More → Settings**.
 
 ### If `npm run dev` shows a 500 with "Cannot find module './933.js'"
 

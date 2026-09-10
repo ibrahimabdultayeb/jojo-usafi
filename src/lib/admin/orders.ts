@@ -425,3 +425,51 @@ export async function getAdminZones(): Promise<AdminZoneRow[]> {
     isDevelopmentFixture: (zone.notes ?? "").startsWith("DEVELOPMENT FIXTURE"),
   }));
 }
+
+/* ------------------------------------------------------- amendable products */
+
+/**
+ * What may be ADDED to an existing order.
+ *
+ * Deliberately `product_shelf` and nothing else. That view is what
+ * `jojo_resolve_lines` calls `orderable`, so a product offered here is a
+ * product the amendment function will accept — the picker cannot suggest
+ * something the database then refuses.
+ *
+ * The price is the effective one (offer price when there is one), for the same
+ * reason: it is the figure the database will charge. The screen still labels
+ * its own arithmetic an estimate, because availability may move between the
+ * search and the save.
+ */
+export interface AmendableProductRow {
+  sku: string;
+  name: string;
+  packSize: string;
+  priceTzs: number;
+  available: number;
+}
+
+export async function getAmendableProducts(): Promise<AmendableProductRow[]> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase
+    .from("product_shelf")
+    .select("sku, display_name, pack_size_label, effective_price_tzs, available")
+    .order("display_name");
+
+  if (error) throw new Error(`Could not read what can be added: ${error.message}`);
+
+  // A view's columns are all nullable to the generated types, whatever the
+  // underlying NOT NULL says. A row without a SKU could not be ordered anyway,
+  // so it is dropped rather than asserted away.
+  return (data ?? []).flatMap((row) =>
+    row.sku && row.display_name
+      ? [{
+          sku: row.sku,
+          name: row.display_name,
+          packSize: row.pack_size_label ?? "",
+          priceTzs: row.effective_price_tzs ?? 0,
+          available: row.available ?? 0,
+        }]
+      : [],
+  );
+}

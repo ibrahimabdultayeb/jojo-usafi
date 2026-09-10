@@ -7,11 +7,13 @@ import { Icon } from "@/components/ui/Icon";
 import { can, type Role } from "@/lib/admin/permissions";
 import {
   advanceOrderAction,
+  amendOrderAction,
   cancelOrderAction,
   completeOrderAction,
   failDeliveryAction,
   type ActionResult,
 } from "@/lib/admin/actions";
+import { AmendSheet, type AmendableProduct } from "@/components/admin/orders/AmendSheet";
 import {
   CANCELLATION_REASONS,
   DELIVERY_FAILURE_REASONS,
@@ -32,12 +34,29 @@ import {
  * anything: reservation maths, transition legality and the payment rules live
  * in the database, so the screen cannot disagree with the shop.
  */
-export function OrderActions({ order, role }: { order: AdminOrder; role: Role }) {
+/**
+ * The four stages during which what is in the box is still a decision rather
+ * than a physical fact. Repeated from `jojo_amend_order`, which refuses every
+ * other stage regardless — this list decides what the screen OFFERS, never
+ * what is allowed.
+ */
+const AMENDABLE: readonly OrderStage[] = ["new", "awaiting_confirmation", "confirmed", "preparing"];
+
+export function OrderActions({
+  order,
+  role,
+  catalogue = [],
+}: {
+  order: AdminOrder;
+  role: Role;
+  catalogue?: readonly AmendableProduct[];
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [cancelOpen, setCancelOpen] = useState(false);
   const [failedOpen, setFailedOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [amendOpen, setAmendOpen] = useState(false);
   const [toast, setToast] = useState<{ text: string; bad: boolean } | null>(null);
 
   // The stage comes from the server on every render. Keeping a local copy would
@@ -46,6 +65,7 @@ export function OrderActions({ order, role }: { order: AdminOrder; role: Role })
   const stage: OrderStage = order.stage;
   const next = NEXT_ACTION[stage];
   const closed = stage === "completed" || stage === "cancelled" || stage === "delivery_failed";
+  const mayAmend = AMENDABLE.includes(stage) && can(role, "orders.advance");
 
   function announce(message: string, bad = false) {
     setToast({ text: message, bad });
@@ -93,6 +113,24 @@ export function OrderActions({ order, role }: { order: AdminOrder; role: Role })
           </div>
         )}
 
+        {mayAmend && (
+          <Button variant="secondary" icon="pencil" full disabled={pending} onClick={() => setAmendOpen(true)}>
+            Change what is in this order
+          </Button>
+        )}
+
+        {/*
+          Once a rider has the box, its contents are a fact about the world.
+          Saying so is better than offering a button that would be refused, and
+          better than silently removing one that was there a minute ago.
+        */}
+        {stage === "out_for_delivery" && can(role, "orders.advance") && (
+          <p className="flex items-start gap-2 rounded-xl bg-slate-100 p-3 text-xs font-medium text-slate-600">
+            <Icon name="truck" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+            This order is already with the rider, so its items can no longer be changed.
+          </p>
+        )}
+
         {!closed && can(role, "orders.cancel") && (
           <details className="group rounded-2xl border border-slate-200 bg-white">
             <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-sm font-bold text-slate-600 hover:text-slate-900">
@@ -135,6 +173,23 @@ export function OrderActions({ order, role }: { order: AdminOrder; role: Role })
           run(() => failDeliveryAction(order.id, returned, reason), () => setFailedOpen(false))
         }
       />
+
+      {/*
+        Mounted only while it is open, so every amendment starts from what the
+        order says NOW. A sheet that stayed mounted would reopen showing the
+        draft from the last time somebody changed their mind.
+      */}
+      {mayAmend && amendOpen && (
+        <AmendSheet
+          order={order}
+          catalogue={catalogue}
+          pending={pending}
+          onClose={() => setAmendOpen(false)}
+          onConfirm={(lines, reason) =>
+            run(() => amendOrderAction(order.id, lines, reason), () => setAmendOpen(false))
+          }
+        />
+      )}
 
       <PaymentSheet
         open={payOpen}

@@ -3,9 +3,18 @@ import { Icon } from "@/components/ui/Icon";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { getCategories } from "@/lib/catalogue/queries";
 import { fill, getDictionary, localePath, type Locale } from "@/lib/i18n";
-import { site, whatsappLink } from "@/lib/site";
+import { site } from "@/lib/site";
+import { whatsappHref, type Contact } from "@/lib/contact";
 
-export async function Footer({ locale }: { locale: Locale }) {
+export async function Footer({ locale, contact }: { locale: Locale; contact?: Contact }) {
+  // A default, so the footer still renders if it is ever used outside the
+  // layout that reads the shop’s real details.
+  const reach = contact ?? {
+    whatsappNumber: site.whatsappNumber,
+    phone: site.phone,
+    email: site.email,
+    addressLine: site.addressLine,
+  };
   const t = getDictionary(locale);
   const categories = await getCategories();
   const path = (p: string) => localePath(locale, p);
@@ -32,7 +41,7 @@ export async function Footer({ locale }: { locale: Locale }) {
             {fill(t.footer.blurb, { area: site.serviceArea })}
           </p>
           <a
-            href={whatsappLink(t.support.questionMessage)}
+            href={whatsappHref(reach.whatsappNumber, t.support.questionMessage)}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-5 inline-flex min-h-12 items-center gap-2 rounded-full bg-[#25D366] px-5 text-sm font-bold text-white transition-[filter] hover:brightness-95"
@@ -85,24 +94,24 @@ export async function Footer({ locale }: { locale: Locale }) {
           <ul className="mt-4 space-y-3 text-sm font-semibold text-slate-600">
             <li className="flex items-start gap-2.5">
               <Icon name="mapPin" className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
-              <span>{site.addressLine}</span>
+              <span>{reach.addressLine}</span>
             </li>
             <li>
               <a
-                href={`tel:${site.phone.replace(/\s/g, "")}`}
+                href={`tel:${reach.phone.replace(/\s/g, "")}`}
                 className="flex min-h-11 items-center gap-2.5 hover:text-brand-700"
               >
                 <Icon name="phone" className="h-4 w-4 shrink-0 text-brand-600" />
-                {site.phone}
+                {reach.phone}
               </a>
             </li>
             <li>
               <a
-                href={`mailto:${site.email}`}
+                href={`mailto:${reach.email}`}
                 className="flex min-h-11 items-center gap-2.5 break-all hover:text-brand-700"
               >
                 <Icon name="mail" className="h-4 w-4 shrink-0 text-brand-600" />
-                {site.email}
+                {reach.email}
               </a>
             </li>
             <li className="flex items-start gap-2.5">

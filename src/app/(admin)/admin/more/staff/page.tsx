@@ -1,17 +1,20 @@
 import { AdminPage } from "@/components/admin/AdminShell";
-import { ComingSoon } from "@/components/admin/ComingSoon";
+import { StaffManager } from "@/components/admin/staff/StaffManager";
+import { getStaff } from "@/lib/admin/staff";
+import { currentStaff } from "@/lib/admin/authorize";
 
 export const metadata = { title: "Staff" };
 
-export default function AdminStaffPage() {
+export default async function AdminStaffPage() {
+  const [staff, me] = await Promise.all([getStaff(), currentStaff()]);
+
   return (
-    <AdminPage title={"Staff"} back={{ href: "/admin/more", label: "More" }}>
-      <ComingSoon
-        icon="shield"
-        title={"Staff accounts arrive with sign-in"}
-        body={"You will create an account for each person who helps run the shop, and choose how much they can see."}
-        bullets={["Owner — everything, including staff and reports", "Manager — orders, products, customers and delivery", "Order staff — orders and customer contact only"]}
-      />
+    <AdminPage
+      title="Staff"
+      subtitle="Who can use this dashboard, and what each of them can do."
+      back={{ href: "/admin/more", label: "More" }}
+    >
+      <StaffManager staff={staff} role={me?.role ?? "order_staff"} currentId={me?.adminId ?? null} />
     </AdminPage>
   );
 }

@@ -94,6 +94,52 @@ Both are implemented as described and are cheap to change:
 2. **An order can be cancelled at any point before it is dispatched**, and after a failed
    delivery, but not once it is out for delivery or completed.
 
+## Amending an order — implemented in Build 10
+
+**What is in an order can be changed while it is still in the shop.** Staff open the order,
+change quantities, remove an item or add a product, say why, and save. Adding a product is
+limited to what a customer could order right now — the same shelf, the same rule.
+
+**Until it is with a rider.** `new`, `awaiting_confirmation`, `confirmed` and `preparing`
+may be amended; `out_for_delivery` and everything after may not. Once the goods are on a
+motorcycle, what is in the bag is a fact about the world and the record must not disagree
+with it. The screen stops offering the control at that point and says why.
+
+**A reason is required** and goes on the order's history, beside who did it and when.
+
+**The shop works out the new total, not the screen.** The order is re-priced from the
+catalogue inside the same transaction that moves the stock, so a price that changed between
+the order being placed and being amended is applied consistently to the whole order rather
+than to some lines. What the screen shows before saving is labelled an estimate, because it
+is one.
+
+**Stock moves with it, and never oversells.** Adding two units reserves two more, removing a
+line releases what it held, and both are written to the append-only ledger. An increase is
+checked against real availability first, and every product either side of the change is
+locked in a fixed order — so two people amending the same order at the same time cannot both
+take the last unit. Exactly one succeeds; the other is told how many are left.
+
+**An order cannot be emptied.** Removing the last item is refused with a sentence pointing at
+cancellation, which is a different act with different consequences for the customer.
+
+## An unconfirmed order does not hold stock for ever — configurable, Build 10
+
+Two durations live in `shop_settings`, both **null until Ibrahim sets them**:
+
+| Setting | Meaning |
+| --- | --- |
+| `reservation_warning_minutes` | when an unconfirmed order should be chased |
+| `reservation_expiry_minutes` | when it lets go of the stock it is holding |
+
+While `reservation_expiry_minutes` is null **nothing expires**, and stock is released only by
+cancellation. That is not an unfinished feature: how long "too long" is, is a business
+decision, and a default here would be this system inventing one.
+
+When it is set, expiry cancels the order through the ordinary cancellation path — so the
+release is written to the ledger exactly once and the order's history says what happened.
+**Nothing runs it automatically yet.** The endpoint exists and is protected; no schedule
+anywhere calls it.
+
 ## Stock rules — as the dashboard applies them (Build 08C)
 
 **Stock is never typed over.** There are exactly two ways an operator changes it, and both
@@ -212,6 +258,8 @@ production-verified, and the first real order would be priced from them.
       `reservation_expiry_minutes` are deliberately null: how long an unconfirmed order may
       hold stock is a business decision, and a default would be a guess. Until they are set,
       nothing expires and reservations are released only by cancellation.
+      *Since Build 10 these are entered on **More → Settings**, and the screen lists what is
+      still missing rather than waiting to be asked.*
 - [ ] **Return and refund wording**, in the customer's own words, for the storefront and for
       what staff say on the phone.
 
@@ -219,3 +267,15 @@ production-verified, and the first real order would be priced from them.
 
 - [ ] Real WhatsApp number, phone, email and address.
 - [ ] The Jojo Usafi logo.
+
+*Since Build 10 all five are entered on **More → Settings**. Every one starts empty and is
+shown as "Not set yet" — a placeholder phone number that reaches nobody is worse than a
+visibly missing one. The screen computes this same list from what the database actually holds
+and shows it as badges, so it cannot fall out of step with this document.*
+
+**The words on the website.**
+
+- [ ] Nothing is required here. Every field on **More → Website** is an override: left blank,
+      the site shows the copy it was designed with, in the right language. It is listed so
+      that "the homepage says something nobody chose" is understood to be a decision already
+      made, not an oversight.

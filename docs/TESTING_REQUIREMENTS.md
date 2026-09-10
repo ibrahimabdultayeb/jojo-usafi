@@ -7,7 +7,7 @@ Every one of these must pass before a commit:
 ```bash
 npm run typecheck        # TypeScript, no emit
 npm run lint             # ESLint
-npm run test             # 190 unit tests (vitest) — no database needed
+npm run test             # 203 unit tests (vitest) — no database needed
 npm run schema:check     # SQL is internally consistent and agrees with the domain layer
 npm run i18n:check       # en + sw key, placeholder and array parity
 npm run catalogue:check  # committed catalogue still matches imports/
@@ -20,7 +20,7 @@ and, since Build 06, the half that needs a real database:
 
 ```bash
 npm run db:types:check   # the generated types still match the live schema
-npm run test:db          # 215 tests against PostgreSQL, Supabase Auth and Storage
+npm run test:db          # 255 tests against PostgreSQL, Supabase Auth and Storage
 ```
 
 The two halves are deliberately separate. `npm run test` must keep working on a laptop with
@@ -39,8 +39,8 @@ migration path is `db push --dry-run`, read the plan, then `db push`.
 
 ## Domain unit tests
 
-`npm run test` — 190 tests over `src/lib/domain/`, the admin capability matrix and the Google Sheet sync planner, all pure
-TypeScript with no I/O:
+`npm run test` — 203 tests over `src/lib/domain/`, the admin capability matrix, the Google
+Sheet sync planner and the website-content rule, all pure TypeScript with no I/O:
 
 | Area | Covers |
 | --- | --- |
@@ -80,8 +80,9 @@ types disagreeing with the live schema.
 
 ## Database, Auth, RLS and Storage tests
 
-`npm run test:db` — 215 tests against the hosted development project. Ten files, run in
-name order by a custom sequencer, sharing one database with `fileParallelism` off.
+`npm run test:db` — 255 tests against the hosted development project. Twelve files, run in
+name order by a custom sequencer, sharing one database with `fileParallelism` off. (Two more
+files exist and are skipped by default; they open the real spreadsheet — see below.)
 
 | File | Tests | Proves |
 | --- | --- | --- |
@@ -94,6 +95,8 @@ name order by a custom sequencer, sharing one database with `fileParallelism` of
 | `07-commerce.test.ts` | 25 | quoting is the database answer and not the browser one; reservation is atomic; the last unit cannot be sold twice (1-in-stock/2-orders and 3-in-stock/5-orders); a refused order leaves nothing behind; customer matching on phone; cancellation releases once and is idempotent; tracking needs the number AND the phone; the commerce path is closed to the browser |
 | `06-catalogue.test.ts` | 14 | the real catalogue as an anonymous shopper receives it: 95 on the shelf, 201 kept, EP01-A01 blocked, EP23-A02 not invented, photographs filed and fetchable, nothing newly readable or writable |
 | `10-sheet-sync.test.ts` | 22 | the catalogue sync against the real database and an in-memory spreadsheet: both directions applied, a `STOCK QTY` of 999,999 moving nothing and writing no ledger row, conflicts recorded and not re-raised, a deleted sheet row leaving the product alone, a second run writing nothing, Google being down leaving checkout working, and orders, ledgers and staff rows untouched |
+| `13-operations.test.ts` | 25 | Build 10's three operations: a Sheet row becomes a draft nobody can reach, with zero stock, and is refused outright for a duplicate SKU, an implausible price or a brand, category or family that does not resolve; an order amended before dispatch moves the reservation both ways, re-prices from the catalogue, refuses to oversell, demands a reason and is refused once out for delivery; two amendments race for the last unit and exactly one wins; expiry does nothing while unconfigured and releases exactly once when it is |
+| `14-website-and-safety.test.ts` | 15 | the shop's settings row: readable by a shopper because the storefront is built from it, writable by nobody but the Owner — not a Manager, not Order staff, not a browser; a phone without its country code and a hero button pointing off-site are refused by CHECK constraints; and the seat itself — Order staff and Managers cannot promote themselves, Order staff cannot switch a colleague off, and somebody who has been switched off can still read the row that says so and can do nothing else. The whole `shop_settings` row is snapshotted before and restored afterwards, and the restore is asserted |
 | `09-admin-operations.test.ts` | 24 | the dashboard's operations run as the people who use them: Order staff refused pricing, stock, zones and self-promotion; Manager allowed all four but refused Owner and refused to rewrite what an order sold for; stock moved only through the ledger, with an actor and a reason; the whole staff journey to Completed with cash and with a digital reference; cancellation and both delivery-failure answers; what each screen can read |
 
 ### The real spreadsheet is never opened by the gate
@@ -180,18 +183,38 @@ does nothing if they already exist.
 - **Track Order has no rate limit.** Guessing a six-digit order number and a nine-digit phone
   together is not a realistic attack, but a determined script should still be slowed down.
   That needs a shared counter, so it belongs with deployment.
-- **The Website screen is still a prototype.** `shop_settings` exists; nothing writes it.
-  It is the last screen reading `src/mocks/admin/data.ts`, and says so on its face.
-- **Reports, Staff and Settings** are marked "Coming soon" and are empty.
+- **Reports** is still marked "Coming soon" and is empty. It waits on real orders to report
+  on. Every other admin screen reads and writes the real database; `src/mocks/` no longer
+  exists.
+- **The logo has no upload.** `shop_settings.logo_media_id` exists and the Settings screen
+  says plainly that uploading one arrives with the media screen. Until then the site shows the
+  JOJO USAFI wordmark.
 
 ## What is still NOT verified
 
-- **an amended order** — changing an order's lines before dispatch is not built.
-- **reservation expiry** — `jojo_stale_reservations` exists and is tested; nothing schedules
-  it, because the durations are Ibrahim's decision.
-- **Google Sheet sync** — the rules are unit-tested; nothing has ever talked to Google.
+- **a scheduled expiry run** — `jojo_expire_reservations` and its protected endpoint are
+  built and tested, including the case where nothing is configured. Nothing schedules them,
+  so the behaviour of a repeated automatic run in production is unproven by definition.
+- **the storefront reading changed settings end to end** — the resolution rule is proved
+  offline and the write path is proved against the database, but no test opens a browser,
+  changes the announcement in the dashboard and reads it back off the homepage.
 - **component unit tests** — the screens are covered by the QA gate and by the database
   tests behind them, not by rendering assertions.
+
+### Operations that touch the real spreadsheet
+
+`tools/sync/*.op.ts` are **operations, not tests**: each is armed by its own environment flag
+and is never part of the gate. They are how every real-Sheet step was carried out and
+recorded, most recently:
+
+```bash
+SYNC_STEP_G=1 npm run sync:op -- tools/sync/g-description.op.ts   # the approved description
+SYNC_STEP_H=1 npm run sync:op -- tools/sync/h-new-product.op.ts   # a new product, then undone
+```
+
+Step H appends two rows to the real Product Master, proves what a new row does and does not
+create, clears both rows, deletes what it made, and finishes by requiring the shop to be
+byte-for-byte what it was before it started.
 
 ## What the QA gate checks
 
@@ -228,6 +251,8 @@ are where a phone-sized dashboard usually goes wrong:
 - Add stock and Set counted stock, on the product editor
 - Cancel order and Delivery failed, behind "Something went wrong with this order"
 - Record the payment, behind Complete order
+- **Change what is in this order** — Build 10's amendment sheet, a row per item with minus,
+  plus and remove, which makes it the densest thing on the dashboard at 390px
 - the delivery-zone editor
 
 Each is checked for horizontal overflow and 44px touch targets, and photographed. If no QA
@@ -236,6 +261,14 @@ that is a missing fixture, not a defect in the shop. If a signed-in staff member
 to `/admin/sign-in`, or an order does not open, that **is** a failure — and a dialog whose
 opener is not on the screen says so out loud, because a silent skip once let two of the four
 order dialogs go unaudited while the run reported success.
+
+**Which order it opens is chosen, not taken.** Every one of those dialogs exists only while
+an order is still open, so the pass scores the first few orders and takes the one carrying
+the most controls: an order before dispatch carries all four, one out for delivery carries
+only the payment sheet, a finished one carries none. It says which case it found. Build 10's
+QA is why: the development orders had all been worked to the end, so the first order in the
+list had nothing to audit. `npm run dev:orders` now keeps one order **amendable** for the
+same reason.
 
 It then signs in again as the development **Order staff** account and checks that the
 smaller role really does see less: no Delivery zones, Website, Reports, Staff or Settings in

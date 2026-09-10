@@ -2181,3 +2181,179 @@ Impact:
 Proved end to end in the round-trip: shop 44 against sheet 43, resolved in the
 shop's favour, and the sheet received 44 on the next run. An offline test pins
 the planner half of it.
+
+---
+
+## 2026-09-10 — An amendment sends the whole order, never a difference
+
+Decision:
+`jojo_amend_order` takes the FULL final list of lines and works out for itself
+what was added, changed and removed. The screen never sends "add two of this" or
+"remove that", and never computes a total.
+
+Reason:
+A difference is only meaningful against a state, and the state the screen is
+looking at is already a few seconds old. Two people amending the same order from
+two phones would each send a difference computed from a different starting point,
+and both would apply. Sending the destination instead makes the last save
+authoritative rather than additive, and the function locks every product either
+side mentions before it moves anything.
+
+The total follows from the same rule. The screen shows an estimate and says so;
+the figure that goes on the order is priced from the catalogue inside the
+transaction, so the shop and the screen cannot disagree about what was charged.
+
+Alternatives:
+Send deltas and apply them in order. Rejected: two concurrent amendments would
+both succeed and the order would end up holding neither person's intention.
+
+Impact:
+`tests/db/13-operations.test.ts` runs two amendments at the last unit of stock
+and proves exactly one of them takes it. The other is refused with the shop's own
+sentence about how much is left.
+
+---
+
+## 2026-09-10 — Items are locked once the order is with a rider
+
+Decision:
+`new`, `awaiting_confirmation`, `confirmed` and `preparing` may be amended.
+`out_for_delivery` and everything after it may not. The order screen stops
+offering the control at that point and says why, rather than silently removing it.
+
+Reason:
+Once the goods are in a bag on a motorcycle, what is in that bag is a fact about
+the world. Editing the order would make the record disagree with what the customer
+is about to be handed, and the rider is the one who finds out.
+
+Alternatives:
+Allow amendment until Completed, on the grounds that the rider could be phoned.
+Rejected: the phone call is the amendment, and it happens before dispatch or it
+becomes a delivery failure and a new order.
+
+Impact:
+The rule is enforced in the database, so an amendment attempted by any route is
+refused with the same sentence. The screen's four-stage list decides only what is
+offered.
+
+---
+
+## 2026-09-10 — A blank website field means the site's own wording
+
+Decision:
+Every text field on the Website settings screen is an OVERRIDE. Clearing it
+restores the designed, translated copy rather than emptying the homepage.
+Switching something off is always a switch — never an empty box — which is why
+migration 0022 adds `show_announcement` beside the promotion band's existing flag.
+
+Reason:
+The alternative regresses a working shop. Until somebody opens that screen every
+field is null, so "blank means nothing" would have deleted the announcement strip
+and the hero headline the moment the screen was wired up. A homepage cannot be
+allowed to break because a form exists.
+
+It also settles the language question honestly: Kiswahili if it was written,
+otherwise English if it was, otherwise the dictionary answers in the right
+language. Nothing is ever machine-translated and nothing is ever blank.
+
+Alternatives:
+Seed the settings row with the current copy so blank could mean empty. Rejected:
+it duplicates the dictionary into the database, where the two then drift, and it
+puts English into a column an operator will later edit without realising the
+Kiswahili site depends on it.
+
+Impact:
+`src/lib/site-content.test.ts` proves the rule in both languages, and
+`tests/db/14-website-and-safety.test.ts` proves who may write it. The "Featured
+products" switch was removed from the screen: the homepage has no featured
+section to remove, and a switch that changes nothing is worse than a missing one.
+
+---
+
+## 2026-09-10 — SYSTEM LAST SYNCED is stamped when something happened
+
+Decision:
+The timestamp column is written when the shop actually wrote to that row, and on
+a row that has never carried one. A run where nothing changed writes nothing.
+
+Reason:
+The value is `now`, so it differed from the sheet on every single run — which
+made every row a row that "changed" and rewrote 201 cells to say nothing. That is
+noise in somebody's spreadsheet, it makes Google's own version history useless for
+spotting a real edit, and it spends quota.
+
+The column is a report column: never read as input, never in `CatalogueFields`,
+never in a fingerprint, never in a recorded base. Build 09 proved it cannot cause
+a sync loop. So changing how often it is written cannot disturb the merge — which
+was the condition attached to making this change at all.
+
+Alternatives:
+Re-stamp every row on a timer, say daily. Rejected: it puts a clock into a pure
+function and buys nothing the Sync Now screen does not already say better, since
+"when did the shop last check the sheet" is a fact about the run, not the row.
+
+Impact:
+A recheck after the change reports "Supabase → Sheet 0 rows" where it would
+previously have reported 201. Three offline tests pin the rule.
+
+---
+
+## 2026-09-10 — The expiry job exists and nothing schedules it
+
+Decision:
+`POST /api/jobs/expire-reservations` is written, authorised, bounded and idempotent.
+No cron entry, no Vercel schedule, no Supabase job and no paid scheduler exists
+anywhere in the repository.
+
+Reason:
+The deployment architecture is not settled, and an automatic thing nobody is
+watching is worse than a button somebody presses. Writing the endpoint now means
+that when a schedule is decided it calls something already proven, rather than
+something invented under time pressure on opening day.
+
+It also does nothing today even if called: `reservation_expiry_minutes` is null
+because nobody has decided how long "too long" is, and the function returns
+`configured: false` and touches no order.
+
+Alternatives:
+Wire it to a scheduler now with a default duration. Rejected twice over — it would
+attach a paid feature, and the default would be this system inventing a business
+rule.
+
+Impact:
+The bearer check both job routes use now lives in `src/lib/jobs/authorise.ts`:
+closed when the secret is missing or short, constant-time, and silent about which
+failure occurred. The route needs `RESERVATION_EXPIRY_JOB_SECRET`; it refuses
+every request until that is set.
+
+---
+
+## 2026-09-10 — The placeholder telephone number is a fallback, not the number
+
+Decision:
+The storefront reads the shop's WhatsApp number, phone, email and address from
+`shop_settings` through `src/lib/contact.ts`, falling back to the placeholders in
+`src/lib/site.ts` while any of them is unset. `whatsappLink()` was **removed**
+from `site.ts` rather than left as a convenience.
+
+Reason:
+The Settings screen collects a real telephone number. Leaving the storefront
+importing `site.whatsappNumber` would have meant the Owner types their number in,
+sees "Saved", and customers keep reaching `255700000000` — a screen that lies
+about what it does.
+
+Removing the old helper rather than repointing it is the part worth recording. A
+helper that silently reads the placeholder is a trap: any component that called it
+would look correct in review and be wrong in production, for as long as nobody
+noticed. A missing export is noticed at once, by the compiler.
+
+Alternatives:
+Keep `whatsappLink()` and have it read the database. Rejected: it is called from
+client components, which cannot await a read. The four that need it use a context
+the layout fills, exactly as the catalogue does.
+
+Impact:
+Six components changed. `getContact()` is one query, cached under the `catalogue`
+tag, so an Owner saving a number sees it on the site immediately and an ordinary
+visitor costs nothing. `PROTOTYPE_NOTES.md` now describes these as fallbacks
+rather than as the shop's details.

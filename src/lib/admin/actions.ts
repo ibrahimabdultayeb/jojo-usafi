@@ -147,6 +147,68 @@ export async function failDeliveryAction(
   );
 }
 
+/* -------------------------------------------------------------- amendment */
+
+export interface AmendLine {
+  readonly sku: string;
+  readonly quantity: number;
+}
+
+/**
+ * Change what is in an order, before it leaves.
+ *
+ * The whole final list goes to the database, not a diff: the caller says what
+ * the order should now contain and `jojo_amend_order` works out what that means
+ * for stock. No arithmetic happens here — not the totals, not the reservation
+ * delta, not whether there is enough. A second implementation of any of those
+ * is a second answer waiting to disagree with the first.
+ */
+export async function amendOrderAction(
+  orderId: string,
+  lines: readonly AmendLine[],
+  reason: string,
+): Promise<ActionResult> {
+  const auth = await authorize("orders.advance");
+  if (!auth.ok) return failed(auth.message);
+
+  if (reason.trim().length === 0) {
+    return failed("Say why the order is changing — it goes on the record.");
+  }
+  if (lines.length === 0) {
+    return failed("An order cannot be left with nothing in it. Cancel it instead.");
+  }
+  if (lines.some((line) => !Number.isInteger(line.quantity) || line.quantity < 1)) {
+    return failed("Every item needs a whole number, one or more. Remove it instead of setting zero.");
+  }
+
+  const { data, error } = await getServiceRoleSupabase().rpc("jojo_amend_order", {
+    p_order_id: orderId,
+    p_items: lines.map((line) => ({ sku: line.sku, quantity: line.quantity })),
+    p_reason: reason.trim(),
+    p_actor_admin_id: auth.staff.adminId,
+  });
+
+  if (error) return failed(readable(error));
+  refreshOrder(orderId);
+
+  const result = data as {
+    order_number: string;
+    added: number;
+    changed: number;
+    removed: number;
+    total_tzs: number;
+  };
+
+  const parts: string[] = [];
+  if (result.added) parts.push(`${result.added} added`);
+  if (result.changed) parts.push(`${result.changed} changed`);
+  if (result.removed) parts.push(`${result.removed} removed`);
+
+  return done(
+    `${result.order_number} updated${parts.length ? ` — ${parts.join(", ")}` : ""}. New total TSh ${result.total_tzs.toLocaleString("en-TZ")}.`,
+  );
+}
+
 /* ---------------------------------------------------------------- products */
 
 export interface ProductPatch {

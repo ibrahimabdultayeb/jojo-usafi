@@ -8,8 +8,33 @@ import { site } from "@/lib/site";
 /** The id the down control scrolls to — the first shopping section on the page. */
 export const SHOP_SECTION_ID = "shop-start";
 
-export function Hero({ locale }: { locale: Locale }) {
+/**
+ * `content` is what the Owner typed on the Website screen. Each field is an
+ * override: null means the designed copy below stands, so a shop that never
+ * opens that screen has the homepage it was designed with.
+ *
+ * A supplied heading replaces the two-line gradient title with one line. The
+ * gradient half is a typographic composition of a sentence this file wrote;
+ * splitting somebody else's sentence in two to keep the effect would break
+ * their wording to preserve our decoration.
+ */
+export function Hero({
+  locale,
+  content,
+}: {
+  locale: Locale;
+  content?: {
+    heroHeading: string | null;
+    heroSub: string | null;
+    heroCtaLabel: string | null;
+    heroCtaHref: string | null;
+  };
+}) {
   const t = getDictionary(locale);
+  const heading = content?.heroHeading ?? null;
+  const sub = content?.heroSub ?? null;
+  const ctaLabel = content?.heroCtaLabel ?? null;
+  const ctaHref = content?.heroCtaHref ?? null;
 
   const proofPoints = [
     { icon: "shield" as const, label: t.hero.proofGenuine },
@@ -35,11 +60,15 @@ export function Hero({ locale }: { locale: Locale }) {
         </span>
 
         <h1 className="mb-5 font-display text-[2.15rem] leading-[1.06] font-bold tracking-tight text-slate-900 sm:text-5xl md:mb-8 md:text-7xl md:leading-[1.02] lg:text-8xl">
-          {t.hero.titleTop}
-          <br />
-          <span className="bg-gradient-to-r from-brand-600 to-emerald-400 bg-clip-text text-transparent">
-            {t.hero.titleBottom}
-          </span>
+          {heading ?? (
+            <>
+              {t.hero.titleTop}
+              <br />
+              <span className="bg-gradient-to-r from-brand-600 to-emerald-400 bg-clip-text text-transparent">
+                {t.hero.titleBottom}
+              </span>
+            </>
+          )}
         </h1>
 
         <ul className="mb-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs font-bold text-slate-600 md:mb-8 md:text-sm">
@@ -52,7 +81,7 @@ export function Hero({ locale }: { locale: Locale }) {
         </ul>
 
         <p className="mx-auto mb-8 max-w-3xl text-base leading-relaxed font-medium text-slate-500 md:mb-10 md:text-xl lg:text-2xl">
-          {fill(t.hero.body, { area: site.serviceArea })}
+          {sub ?? fill(t.hero.body, { area: site.serviceArea })}
         </p>
 
         {/* The two hero actions keep their size across languages, so the most
@@ -61,12 +90,14 @@ export function Hero({ locale }: { locale: Locale }) {
             wide as the centred column, which the translated headline and body
             copy legitimately size. */}
         <div className="flex flex-col justify-center gap-3 sm:flex-row md:gap-4">
+          {/* A typed button label is one specific string, so it cannot be
+              width-stabilised against both dictionaries the way ours is. */}
           <Link
-            href={localePath(locale, "/shop")}
+            href={localePath(locale, ctaHref ?? "/shop")}
             data-qa-anchor="hero-cta-shop"
             className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-slate-900 px-8 font-display text-base font-bold text-white shadow-xl transition-all hover:-translate-y-0.5 hover:bg-brand-600 hover:shadow-brand-200 md:px-10 md:text-lg"
           >
-            <StableText pick={(d) => d.hero.ctaShop}>{t.hero.ctaShop}</StableText>
+            {ctaLabel ?? <StableText pick={(d) => d.hero.ctaShop}>{t.hero.ctaShop}</StableText>}
             <Icon name="arrowRight" className="h-5 w-5" />
           </Link>
           <Link

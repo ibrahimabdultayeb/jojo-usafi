@@ -1,13 +1,16 @@
 import Link from "next/link";
-import { SHOP_SECTION_ID } from "@/components/home/Hero";
 import { getCategories, getProducts } from "@/lib/catalogue/queries";
 import { fill, getDictionary, localePath, type Locale } from "@/lib/i18n";
 import { toneSet } from "@/lib/tones";
 
 /**
- * Shop by category, and the target of the hero's down control — the first
- * shopping surface below the fold. On phones this is a horizontal rail so the
- * categories stay one thumb-swipe away instead of pushing the shelf off screen.
+ * Shop by category — the first shopping surface below the fold. On phones this
+ * is a horizontal rail so the categories stay one thumb-swipe away instead of
+ * pushing the shelf off screen.
+ *
+ * The hero's down control used to aim at this section's id. It no longer does:
+ * an Owner who switches this section off would have taken the anchor with it
+ * and left the control silently doing nothing. HomeView owns the anchor now.
  */
 export async function CategoryStrip({ locale }: { locale: Locale }) {
   const t = getDictionary(locale);
@@ -20,10 +23,7 @@ export async function CategoryStrip({ locale }: { locale: Locale }) {
   }
 
   return (
-    <section
-      id={SHOP_SECTION_ID}
-      className="scroll-target border-y border-slate-100 bg-white py-8 outline-none md:py-12"
-    >
+    <section className="border-y border-slate-100 bg-white py-8 md:py-12">
       <div className="shell">
         <div className="mb-5 flex items-baseline justify-between gap-4">
           <h2 className="font-display text-xl font-bold tracking-tight text-slate-900 md:text-3xl">

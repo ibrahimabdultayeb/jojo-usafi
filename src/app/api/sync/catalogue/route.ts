@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { timingSafeEqual } from "node:crypto";
+import { bearerAuthorised } from "@/lib/jobs/authorise";
 import { runCatalogueSync } from "@/lib/sheets/run";
 
 /**
@@ -22,22 +22,10 @@ import { runCatalogueSync } from "@/lib/sheets/run";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-function authorised(request: NextRequest): boolean {
-  const expected = process.env.SHEET_SYNC_WEBHOOK_SECRET;
-
-  // Closed by default. A missing secret is not "no authentication required".
-  if (!expected || expected.trim().length < 16) return false;
-
-  const header = request.headers.get("authorization") ?? "";
-  const offered = header.startsWith("Bearer ") ? header.slice(7) : "";
-  if (offered.length === 0) return false;
-
-  const a = Buffer.from(offered);
-  const b = Buffer.from(expected);
-  // Compare lengths first — `timingSafeEqual` throws on a mismatch — and still
-  // do a constant-time compare on equal lengths.
-  return a.length === b.length && timingSafeEqual(a, b);
-}
+// Closed by default, constant-time, and silent about which failure happened.
+// The three properties live in one place now that there are two job routes.
+const authorised = (request: NextRequest) =>
+  bearerAuthorised(request, process.env.SHEET_SYNC_WEBHOOK_SECRET);
 
 export async function POST(request: NextRequest) {
   if (!authorised(request)) {
