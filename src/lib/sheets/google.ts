@@ -197,6 +197,8 @@ export interface SheetGateway {
   /** Append the system report columns to the right of the existing headers. */
   appendHeaders(headers: readonly string[], afterColumnCount: number): Promise<void>;
   readonly describe: string;
+  /** Widen the tab so `columns` columns exist. Optional: fakes have no grid. */
+  ensureWidth?(columns: number): Promise<void>;
 }
 
 export interface CellUpdate {
@@ -278,6 +280,15 @@ export function googleSheetGateway(config: GoogleConfig): SheetGateway {
 
     async appendHeaders(headers, afterColumnCount) {
       if (headers.length === 0) return;
+
+      // A spreadsheet is a fixed grid, not an infinite plane. Writing to a
+      // column past its right-hand edge is refused outright — "exceeds grid
+      // limits" — so the grid has to be widened first. The real Product Master
+      // is exactly 39 columns wide, which is how this was found: the append
+      // failed, the system columns never appeared, and the run reported
+      // success anyway.
+      await this.ensureWidth!(afterColumnCount + headers.length);
+
       await this.writeCells(
         headers.map((header, index) => ({
           row: 1,
@@ -285,6 +296,63 @@ export function googleSheetGateway(config: GoogleConfig): SheetGateway {
           value: header,
         })),
       );
+    },
+
+    /** Widen the tab if it is narrower than `columns`. Idempotent. */
+    async ensureWidth(columns: number) {
+      const token = await accessToken(config);
+      const url = `${SHEETS_API}/${encodeURIComponent(config.spreadsheetId)}?fields=${encodeURIComponent("sheets(properties(sheetId,title,gridProperties(columnCount)))")}`;
+
+      const response = await fetchWithTimeout(url, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        throw new GoogleUnavailable("Could not read the sheet's shape.", await safeBody(response));
+      }
+
+      const body = (await response.json()) as {
+        sheets?: {
+          properties?: {
+            sheetId?: number;
+            title?: string;
+            gridProperties?: { columnCount?: number };
+          };
+        }[];
+      };
+
+      const tab = (body.sheets ?? []).find((s) => s.properties?.title === config.tab);
+      if (!tab?.properties || tab.properties.sheetId === undefined) {
+        throw new GoogleUnavailable(`The spreadsheet has no tab named "${config.tab}".`);
+      }
+
+      const current = tab.properties.gridProperties?.columnCount ?? 0;
+      if (current >= columns) return;
+
+      const widen = await fetchWithTimeout(
+        `${SHEETS_API}/${encodeURIComponent(config.spreadsheetId)}:batchUpdate`,
+        {
+          method: "POST",
+          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+          body: JSON.stringify({
+            requests: [
+              {
+                appendDimension: {
+                  sheetId: tab.properties.sheetId,
+                  dimension: "COLUMNS",
+                  length: columns - current,
+                },
+              },
+            ],
+          }),
+        },
+      );
+
+      if (!widen.ok) {
+        throw new GoogleUnavailable(
+          "Could not make room for the system columns.",
+          await safeBody(widen),
+        );
+      }
     },
   };
 }

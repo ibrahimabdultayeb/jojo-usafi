@@ -1982,3 +1982,68 @@ is already in the row, and a migration to restate it would be a schema change fo
 
 Impact:
 No schema change. The distinction is visible exactly where it matters and nowhere else.
+
+---
+
+## 2026-09-10 — A half-finished run records no agreement
+
+Decision:
+If the system columns cannot be created, or the sheet write fails, the run records **no**
+`sync_state` agreement and is reported as **failed**. The database half stands; the sheet half
+is simply done again next time.
+
+Reason:
+The first real run against the Product Master failed to append its system columns — the tab
+was 39 columns wide and Google refuses a write past the edge of the grid — and then reported
+*"Sync complete"* and recorded 201 agreements describing a sheet that had never been written.
+
+`sync_state` is the reference point for everything afterwards: echo detection, stale writes,
+conflicts. An agreement recorded against a version of the sheet that never existed poisons all
+three, silently and permanently. The sheet would have looked unchanged when it had never been
+changed at all, and no later run could have noticed.
+
+The original code caught the failure, pushed a note into the report, and carried on. A note is
+the right response to something that does not matter. This mattered.
+
+Alternatives:
+Record the agreement and let the next run repair it. Rejected: there is nothing to repair
+from, because the wrong base makes the difference invisible. Retry the append inside the run.
+Rejected as the primary fix — worth doing one day, but the correctness question is what to
+record when it does not work, not how many times to try.
+
+Impact:
+`report.ok` is false, the job is `failed` with the reason, and the operator is told the sheet
+will catch up. Two tests in `tests/db/10-sheet-sync.test.ts` cover it: the failure records no
+agreement, and the following run completes and records one.
+
+The agreement that the broken run recorded was deleted and its job row corrected from
+`applied` to `failed` with an explanation. The record of the run stays — it happened — but it
+no longer claims to have succeeded.
+
+---
+
+## 2026-09-10 — A spreadsheet is a fixed grid, so widen it before writing past the edge
+
+Decision:
+`appendHeaders` reads the tab's `gridProperties.columnCount` and, if the new columns would sit
+beyond it, issues an `appendDimension` request to widen the tab first. Idempotent: a tab that
+is already wide enough is left alone.
+
+Reason:
+Google Sheets does not grow a sheet to fit a write. A `values.batchUpdate` addressing a column
+past the grid's edge is refused outright. The real Product Master is exactly 39 columns wide
+and the sync wanted columns 40 to 44, so every system cell was silently dropped — the write
+list was built from a header index that never gained the new columns.
+
+This was invisible in every test, because the in-memory sheet used by the suite grows a row to
+fit whatever is written to it. That was a reasonable fake for everything else and exactly
+wrong here.
+
+Alternatives:
+Ask the operator to add the columns by hand. Rejected: five columns the system owns should not
+be a setup step somebody can get wrong. Write the system values into a second tab. Rejected:
+the whole point is that the figures sit beside the row they describe.
+
+Impact:
+`MemorySheet` gained `failHeadersWith` so the failure can be reproduced deliberately, which is
+how the "records no agreement" rule above is tested.

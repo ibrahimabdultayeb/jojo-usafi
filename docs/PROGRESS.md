@@ -32,11 +32,11 @@ edits delivery areas. Every write is refused if the person's role does not allow
 database rather than by the screen. The invented orders, customers, zones and sales figures
 are deleted, not kept as a fallback.
 
-**The Google Sheet sync is built and connected.** Two-way, validated, conflict-aware and
-audited, with an admin screen and 47 tests. As of 2026-09-10 it can read the real *Product
-Master* — 201 rows, 39 headers, all recognised — and a read-only dry run has been done. **No
-sync has been run yet**, deliberately: see `docs/GOOGLE_SHEET_SYNC.md` → *The first
-connection* for exactly what the first one would write.
+**The Google Sheet sync is connected and its baseline is synchronised.** On 2026-09-10 the
+first real run wrote 910 cells — the five read-only system columns and their headers — and
+recorded what the two sides agree on. Not one of Ibrahim's own cells was touched and nothing
+in the shop moved. **The catalogue itself has not been synced yet**: the second plan is
+calculated and waiting on one decision. See `docs/GOOGLE_SHEET_SYNC.md`.
 
 What is still not true: the **Website** screen saves nothing and says so; Reports, Staff and
 Settings are empty; and no product has yet been synced to or from a real Google Sheet.
@@ -1422,6 +1422,84 @@ After the pass: 201 products, 95 visible, 95 on the shelf, all `sort_priority` s
 inventory movements, 2 orders, and `sync_state` / `sync_events` / `sync_conflicts` all empty.
 Nothing moved.
 
+## Build 09 continued — the baseline sync, and a stop — 2026-09-10
+
+Ibrahim's two decisions came in: EP04-A01's bad priority cell cleared to blank (meaning *no
+decision*, not a number to invent), and **Show** confirmed as *intent* — "publish this when it
+satisfies the system's own requirements" — never as proof that a product is publishable.
+
+The sync was run in stages, each one a file under `tools/sync/` that refuses to do anything
+without its own flag. They are operations, not tests: `npm run test` and `npm run test:db`
+never open the real spreadsheet.
+
+### Step A — the sheet, rechecked
+
+201 data rows, **201 parsed cleanly, 201 unique SKUs**, no duplicates, no malformed rows, and
+**not one price differs from the shop**. EP04-A01's blank cell reads as 0 — the database's own
+"no decision" — rather than an invented figure.
+
+### Step B — the baseline, written
+
+**910 cells: the five system columns across 201 rows, plus their five headers.** Zero of
+Ibrahim's own cells. Afterwards, byte for byte: every inventory row, every price, the public
+shelf and the counts of orders, order items and customers were unchanged. 201 agreements
+recorded, no conflicts, and all 201 rows of the sheet's system values match the shop exactly.
+
+Two independent guards: the plan was recomputed and checked before the run, and the gateway
+was wrapped so a write to any column but the five would throw before reaching Google.
+
+### Step C — the second plan, calculated and not applied
+
+116 products, stable across two calculations, no conflicts, no issues, nothing new or missing:
+
+| Field | Products | |
+| --- | --- | --- |
+| Show on website | **106** | approved |
+| Display order | **14** | **not approved** |
+| Description | **1** | **not approved** |
+
+No inventory field, no price, no lifecycle, no SKU, no web address — asserted one by one. All
+106 products that would become visible lack a photograph, none is on the shelf, and
+`product_shelf` requires a primary image regardless of the flag, so the expected shelf after
+applying is **95 — unchanged**.
+
+### Why it stopped there
+
+The instruction was to stop if the second plan held anything materially beyond the approved
+website-intent changes. It does: 14 display-order values and 1 description. All three fields
+are `Both ways` in the authority matrix and none is destructive — in every case the Sheet is
+supplying something the database never had — but 15 changes across two other fields is not
+"approximately 105 website-intent changes", so **steps D, E and F have not run.**
+
+### Two faults the first real run found
+
+**Google refuses a write past the edge of the grid.** The tab is exactly 39 columns wide, so
+appending five system columns was rejected. A spreadsheet is a fixed grid, not an infinite
+plane. `appendHeaders` now widens the tab first, idempotently.
+
+**Worse: the run reported success anyway.** The failed append was caught, noted, and the run
+carried on to record an agreement describing a sheet that had never been written. `sync_state`
+is the reference point for echo detection, stale writes and conflicts — an agreement against a
+version that never existed poisons all three, permanently and invisibly.
+
+A failed header append or cell write now records **no agreement** and reports the run as
+failed. The database half stands; the next run does the sheet half again. Two tests cover it.
+
+The agreement that broken run recorded was deleted and its job row corrected from `applied` to
+`failed` with an explanation. The record of the run stays — it happened — but it no longer
+claims to have succeeded.
+
+Neither fault was visible in any test, because the in-memory sheet grows to fit whatever is
+written to it. That was a reasonable fake for everything else and exactly wrong here.
+`MemorySheet` gained `failHeadersWith` so the failure can be reproduced deliberately.
+
+### Verified
+
+`typecheck` · `lint` · `test` (**189**) · `build` · `test:db` (**215** passed, 3 skipped).
+
+After the two runs: 201 products, 95 visible, 95 on the shelf, 204 inventory movements, 2
+orders, 201 agreements, 0 conflicts. Nothing operational moved.
+
 ## Next
 
 - Confirm the open business rules (delivery fee, served areas, retail prices). A global
@@ -1452,12 +1530,11 @@ Nothing moved.
   tested, 2026-09-09. Not connected.**
 - ~~**Ibrahim, to switch the sync on:** the Google service account and spreadsheet~~ — **done,
   2026-09-10.** Connected, read and checked; no sync run yet.
-- **Ibrahim, one decision before the first real sync:** 105 products say **Show** in the sheet
-  and are hidden in the shop, every one of them because it has no approved photograph. The
-  first sync will not touch either side. The *second* will offer to set those 105 to visible —
-  which is what your sheet says you want, and they still will not appear on the website until
-  a photograph exists. Confirm that is right, and fix EP04-A01 row 50, whose display-order
-  cell contains  instead of a number.
+- **Ibrahim, one decision before the catalogue sync:** the second plan proposes 106 website-
+  intent changes (approved), and also **14 display-order values** and **1 product description**
+  that the Sheet holds and the shop does not. None is destructive; all three fields are
+  two-way in the authority matrix. Say whether to apply all 116, or only the 106 visibility
+  changes, and the sync finishes.
 - **Build 10**, in this order:
   1. **The first real sync** — 905 system-column cells, then a second dry run to review the
      105 visibility edits the sheet is asking for

@@ -459,6 +459,74 @@ describe("Google Sheets is unavailable", () => {
   });
 });
 
+/* --------------------------------------------- a run that only half worked */
+
+describe("when the system columns cannot be created", () => {
+  /*
+    The first real run against Ibrahim's Product Master did exactly this. The
+    tab was 39 columns wide, Google refused a write past its edge, and the run
+    reported "Sync complete" — having recorded an agreement describing a sheet
+    that had never been written. Every later comparison would have started from
+    a version that never existed, and the difference would have been invisible.
+  */
+  /**
+   * A sheet that does not yet have the system columns — the state the real
+   * Product Master was in, and the only state in which they get appended.
+   */
+  function sheetWithoutSystemColumns(over: Record<string, string | number> = {}): MemorySheet {
+    const plain = COLUMNS.map((c) => c.header);
+    const full = row(SKU.public, over);
+    return new MemorySheet([plain, plain.map((header) => full[HEADERS.indexOf(header)])]);
+  }
+
+  it("reports failure and records no agreement", async () => {
+    const sheet = sheetWithoutSystemColumns();
+    sheet.failHeadersWith = "Could not make room for the system columns.";
+
+    const report = await sync(sheet);
+
+    expect(report.ok, "a half-finished run is not a successful one").toBe(false);
+    expect(report.headline + report.detail.join(" ")).toMatch(/system columns/i);
+
+    const { count } = await db
+      .from("sync_state")
+      .select("*", { count: "exact", head: true })
+      .eq("entity_table", ENTITY_TABLE)
+      .eq("entity_key", SKU.public);
+
+    expect(count, "nothing may be recorded as agreed").toBe(0);
+
+    const { data: job } = await db
+      .from("sync_jobs")
+      .select("status, error_message")
+      .eq("entity_table", ENTITY_TABLE)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    expect(job!.status).toBe("failed");
+    expect(job!.error_message).toBeTruthy();
+  });
+
+  it("still leaves the shop correct, and catches up on the next run", async () => {
+    const sheet = sheetWithoutSystemColumns({ "PRICE TZS": 12_000 });
+    sheet.failHeadersWith = "Could not make room for the system columns.";
+    await sync(sheet);
+
+    // The next run, with the sheet behaving, completes and records the agreement.
+    sheet.failHeadersWith = null;
+    const second = await sync(sheet);
+
+    expect(second.ok).toBe(true);
+    const { count } = await db
+      .from("sync_state")
+      .select("*", { count: "exact", head: true })
+      .eq("entity_table", ENTITY_TABLE)
+      .eq("entity_key", SKU.public);
+    expect(count).toBe(1);
+  });
+});
+
 /* ------------------------------------------------------------------ dry run */
 
 describe("checking without changing", () => {

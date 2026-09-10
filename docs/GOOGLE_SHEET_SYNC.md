@@ -9,11 +9,11 @@ Supabase; no customer request has ever touched Google, and none ever will. The S
 human-friendly control surface for the catalogue — it is not a second database, and it owns
 nothing operational.
 
-> **Status: connected, read and checked. No sync has been run.** The service account can
-> open *Jojo Usafi Ecommerce Master Control* → *Product Master*, and a read-only dry run on
-> 2026-09-10 read all 201 rows, validated every header and compared them with the shop. What
-> a first real sync would write is **905 cells, every one of them a system report column** —
-> not one of the operator's own cells. See *The first connection* below.
+> **Status: baseline synchronised. The catalogue itself has not been synced yet.** On
+> 2026-09-10 the first real run wrote 910 cells — the five system report columns and their
+> headers — and recorded what the two sides agree on. Not one of Ibrahim's own cells was
+> touched, and nothing in the shop moved. The second plan is calculated and **waiting for a
+> decision**: see *The staged first sync* below.
 
 ---
 
@@ -249,6 +249,97 @@ figure is neither corrected nor multiplied.
 
 **EP23-A02** — not in the sheet at all, and not in the shop. Still an approved photograph with
 no product. The sync proposes nothing; an image does not create a product.
+
+
+## The staged first sync — 2026-09-10
+
+Run as files under `tools/sync/`, one per step, each refusing to do anything without its own
+flag. They are operations, not tests: `npm run test` and `npm run test:db` never open the real
+spreadsheet.
+
+```bash
+SYNC_STEP_A=1 npm run sync:op -- tools/sync/a-recheck.op.ts       # read only
+SYNC_STEP_B=1 npm run sync:op -- tools/sync/b-baseline.op.ts      # writes system columns
+SYNC_STEP_C=1 npm run sync:op -- tools/sync/c-second-plan.op.ts   # read only
+```
+
+### Step A — the sheet, rechecked
+
+201 data rows, **201 parsed cleanly, 201 unique SKUs**, no duplicates, no malformed rows, and
+**not one price differs from the shop**. EP04-A01's display-order cell is now blank, which
+reads as *no decision* — 0 — rather than an invented number.
+
+### Step B — the baseline
+
+**910 cells written: the five system columns across 201 rows, plus their five headers.** Zero
+of Ibrahim's own cells. Afterwards, byte for byte: every inventory row, every price, the
+public shelf, and the counts of orders, order items and customers were unchanged. 201
+agreements recorded, no conflicts, and all 201 rows of the sheet's system values match the
+shop exactly.
+
+Two guards made that safe independently of each other: the plan was recomputed and checked
+before the run, and the gateway was wrapped so that a write to any column but the five would
+throw before reaching Google.
+
+**It failed the first time, and that was worth more than a clean pass.** See *Two faults the
+first real run found*.
+
+### Step C — the second plan, calculated and not applied
+
+| | |
+| --- | --- |
+| Sheet → Supabase | **116 products** |
+| Supabase → Sheet | 201 rows |
+| Conflicts | 0 |
+| Echoes | 85 |
+| Issues, new, missing | 0, 0, 0 |
+
+| Field | Products | |
+| --- | --- | --- |
+| Show on website | **106** | approved |
+| Display order | **14** | **not yet approved** |
+| Description | **1** | **not yet approved** |
+
+Identical on a second calculation — the plan is stable, with no drift and no growth.
+
+**Nothing operational is reachable.** No inventory field, no price, no lifecycle, no SKU and
+no web address appears in the plan, asserted field by field.
+
+**The shelf cannot be reached by a Show flag.** All 106 products that would become visible
+lack an approved photograph, none is on the shelf now, and `product_shelf` requires a primary
+image regardless of the flag. The expected shelf after applying is **95 — unchanged**.
+
+### Why step D has not run
+
+The instruction was to stop if the second plan contained anything materially beyond the
+approved website-intent changes. It does: **14 display-order values and 1 description**, all
+of them the Sheet supplying something the database never had (a `0` default that was never
+imported, and a product description the shop has never held). None is destructive and all
+three fields are `Both ways` in the authority matrix — but "approximately 105 website-intent
+changes" is what was approved, and 15 changes in two other fields is not that.
+
+Waiting on Ibrahim.
+
+## Two faults the first real run found
+
+**Google refuses a write past the edge of the grid.** The tab is exactly 39 columns wide, so
+appending five system columns was rejected — "exceeds grid limits". A spreadsheet is a fixed
+grid, not an infinite plane. `appendHeaders` now widens the tab first, and the widening is
+idempotent.
+
+**Worse: the run reported success anyway.** The failed append was caught, noted, and the run
+carried on to record an agreement — describing a sheet that had never been written. Every
+later comparison would have started from a version that never existed, and the difference
+would have been invisible forever.
+
+Now a failed header append, or a failed cell write, means **no agreement is recorded** and the
+run is reported as failed. The database half stands, because it is correct and already saved;
+the next run simply does the sheet half again. Both cases are covered by tests in
+`tests/db/10-sheet-sync.test.ts`.
+
+The agreement that the broken run recorded was removed, and its `sync_jobs` row was corrected
+from `applied` to `failed` with an explanation. The record of the run stays — it happened —
+but it no longer claims to have succeeded.
 
 ## Conflicts
 

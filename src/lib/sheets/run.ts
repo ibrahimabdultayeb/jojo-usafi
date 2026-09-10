@@ -355,6 +355,8 @@ export async function runCatalogueSync(options: RunOptions): Promise<RunReport> 
 
   // Append the system columns if the sheet does not have them yet, so the
   // operator's own layout is never disturbed — only extended to the right.
+  let headersFailed: string | null = null;
+
   if (plan.headerCheck.toAppend.length > 0) {
     try {
       await gateway.appendHeaders(plan.headerCheck.toAppend, snapshot.headers.length);
@@ -362,8 +364,16 @@ export async function runCatalogueSync(options: RunOptions): Promise<RunReport> 
         headerIndex.set(header, snapshot.headers.length + offset),
       );
       notes.push(`Added ${plan.headerCheck.toAppend.length} read-only system column(s) to the sheet.`);
-    } catch {
-      notes.push("The system columns could not be added to the sheet this time.");
+    } catch (error) {
+      // NOT a note-and-carry-on. Without those columns every cell destined for
+      // them is silently dropped, so the run would report "Sync complete",
+      // record an agreement, and leave the sheet with none of the information
+      // the agreement claims it has. The first real run against the Product
+      // Master did exactly that: the grid was 39 columns wide, Google refused
+      // the write, and the failure arrived as a cheerful success.
+      headersFailed =
+        error instanceof GoogleUnavailable ? error.message : "The system columns could not be added.";
+      notes.push(`${headersFailed} Nothing was recorded as agreed, so the next run will try again.`);
     }
   }
 
@@ -402,17 +412,40 @@ export async function runCatalogueSync(options: RunOptions): Promise<RunReport> 
 
   /* -------------------------------------------------- record the agreement */
 
-  await recordAgreement(db, jobId, plan, products);
+  /*
+    AN AGREEMENT IS ONLY RECORDED IF BOTH SIDES ACTUALLY GOT THERE.
 
-  await finishJob(db, jobId, failures > 0 ? "failed" : "applied", {
+    `sync_state` says "this is what the two last agreed on", and everything
+    afterwards is measured against it: an echo, a stale write, a conflict.
+    Writing it after a half-finished run would make the next comparison start
+    from a version of the sheet that never existed — the sheet would look
+    unchanged when it had never been changed at all, and the difference would
+    be invisible forever.
+
+    So a failed sheet write, or system columns that could not be created, means
+    no agreement. The database half stands (it is correct and already saved),
+    and the next run simply does the sheet half again.
+  */
+  const sheetIsBehind = headersFailed ?? sheetWriteFailed;
+
+  if (!sheetIsBehind) {
+    await recordAgreement(db, jobId, plan, products);
+  }
+
+  const failedOverall = failures > 0 || sheetIsBehind !== null;
+
+  await finishJob(db, jobId, failedOverall ? "failed" : "applied", {
     rowsSeen: plan.sheetRowsSeen,
     rowsApplied: applied,
     rowsSkipped: plan.unchanged + plan.echoes,
     rowsFailed: failures,
-    errorMessage: failures > 0 ? `${failures} row(s) could not be applied.` : undefined,
+    errorMessage:
+      failures > 0
+        ? `${failures} row(s) could not be applied.`
+        : (sheetIsBehind ?? undefined),
   });
 
-  return describe(plan, false, jobId, sheetWriteFailed, {
+  return describe(plan, false, jobId, sheetIsBehind, {
     applied,
     sheetCellsWritten,
     notes,

@@ -21,6 +21,13 @@ export class MemorySheet implements SheetGateway {
   /** Set to make every call fail, the way an outage does. */
   failWith: string | null = null;
 
+  /**
+   * Set to make only the header append fail — what a real spreadsheet does when
+   * the grid is not wide enough for the columns being added. Google refuses the
+   * write, everything else succeeds, and the run is left half done.
+   */
+  failHeadersWith: string | null = null;
+
   /** Every batch write this sheet received, for asserting call counts. */
   readonly writes: CellUpdate[][] = [];
   reads = 0;
@@ -54,6 +61,8 @@ export class MemorySheet implements SheetGateway {
   }
 
   async appendHeaders(headers: readonly string[], afterColumnCount: number): Promise<void> {
+    this.guard();
+    if (this.failHeadersWith) throw new GoogleUnavailable(this.failHeadersWith);
     await this.writeCells(
       headers.map((header, index) => ({ row: 1, column: afterColumnCount + index, value: header })),
     );

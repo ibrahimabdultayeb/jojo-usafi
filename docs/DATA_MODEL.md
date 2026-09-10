@@ -7,7 +7,7 @@ The **Supabase PostgreSQL** schema, authored as version-controlled migrations in
 > **Status: applied and verified.** All 19 migrations have been executed against the hosted
 > development project (*Jojo Usafi Dev*, `dyjhacbbedytcstxxjzl`, free tier). Everything below
 > is checked statically by `npm run schema:check` and — since Build 06 — proved at runtime by
-> `npm run test:db`, 213 tests against the real database, Supabase Auth and Supabase Storage.
+> `npm run test:db`, 215 tests against the real database, Supabase Auth and Supabase Storage.
 >
 > Since Build 07 the database holds the **real catalogue**: 201 products from the Product
 > Master, 95 of them on the public shelf, 22 brands, 5 categories, 65 families, 201 inventory

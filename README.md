@@ -5,7 +5,7 @@ first brand catalogue it sells — not the whole store.
 
 **The storefront runs on Supabase.** English and Kiswahili, on the real Product Master and
 the approved photography: 201 products imported, 95 on the public shelf, photographs served
-from Supabase Storage, and 213 tests proving the database, Auth, Row Level Security and
+from Supabase Storage, and 215 tests proving the database, Auth, Row Level Security and
 Storage behave as claimed.
 
 **A shopper can buy, and staff can run the shop.** Guest checkout reserves stock atomically
@@ -14,10 +14,9 @@ them — confirm, prepare, send out, complete with the payment actually collecte
 a delivery failed — and edits prices, stock and delivery areas, with every write refused if
 the signed-in person's role does not allow it.
 
-The **Google Sheet catalogue sync** is built, tested and connected to the real Product Master.
-It has been read and checked; **no sync has been run yet**. What the first one would write —
-905 cells, every one a system report column — is in
-[`docs/GOOGLE_SHEET_SYNC.md`](./docs/GOOGLE_SHEET_SYNC.md).
+The **Google Sheet catalogue sync** is connected, and its baseline is synchronised: 910 cells
+of read-only system reporting, none of them one of the operator's own. The catalogue itself is
+not synced yet — see [`docs/GOOGLE_SHEET_SYNC.md`](./docs/GOOGLE_SHEET_SYNC.md).
 
 What does not exist yet: online payments and the Website/Reports/Staff/Settings screens. See
 [`PROTOTYPE_NOTES.md`](./PROTOTYPE_NOTES.md) for what is still mocked in the UI and
@@ -90,7 +89,7 @@ These need the hosted development project, and `.env.local`:
 | --- | --- |
 | `npm run db:types` | Regenerate `src/lib/supabase/database.types.ts` from the live schema |
 | `npm run db:types:check` | Fail if the committed types and the live schema have drifted |
-| `npm run test:db` | 213 tests against real PostgreSQL, Supabase Auth and Supabase Storage |
+| `npm run test:db` | 215 tests against real PostgreSQL, Supabase Auth and Supabase Storage |
 | `npm run qa:staff create` | A development Manager and Order staff login for dashboard QA. Prints one password and stores none. `status` and `remove` complete the set |
 | `npm run dev:zones` | Four placeholder delivery areas, each marked as a development fixture |
 | `npm run dev:orders` | Two development orders, placed through the real `jojo_place_order` |
@@ -151,7 +150,7 @@ src/lib/supabase/         the three clients, generated types, environment valida
 src/lib/i18n/             locale config, dictionaries, client hook
 src/lib/                  cart state, formatting, site settings, colour tones
 supabase/migrations/      the schema — 19 migrations, all applied to the dev project
-tests/db/                 213 tests against the real database, Auth and Storage
+tests/db/                 215 tests against the real database, Auth and Storage
 scripts/                  catalogue build, i18n check, schema check, type generation, QA gate
 public/products/          approved product photography, one file per SKU
 preview/screenshots/      QA screenshots

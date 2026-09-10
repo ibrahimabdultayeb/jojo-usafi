@@ -28,7 +28,7 @@ What is real and what is not:
 | | |
 | --- | --- |
 | Schema applied, constraints and triggers firing | **yes**, proved by `npm run test:db` |
-| Row Level Security enforcing, per role | **yes**, 213 tests against real sessions |
+| Row Level Security enforcing, per role | **yes**, 215 tests against real sessions |
 | Supabase Auth, staff roles, first-Owner bootstrap | **yes**, mechanism built and tested |
 | Storage buckets and their security | **yes** — and deliberately **empty** |
 | The real Owner account | **yes** — Ibrahim Abdul Tayeb, claimed 2026-09-09 |
@@ -36,7 +36,7 @@ What is real and what is not:
 | The 95 product photographs in Storage | **yes** — `product-media/<SKU>/` |
 | The catalogue in the database | **yes** — 201 products, 95 on the public shelf |
 | The application reading Supabase | **yes** — storefront and admin product screens |
-| Google Sheet synchronisation | **built, tested and connected** — reads the real Product Master; no sync run yet. See `docs/GOOGLE_SHEET_SYNC.md` |
+| Google Sheet synchronisation | **connected, baseline synced** — system columns written; the catalogue itself not synced yet. See `docs/GOOGLE_SHEET_SYNC.md` |
 | The stock reservation engine | **yes** — one transaction, concurrency proved |
 | Server-authoritative quotation and order creation | **yes** |
 | Cancellation with reservation release | **yes** — idempotent |
@@ -87,7 +87,7 @@ src/lib/supabase/database.types.ts GENERATED from the real database — never ha
 src/lib/supabase/types.ts          friendly aliases into the generated types
 scripts/schema-check.mjs           offline: the SQL and the domain layer agree
 scripts/gen-types.mjs              generate / drift-check the types against the database
-tests/db/                          213 tests against the real database, Auth and Storage
+tests/db/                          215 tests against the real database, Auth and Storage
 scripts/import-catalogue.mjs       CSV artifact -> Supabase, idempotent, never deletes
 src/lib/catalogue/queries.ts       the storefront read: product_shelf, cached 5 minutes
 src/lib/catalogue/admin.ts         the admin read, under the CALLER's own RLS
