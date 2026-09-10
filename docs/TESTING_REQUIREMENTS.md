@@ -13,6 +13,7 @@ npm run i18n:check       # en + sw key, placeholder and array parity
 npm run catalogue:check  # committed catalogue still matches imports/
 npm run build            # production build
 npm run qa:screenshots   # needs a running server (npm run start)
+npm run qa:deployed      # only meaningful against a real deployment — see below
 npm run verify:cache     # a price saved in the editor reaches the shop immediately
 ```
 
@@ -280,6 +281,42 @@ check in this repository is bypassed.
 `QA_ONLY=admin npm run qa:screenshots` runs only the admin passes — about four minutes
 rather than twenty-five, which is what makes re-checking a dialog cheap enough to actually
 do.
+
+## The deployed gate
+
+`npm run qa:deployed -- https://<host>` — added in Build 11. Every check in it is
+something that is **true on localhost by accident** and has to be proved on a real
+deployment:
+
+- the five security headers actually arrive, over HTTPS
+- `robots.txt`, the `noindex` meta tag, and `X-Robots-Tag` on `/admin`
+- five `/admin` routes redirect a stranger to sign-in
+- both job endpoints answer **401** with no credential *and* with a wrong one
+- **no server secret is in anything a browser can download** — the homepage and
+  every `_next/static` bundle it loads are scanned for a PEM header, a
+  `…iam.gserviceaccount.com` address, a JWT claiming `service_role`, and the
+  secret variable names beside a value. Only the rule that matched is printed,
+  never the match
+- the public Supabase URL *is* present, because its absence would mean the
+  browser cannot reach the database at all
+- photographs really load from Supabase Storage, and prices render in TSh
+- six pages answer in both languages, and `/sw` declares `lang="sw"`
+
+It exits non-zero on any failure. Over `http://localhost` it says it is being
+rehearsed rather than failing the HTTPS check; over any other host, plain HTTP is
+a failure. Rehearsed locally: **32 checks, 0 failures**.
+
+**The secret scan was proved by planting one.** A check of this kind that has
+never been seen to fail is not evidence — it may simply be looking in the wrong
+place. So a PEM-shaped value was put into a `NEXT_PUBLIC_` variable and read from
+a client component, which is exactly the real failure mode, and the build was
+run. The scan reported it in the homepage HTML, in the shop HTML **and inside
+`/_next/static/chunks/87-….js`** — which is the part that matters, because it
+proves the chunk discovery reaches the bundles and not only the pages. The plant
+was then removed and the gate rebuilt clean.
+
+`qa:screenshots` is the other half and already accepts `BASE_URL`, so the same
+layout, touch-target and dashboard pass runs against the deployment unchanged.
 
 ## Locale layout stability
 

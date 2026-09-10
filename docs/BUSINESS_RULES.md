@@ -234,6 +234,14 @@ Unresolved business decisions should be added to `docs/DECISIONS.md` once settle
 
 ## Production blockers — must be confirmed before launch
 
+*The full list, with the engineering blockers beside the business ones, is kept in*
+*[`STAGING.md`](./STAGING.md) §8. This section is the business half.*
+
+**One engineering blocker is worth naming here because it is about people, not code:**
+an invited staff member **cannot sign in**. Setting a password is not built, so Ibrahim's
+own Owner account — claimed through the one-time bootstrap — is currently the only account
+that can use the dashboard.
+
 Added in Build 08, when the shop became able to take an order. Development is not
 blocked by any of these; going live is.
 

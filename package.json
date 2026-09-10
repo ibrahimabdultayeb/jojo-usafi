@@ -22,6 +22,7 @@
     "dev:orders": "node scripts/seed-dev-orders.mjs",
     "dev:zones": "node scripts/seed-dev-zones.mjs",
     "verify:cache": "node scripts/verify-cache-invalidation.mjs",
+    "qa:deployed": "node scripts/qa-deployed.mjs",
     "sync:op": "vitest run --config vitest.tools.config.ts"
   },
   "dependencies": {

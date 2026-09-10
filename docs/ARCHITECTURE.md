@@ -338,6 +338,29 @@ supabase/                     config, migrations, seed
 scripts/                      catalogue build, i18n parity check, schema check, QA gate
 ```
 
+## Deployment (Build 11)
+
+Full detail in [`STAGING.md`](./STAGING.md). The shape:
+
+```
+GitHub  ibrahimabdultayeb/jojo-usafi
+   ↓
+Vercel  staging  →  Supabase  Jojo Usafi Dev (dyjhacbbedytcstxxjzl)
+        production  →  a separate Supabase project, NOT created
+```
+
+**Staging is the production build against the development database.** That is
+what makes it worth having: the remaining class of defect this project cannot
+find locally is the deployment-only one — a missing variable, a header that never
+arrives, an auth redirect pointing at localhost, a secret inlined into a bundle.
+
+`APP_ENV` decides whether a deployment is indexed, and anything that is not the
+literal string `production` means staging. See `src/lib/environment.ts` for why
+the default falls that way.
+
+**Production will be a separate Supabase project**, not a promoted development
+one. The reasoning and the ordered procedure are in `STAGING.md` §7.
+
 ## Expected domains
 
 catalogue · brands · suppliers · categories · inventory · customers · orders ·

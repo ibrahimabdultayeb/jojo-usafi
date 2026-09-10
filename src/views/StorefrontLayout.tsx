@@ -17,6 +17,7 @@ import { getContact } from "@/lib/contact";
 import { getCatalogue } from "@/lib/catalogue/queries";
 import { LocaleProvider } from "@/lib/i18n/client";
 import { getDictionary, localeAlternates, localeTag, type Locale } from "@/lib/i18n";
+import { isStaging } from "@/lib/environment";
 import { getSiteContent } from "@/lib/site-content";
 import { site } from "@/lib/site";
 
@@ -42,6 +43,10 @@ export function storefrontMetadata(locale: Locale): Metadata {
     title: { default: t.meta.siteTitle, template: `%s · ${site.name}` },
     description: t.meta.siteDescription,
     alternates: localeAlternates(locale, "/"),
+    // Belt and braces with `robots.txt`. That file asks a crawler not to FETCH
+    // a page; this asks it not to LIST one — and a page linked from elsewhere
+    // can be listed without ever being fetched.
+    ...(isStaging() ? { robots: { index: false, follow: false } } : {}),
     openGraph: {
       siteName: site.name,
       locale: localeTag[locale].replace("-", "_"),

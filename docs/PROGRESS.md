@@ -1695,6 +1695,87 @@ stock. Every one starts empty and says "Not set yet", because a plausible-lookin
 placeholder phone number is worse than a visibly missing one — the missing one gets
 fixed before launch and the plausible one gets discovered by a customer.
 
+## Build 11 — staging preparation, and a stop — 2026-09-10
+
+**PARTIAL, and stopped at the one thing only Ibrahim can do.** The Vercel CLI on
+this machine is logged out, and logging in needs a browser and an account choice.
+Nothing about a deployment can proceed without it, so everything that does not
+depend on it was done instead.
+
+### What is ready for the moment there is a URL
+
+**Security headers.** `X-Frame-Options`, `X-Content-Type-Options`,
+`Referrer-Policy`, `Permissions-Policy` and `Strict-Transport-Security` on every
+route, plus `X-Robots-Tag: noindex, nofollow` on `/admin` — which is deliberately
+separate, because it has to survive the day this becomes production. No
+Content-Security-Policy: this shop loads photography from Supabase Storage, opens
+websockets to Supabase and serves two Google fonts, and a policy written without
+measuring those breaks images or sign-in. Written down as final hardening rather
+than shipped blind.
+
+**Staging is not advertised**, three ways that fail differently: `Disallow: /` in
+`robots.txt`, a `noindex` meta tag, and the `/admin` header above. All three read
+`APP_ENV`, and anything that is not the literal string `production` means
+staging — so a deployment nobody labelled is not indexed.
+
+**`npm run qa:deployed`**, a new gate whose every check is something that is true
+on localhost by accident: that the headers actually arrive over HTTPS, that five
+`/admin` routes redirect a stranger, that both job endpoints answer 401 with no
+credential and with a wrong one, that photographs really load from Storage, that
+six pages answer in both languages — and that **no server secret is in anything a
+browser can download**. It scans the homepage and every bundle it loads for a PEM
+header, a service-account address, a JWT claiming `service_role` and the secret
+variable names beside a value, and prints only which rule matched, never the
+match. Rehearsed against localhost: **32 checks, 0 failures**.
+
+**`docs/STAGING.md`** — the environment-variable schema by exact name and scope,
+which of them are secret, how the values reach Vercel without passing through a
+chat window, what Supabase Auth needs, what the two gates prove, the launch
+checklist, and the production architecture plan.
+
+### One thing found that is worse than a missing deployment
+
+**An invited staff member cannot sign in.** `inviteUserByEmail` sends a link back
+to the site's own URL and this application has no route that answers one: no
+callback, no set-password screen, no "Forgot password" on the sign-in form. The
+person follows the email, lands on the storefront, and nothing happens.
+
+Build 10's dashboard told the Owner to send them to "Forgot password" — a control
+that does not exist. That message and the one beside it were corrected to say
+plainly that setting a password is not built yet. A message pointing at a control
+that is not there is worse than no message: it sends somebody looking for it and
+then makes them doubt what they are seeing.
+
+This blocks **every staff account except Ibrahim's own**, which was claimed
+through the one-time Owner bootstrap. It is the first item of Build 12.
+
+### Production will not be this database
+
+Recorded as a decision rather than left to the moment of launching. The
+development project holds fixture orders, placeholder delivery zones, QA logins
+and an append-only audit trail of every experiment since Build 06 — and
+append-only means the cleanup is partly impossible. A shop's first order should be
+order one. The free tier allows two projects, so it stays TZS 0. The ordered
+procedure is in `docs/STAGING.md` §7.
+
+### Gates, all green
+
+```
+typecheck · lint · test (203) · schema · i18n · catalogue · db:types · build
+verify:cache   a price saved in the dashboard reaches the shop immediately
+qa:deployed    32 checks against the local production build
+```
+
+### What Ibrahim does next
+
+```bash
+vercel login
+```
+
+Then the linking, the non-secret variables, the deployment and both gates are
+done from here. The secret values are pasted by Ibrahim into the Vercel dashboard
+and never sent to Claude.
+
 ## Next
 
 - Confirm the open business rules (delivery fee, served areas, retail prices). A global
@@ -1739,12 +1820,18 @@ fixed before launch and the plausible one gets discovered by a customer.
   3. **How long an unconfirmed order holds stock** — until this is set, nothing expires and
      stock is released only by cancellation
   4. The real **delivery areas and fees**, replacing the four development placeholders
-- **Build 11**, in whatever order Ibrahim wants them:
-  1. **Reports** — the last "Coming soon" screen, waiting on real orders to report on
-  2. **Media** — uploading and replacing a product photograph, and the logo
-  3. A **schedule** for the sync and for reservation expiry, once the deployment
-     architecture is settled. Both endpoints already exist and are protected.
-  4. **Kiswahili product content** — `product_content` is per-locale; the master has one
+- **Ibrahim, to unblock the deployment:** run `vercel login` in the terminal. Everything
+  else about staging is ready and waits on that one command — see `docs/STAGING.md` §10.
+- **Build 12**, in this order:
+  1. **Setting a password.** An invited staff member cannot sign in: there is no callback
+     route, no set-password screen and no "Forgot password". This blocks every staff
+     account except Ibrahim's own.
+  2. **Finish Build 11** — deploy staging, then the deployed order, admin, lifecycle,
+     admin → Sheet and Sheet → site round trips against the real HTTPS URL
+  3. **Media** — uploading and replacing a product photograph, and the logo
+  4. **Reports** — the last "Coming soon" screen, waiting on real orders to report on
+  5. A **schedule** for the sync and for reservation expiry
+  6. **Kiswahili product content** — `product_content` is per-locale; the master has one
      language
 
 Claude must update this file after meaningful milestones.

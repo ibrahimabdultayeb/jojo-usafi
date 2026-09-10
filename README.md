@@ -81,6 +81,7 @@ Saved screenshots at every QA width, in both languages, are in
 | `npm run i18n:check` | Verify English and Kiswahili carry the same copy keys |
 | `npm run test` | 203 unit tests — pure functions, **no database needed** |
 | `npm run schema:check` | Offline: the migrations are internally consistent and agree with the domain layer |
+| `npm run qa:deployed -- https://host` | The checks that only mean something against a real deployment — headers, indexing, admin redirects, closed job endpoints, and a scan of every downloadable bundle for a leaked server secret |
 | `npm run qa:screenshots` | Full QA gate — screenshots and behaviour checks at 390/430/768/1024/1440 in both languages, plus the signed-in admin dashboard and its dialogs (a server must be running; set `BASE_URL` for anything other than port 3000) |
 
 These need the hosted development project, and `.env.local`:
@@ -106,6 +107,22 @@ cp .env.example .env.local                            # then fill in the three v
 `.env.local` is git-ignored and must never be committed. The migration path against a hosted
 project is always `npx supabase db push --dry-run`, read the plan, then `npx supabase db
 push` — `db reset` is never used on a hosted project.
+
+### Deploying
+
+Staging, its environment variables, the Supabase Auth setup, the launch
+checklist and the production plan are all in [`docs/STAGING.md`](docs/STAGING.md).
+
+Two things worth knowing before the first deployment:
+
+- **`APP_ENV`** decides whether a deployment is indexed by Google. Anything that
+  is not the literal string `production` means staging, and staging is withheld
+  from search engines three different ways. An unlabelled deployment is not
+  indexed — which also means the real shop needs `APP_ENV=production` set, or it
+  will be invisible.
+- **The Supabase variables are needed at BUILD time.** Product pages are
+  prerendered, so `next build` reads the shelf. A missing variable fails the
+  build with its name in the error rather than producing an empty shop.
 
 ### The two protected job endpoints
 

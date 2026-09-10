@@ -2357,3 +2357,124 @@ Six components changed. `getContact()` is one query, cached under the `catalogue
 tag, so an Owner saving a number sees it on the site immediately and an ordinary
 visitor costs nothing. `PROTOTYPE_NOTES.md` now describes these as fallbacks
 rather than as the shop's details.
+
+---
+
+## 2026-09-10 — An unlabelled deployment is a staging deployment
+
+Decision:
+`APP_ENV` decides whether a deployment is indexed, and anything that is not the
+literal string `production` means staging. Unset means staging. Staging is
+withheld from search engines three ways: `Disallow: /` in `robots.txt`, a
+`noindex` meta tag, and — for `/admin` on every deployment including the real
+one — an `X-Robots-Tag` header.
+
+Reason:
+The cost of the default being wrong is asymmetric. A staging shop that gets
+indexed puts unconfirmed prices, development orders and a half-decided catalogue
+into search results under Jojo Usafi's own name, and the damage is done before
+anybody looks. A production shop accidentally marked staging is invisible — worse
+in the moment, but obvious within a day and fixed by setting one variable.
+
+Three mechanisms rather than one because they fail differently: `robots.txt` asks
+a crawler not to FETCH a page, `noindex` tells it not to LIST one, and a page
+linked from somewhere else can be listed without ever being fetched.
+
+Alternatives:
+Read Vercel's own `VERCEL_ENV`. Rejected: it says which Vercel environment a
+deployment is in, not which database it points at, and this staging deployment is
+deliberately the production build against the development project. An explicit
+variable also works locally, which `VERCEL_ENV` does not.
+
+Impact:
+`APP_ENV=production` is now a numbered step in the launch checklist rather than
+an assumption. `npm run qa:deployed` fails if the homepage of a staging
+deployment has no `noindex`.
+
+---
+
+## 2026-09-10 — Headers that cannot break the shop, and no CSP yet
+
+Decision:
+`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`,
+`Permissions-Policy` and `Strict-Transport-Security` are set on every route. No
+Content-Security-Policy is set at all.
+
+Reason:
+The five above are unambiguously right for a shop and cannot break one. A CSP is
+different in kind: this application loads photography from Supabase Storage,
+opens XHR and websockets to a Supabase project, and serves two Google fonts. A
+policy written without measuring those origins breaks images, sign-in or both —
+and a broken CSP is normally discovered by a customer rather than by a test.
+
+`Strict-Transport-Security` carries no `preload`. Preloading is a commitment made
+on behalf of a domain nobody has chosen yet, and it is hard to undo.
+
+Alternatives:
+Ship a report-only CSP now. Reasonable, and still the likely next step — but it
+needs a measurement pass to be worth anything, and this build's time was better
+spent on the deployment itself. It is written down as final-hardening work
+instead of shipped blind.
+
+Impact:
+`npm run qa:deployed` asserts the five headers arrive over HTTPS and prints the
+CSP's absence as a note, so the decision stays visible rather than forgotten.
+
+---
+
+## 2026-09-10 — Production gets its own Supabase project
+
+Decision:
+When production happens it will be a NEW Supabase project. The development
+project is not promoted.
+
+Reason:
+The development project is not a clean slate and should not pretend to be one. It
+holds fixture orders, four placeholder delivery zones, QA staff logins, and an
+append-only audit trail of every experiment since Build 06. Those ledgers cannot
+be cleaned up — that is what append-only means — so a promoted project would
+carry a first order that was a test. A shop's first order should be order one.
+
+It also converts every existing safety check into a production guard. Every
+script here already refuses to run against anything but `dyjhacbbedytcstxxjzl`;
+the day a second ref exists, those assertions are what stops a test touching real
+customers.
+
+Alternatives:
+Promote development and delete the fixtures. Rejected: partly impossible, and it
+would mean the one database holding real orders is also the one every test in the
+repository is pointed at.
+
+Impact:
+Free tier allows two projects, so it remains TZS 0. The full ordered procedure is
+in `docs/STAGING.md` §7, including where the catalogue import and the Owner
+bootstrap must fall relative to each other.
+
+---
+
+## 2026-09-10 — An invited staff member cannot sign in, and the dashboard now says so
+
+Decision:
+The messages promising that a new staff member will "set a password through their
+own email" or use "Forgot password" were removed. The dashboard now says plainly
+that setting a password is not built and the person cannot sign in yet.
+
+Reason:
+It was not true. `inviteUserByEmail` sends a link back to the site's own URL, and
+this application has no route that answers one: no callback, no set-password
+screen, no "Forgot password" on the sign-in form. An invited person follows the
+link, lands on the storefront and nothing happens.
+
+A message pointing at a control that does not exist is worse than no message. It
+sends somebody looking for it, then makes them doubt what they are seeing.
+
+Alternatives:
+Build the flow immediately. It is the right next thing and it is the first item
+of engineering work in the launch checklist — but it needs a real deployment to
+test the email round trip against, and this build could not deploy. Shipping an
+untested auth flow to close a documentation gap would be the wrong trade.
+
+Impact:
+**This blocks every staff account except Ibrahim's own**, which was claimed
+through the one-time Owner bootstrap. It is recorded as a launch blocker in
+`docs/STAGING.md` §8 and is the first item of Build 12.

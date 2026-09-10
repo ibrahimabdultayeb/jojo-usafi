@@ -114,10 +114,19 @@ export async function inviteStaffAction(
 
   revalidatePath("/admin/more/staff");
 
+  // WHAT THIS SAYS IS WHAT ACTUALLY HAPPENS.
+  //
+  // The invitation email carries a link back to this website, and nothing here
+  // answers that link yet: there is no screen for setting a password and no
+  // "Forgot password" on the sign-in form. Build 10 promised both, which was
+  // wrong — a message pointing at a control that does not exist sends somebody
+  // looking for it. Until that screen exists, the person is added and cannot
+  // sign in on their own, and the Owner needs to know that now rather than
+  // discover it when the new staff member cannot get in.
   return done(
-    emailed
-      ? `${cleanName} has been invited as ${ROLE_LABEL[role]}. They will get an email to set a password.`
-      : `${cleanName} has been added as ${ROLE_LABEL[role]}. Ask them to use "Forgot password" at the sign-in screen to set one.`,
+    `${cleanName} has been added as ${ROLE_LABEL[role]}.${
+      emailed ? " An invitation email has been sent." : ""
+    } They cannot set a password yet — that screen is still to be built, so tell them to wait.`,
   );
 }
 
