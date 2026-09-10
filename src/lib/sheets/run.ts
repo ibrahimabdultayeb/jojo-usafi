@@ -35,6 +35,21 @@ export interface RunOptions {
   readonly requestedBy: string | null;
   /** Swapped for an in-memory sheet by the tests. */
   readonly gateway?: SheetGateway;
+  /**
+   * When set, ONLY these fields may flow Sheet → Supabase. Everything else the
+   * plan proposes is held: not applied, not recorded as agreed, and therefore
+   * proposed again next time until somebody decides about it.
+   *
+   * This exists because approval is field-specific in practice. Ibrahim
+   * approved website visibility and display order and deliberately held one
+   * product description for content review — and "apply the plan" would have
+   * been all three or none.
+   *
+   * Holding a field is safe precisely because the agreement is recorded from
+   * what was APPLIED. The held difference stays a difference, so it keeps being
+   * offered rather than quietly disappearing.
+   */
+  readonly applyFields?: readonly (keyof CatalogueFields)[];
 }
 
 export interface RunReport {
@@ -143,37 +158,109 @@ async function loadState(db: Service): Promise<{
   const state = new Map<string, SyncStateRecord>();
   const base = new Map<string, CatalogueFields>();
 
-  const { data: rows } = await db
-    .from("sync_state")
-    .select("entity_key, version, db_fingerprint, sheet_fingerprint, last_source")
-    .eq("entity_table", ENTITY_TABLE);
+  // Paged for the same reason as the bases below: PostgREST caps a response at
+  // 1000 rows and says nothing about it. One row per product is under that
+  // today, and a catalogue of 1200 products would silently lose the last 200.
+  for (let page = 0; page < 50; page += 1) {
+    const from = page * 1000;
+    const { data: rows, error } = await db
+      .from("sync_state")
+      .select("entity_key, version, db_fingerprint, sheet_fingerprint, last_source")
+      .eq("entity_table", ENTITY_TABLE)
+      .order("entity_key")
+      .range(from, from + 999);
 
-  for (const row of rows ?? []) {
-    state.set(row.entity_key, {
-      entityTable: ENTITY_TABLE,
-      entityKey: row.entity_key,
-      version: Number(row.version),
-      dbFingerprint: row.db_fingerprint,
-      sheetFingerprint: row.sheet_fingerprint,
-      lastSource: row.last_source,
-    });
+    if (error || !rows || rows.length === 0) break;
+
+    for (const row of rows) {
+      state.set(row.entity_key, {
+        entityTable: ENTITY_TABLE,
+        entityKey: row.entity_key,
+        version: Number(row.version),
+        dbFingerprint: row.db_fingerprint,
+        sheetFingerprint: row.sheet_fingerprint,
+        lastSource: row.last_source,
+      });
+    }
+
+    if (rows.length < 1000) break;
   }
 
-  const { data: agreed } = await db
-    .from("sync_events")
-    .select("entity_key, field_changes, created_at")
-    .eq("entity_table", ENTITY_TABLE)
-    .eq("operation", "upsert")
-    .eq("status", "applied")
-    .order("created_at", { ascending: true });
+  /*
+    NEWEST FIRST, AND PAGED. THIS IS NOT A STYLE CHOICE.
 
-  // Later rows win: the newest agreement is the base.
-  for (const row of agreed ?? []) {
-    const fields = (row.field_changes as { base?: CatalogueFields } | null)?.base;
-    if (fields) base.set(row.entity_key, fields);
+    This used to be one unbounded select ordered oldest-first, taking the last
+    row per key as the base. PostgREST caps a response at 1000 rows, silently.
+    With 201 products and a handful of runs there were 1993 base rows, so the
+    query returned the OLDEST 1000 and every base the sync compared against was
+    months of runs out of date — invisibly, with no error anywhere.
+
+    It surfaced as a settled conflict refusing to stick: the decision was
+    written, the next run read a stale base, and the sheet kept asserting the
+    value a person had just rejected.
+
+    Reading newest-first and keeping the first occurrence of each key makes the
+    result correct regardless of how much history there is.
+  */
+  const PAGE = 1000;
+  const MAX_PAGES = 50; // 50,000 rows. Far beyond what pruning below leaves.
+
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const from = page * PAGE;
+    const { data: agreed, error } = await db
+      .from("sync_events")
+      .select("entity_key, field_changes")
+      .eq("entity_table", ENTITY_TABLE)
+      .eq("operation", "upsert")
+      .eq("status", "applied")
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE - 1);
+
+    if (error || !agreed || agreed.length === 0) break;
+
+    for (const row of agreed) {
+      // Newest first, so the first one seen for a key is the current one.
+      if (base.has(row.entity_key)) continue;
+      const fields = (row.field_changes as { base?: CatalogueFields } | null)?.base;
+      if (fields) base.set(row.entity_key, fields);
+    }
+
+    if (agreed.length < PAGE) break;
   }
 
   return { state, base };
+}
+
+/**
+ * Remove base snapshots that a newer one has replaced.
+ *
+ * `sync_events` carries two different kinds of row. An `update` row is history —
+ * what changed, which way, from what to what — and is never touched. An
+ * `upsert` row is not history: it is a snapshot of what the two sides agreed on
+ * at that moment, and only the newest one per product means anything.
+ *
+ * Left alone they accumulate at 201 rows per run, which is what pushed the
+ * loader past PostgREST's response cap in the first place.
+ */
+async function pruneSupersededBases(
+  db: Service,
+  skus: readonly string[],
+  writtenAfter: string,
+): Promise<void> {
+  if (skus.length === 0) return;
+
+  // One delete per chunk of keys, not one per product: anything older than the
+  // batch just written is, by definition, superseded.
+  for (let i = 0; i < skus.length; i += 200) {
+    await db
+      .from("sync_events")
+      .delete()
+      .eq("entity_table", ENTITY_TABLE)
+      .eq("operation", "upsert")
+      .eq("status", "applied")
+      .lt("created_at", writtenAfter)
+      .in("entity_key", skus.slice(i, i + 200));
+  }
 }
 
 async function openConflictSkus(db: Service): Promise<Set<string>> {
@@ -281,7 +368,38 @@ export async function runCatalogueSync(options: RunOptions): Promise<RunReport> 
   let failures = 0;
   const notes: string[] = [];
 
-  for (const change of plan.toDatabase) {
+  // Narrow the plan to the fields this run is allowed to apply, BEFORE anything
+  // is written and before the agreement is computed from it.
+  const allowed = options.applyFields ? new Set<string>(options.applyFields) : null;
+  let heldFields = 0;
+  let heldProducts = 0;
+
+  const toApply = !allowed
+    ? plan.toDatabase
+    : plan.toDatabase.flatMap((change) => {
+        const kept: Partial<CatalogueFields> = {};
+        let held = 0;
+        for (const [field, value] of Object.entries(change.changes)) {
+          if (allowed.has(field)) (kept as Record<string, unknown>)[field] = value;
+          else held += 1;
+        }
+        if (held > 0) {
+          heldFields += held;
+          heldProducts += 1;
+        }
+        return Object.keys(kept).length === 0 ? [] : [{ ...change, changes: kept }];
+      });
+
+  if (heldFields > 0) {
+    notes.push(
+      `${heldFields} change(s) on ${heldProducts} product(s) were left for a decision and not applied.`,
+    );
+  }
+
+  // Everything downstream — the agreement included — sees only what was applied.
+  const effective: SyncPlan = { ...plan, toDatabase: toApply };
+
+  for (const change of toApply) {
     const patch = toColumnPatch(change.changes);
     const { error } = await db
       .from("products")
@@ -429,7 +547,7 @@ export async function runCatalogueSync(options: RunOptions): Promise<RunReport> 
   const sheetIsBehind = headersFailed ?? sheetWriteFailed;
 
   if (!sheetIsBehind) {
-    await recordAgreement(db, jobId, plan, products);
+    await recordAgreement(db, jobId, effective, products);
   }
 
   const failedOverall = failures > 0 || sheetIsBehind !== null;
@@ -445,7 +563,7 @@ export async function runCatalogueSync(options: RunOptions): Promise<RunReport> 
         : (sheetIsBehind ?? undefined),
   });
 
-  return describe(plan, false, jobId, sheetIsBehind, {
+  return describe(effective, false, jobId, sheetIsBehind, {
     applied,
     sheetCellsWritten,
     notes,
@@ -594,7 +712,25 @@ async function recordAgreement(
   if (touched.size === 0) return;
 
   const bySku = new Map(products.map((p) => [p.sku, p]));
+  const changeBySku = new Map(plan.toDatabase.map((c) => [c.sku, c]));
+  const sheetRowBySku = new Map(plan.toSheet.map((c) => [c.sku, c.row]));
   const now = new Date().toISOString();
+
+  /*
+    WRITTEN IN BATCHES, NOT ONE PRODUCT AT A TIME.
+
+    This used to be two round trips per SKU. Against 201 real products that is
+    402 sequential calls to Mumbai, and the first real catalogue run was killed
+    by a five-minute timeout in the middle of them — after every product update
+    had already landed. The work was right and the bookkeeping was cut in half,
+    which is the worst place to be interrupted.
+
+    A partial agreement is survivable — a stale base makes the next run see both
+    sides having changed to the SAME value, which is not a conflict and not a
+    change — but "survivable" is not a reason to keep doing it 402 times.
+  */
+  const states: Record<string, unknown>[] = [];
+  const events: Record<string, unknown>[] = [];
 
   for (const sku of touched) {
     const product = bySku.get(sku);
@@ -602,7 +738,7 @@ async function recordAgreement(
 
     // The agreed values are the database's, AFTER this run's changes — that is
     // what both sides now hold.
-    const change = plan.toDatabase.find((c) => c.sku === sku);
+    const change = changeBySku.get(sku);
     const agreed: CatalogueFields = { ...product.fields, ...(change?.changes ?? {}) };
 
     const comparable: Record<string, unknown> = {};
@@ -611,28 +747,25 @@ async function recordAgreement(
     }
     const print = fingerprint(comparable);
 
-    await db.from("sync_state").upsert(
-      {
-        entity_table: ENTITY_TABLE,
-        entity_key: sku,
-        entity_id: product.id,
-        db_fingerprint: print,
-        sheet_fingerprint: print,
-        last_source: change ? "sheet" : "admin",
-        last_synced_at: now,
-        sheet_row: plan.toDatabase.find((c) => c.sku === sku)?.row ?? plan.toSheet.find((c) => c.sku === sku)?.row ?? null,
-      },
-      { onConflict: "entity_table,entity_key" },
-    );
+    states.push({
+      entity_table: ENTITY_TABLE,
+      entity_key: sku,
+      entity_id: product.id,
+      db_fingerprint: print,
+      sheet_fingerprint: print,
+      last_source: change ? "sheet" : "admin",
+      last_synced_at: now,
+      sheet_row: change?.row ?? sheetRowBySku.get(sku) ?? null,
+    });
 
-    await db.from("sync_events").insert({
+    events.push({
       job_id: jobId,
       source: "system",
       direction: "sheet_to_db",
       operation: "upsert",
       entity_table: ENTITY_TABLE,
       entity_key: sku,
-      field_changes: { base: agreed } as never,
+      field_changes: { base: agreed },
       fingerprint: print,
       status: "applied",
       idempotency_key: idempotencyKey({
@@ -645,6 +778,100 @@ async function recordAgreement(
       applied_at: now,
     });
   }
+
+  // Chunked so one oversized request cannot fail the lot, and so a very large
+  // catalogue does not arrive as a single enormous body.
+  const CHUNK = 100;
+  const cutoff = new Date().toISOString();
+
+  for (let i = 0; i < states.length; i += CHUNK) {
+    const { error } = await db
+      .from("sync_state")
+      .upsert(states.slice(i, i + CHUNK) as never, { onConflict: "entity_table,entity_key" });
+    if (error) throw new Error(`Could not record the agreement: ${error.message}`);
+  }
+  for (let i = 0; i < events.length; i += CHUNK) {
+    const { error } = await db.from("sync_events").insert(events.slice(i, i + CHUNK) as never);
+    if (error) throw new Error(`Could not record the agreement: ${error.message}`);
+  }
+
+  await pruneSupersededBases(db, [...touched], cutoff);
+}
+
+/**
+ * Write the agreed base for ONE product, after a person has settled a conflict.
+ *
+ * Deleting `sync_state` is not enough on its own, and that was a real defect:
+ * the base lives in `sync_events`, so a resolved conflict would be re-detected
+ * on the very next run and the decision would never stick.
+ *
+ * What the base has to say depends on who won, and the asymmetry is the point:
+ *
+ *   the sheet won   both sides now hold the chosen value, so the base is that
+ *                   value and neither side has anything to say.
+ *   the shop won    the sheet still holds the REJECTED value, so the base is
+ *                   recorded as that rejected value. The database then reads as
+ *                   changed and the sheet as unchanged, and the next run carries
+ *                   the decision out to the sheet — which is what "use Jojo
+ *                   Usafi" has to mean, or the sheet would simply re-assert
+ *                   itself for ever.
+ */
+export async function recordResolvedBase(
+  sku: string,
+  agreed: CatalogueFields,
+  source: "sheet" | "admin",
+): Promise<void> {
+  const db = getServiceRoleSupabase();
+  const now = new Date().toISOString();
+
+  const comparable: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(agreed)) {
+    if (key !== "variantLabel") comparable[key] = value;
+  }
+  const print = fingerprint(comparable);
+
+  const { data: product } = await db.from("products").select("id").eq("sku", sku).maybeSingle();
+
+  await db.from("sync_events").insert({
+    source: "system",
+    direction: "sheet_to_db",
+    operation: "upsert",
+    entity_table: ENTITY_TABLE,
+    entity_key: sku,
+    field_changes: { base: agreed } as never,
+    fingerprint: print,
+    status: "applied",
+    idempotency_key: idempotencyKey({
+      direction: "sheet_to_db",
+      entityTable: ENTITY_TABLE,
+      entityKey: sku,
+      operation: "upsert",
+      fingerprint: `${print}:resolved:${now}`,
+    }),
+    applied_at: now,
+  });
+
+  await pruneSupersededBases(getServiceRoleSupabase(), [sku], now);
+
+  await db.from("sync_state").upsert(
+    {
+      entity_table: ENTITY_TABLE,
+      entity_key: sku,
+      entity_id: product?.id ?? null,
+      db_fingerprint: print,
+      sheet_fingerprint: print,
+      last_source: source,
+      last_synced_at: now,
+    },
+    { onConflict: "entity_table,entity_key" },
+  );
+}
+
+/** The catalogue fields of one product, for building a resolved base. */
+export async function fieldsForSku(sku: string): Promise<CatalogueFields | null> {
+  const db = getServiceRoleSupabase();
+  const products = await loadProducts(db);
+  return products.find((p) => p.sku === sku)?.fields ?? null;
 }
 
 async function finishJob(

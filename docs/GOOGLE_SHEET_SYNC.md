@@ -9,11 +9,10 @@ Supabase; no customer request has ever touched Google, and none ever will. The S
 human-friendly control surface for the catalogue — it is not a second database, and it owns
 nothing operational.
 
-> **Status: baseline synchronised. The catalogue itself has not been synced yet.** On
-> 2026-09-10 the first real run wrote 910 cells — the five system report columns and their
-> headers — and recorded what the two sides agree on. Not one of Ibrahim's own cells was
-> touched, and nothing in the shop moved. The second plan is calculated and **waiting for a
-> decision**: see *The staged first sync* below.
+> **Status: live and synchronised.** As of 2026-09-10 the sheet and the shop agree on every
+> catalogue field the two of them share, in both directions, with one deliberate exception —
+> a single product description held for content review. Stock has never been synchronised and
+> never will be. See *The staged first sync* and *Steps D, E and F*.
 
 ---
 
@@ -320,6 +319,86 @@ changes" is what was approved, and 15 changes in two other fields is not that.
 
 Waiting on Ibrahim.
 
+
+## Steps D, E and F — 2026-09-10
+
+```bash
+SYNC_STEP_D=1 npm run sync:op -- tools/sync/d-apply-approved.op.ts
+SYNC_STEP_E=1 npm run sync:op -- tools/sync/e-idempotency.op.ts
+SYNC_STEP_F=1 npm run sync:op -- tools/sync/f-round-trip.op.ts
+```
+
+### Step D — the approved fields, and only those
+
+Approval is field-specific in practice, so `runCatalogueSync` gained
+`applyFields`. It narrows what may flow Sheet → Supabase **before** anything is
+written and before the agreement is computed, which is what makes holding a
+field safe: the held difference stays a difference and keeps being offered
+rather than disappearing into a recorded agreement.
+
+**Two different counts, which are easy to confuse:**
+
+| | |
+| --- | --- |
+| Products affected | **116** |
+| Field-level changes | **121** |
+
+They differ because a product can appear under more than one field.
+
+| Field | Products | |
+| --- | --- | --- |
+| Show on website | **106** | applied |
+| Display order | **14** | applied |
+| Description | **1** | **held** |
+
+Verified afterwards as an end state rather than as a count of deltas — for all
+201 rows, does the shop hold what the sheet says? Website intent agreeing
+**201/201**, display order agreeing **201/201**, nothing disagreeing.
+
+**The public shelf stayed at 95.** That is the whole point of the decision: 106
+products now say *Show*, and not one of them reached a customer, because
+`product_shelf` still requires an approved photograph. When a photograph is
+added, the product becomes eligible on its own, without anybody having to make
+the visibility decision a second time.
+
+Inventory, prices, the stock ledger, orders and customers were byte-identical.
+
+### Step E — idempotency
+
+Two checks in a row, then a real run, then another check. Sheet → Supabase stayed
+at exactly **1** — the deliberately held description — every time. No approved
+change repeated, no conflicts, and inventory, prices, the ledger, the shelf,
+orders and customers all unchanged.
+
+**Blank ≡ no decision.** EP04-A01's `PRODUCT PRIORITY` cell is blank and the shop
+holds 0. They compare equal, so the pair produces no difference and no repeated
+write, and nothing writes 0 back into the blank cell.
+
+**The timestamp cannot feed itself.** `SYSTEM LAST SYNCED` is rewritten on every
+run. It cannot start a cycle because the system columns are not part of the
+comparison at all — only the bidirectional fields are — so a fresh timestamp can
+never read as an edit. Proved by running a live sync that rewrote all 201
+timestamps and then checking: still 1 outstanding item, still 0 conflicts.
+
+### Step F — the round trip
+
+On `PRODUCT PRIORITY` — display order — of one photographed, published product
+(EP01-A06). Pure merchandising: not stock, not price, not lifecycle, not the
+description under review. An integer, which matters: **a boolean cannot produce
+a conflict at all**, because two sides that both change away from the same base
+must have changed to the same value.
+
+| | |
+| --- | --- |
+| A — sheet only, 41 | shop received 41 |
+| B — shop only, 42 | sheet received 42 |
+| C — sheet 43, shop 44 | **conflict raised, neither applied** — shop stayed 44, sheet stayed 43 |
+| C — synced again | still one conflict, nothing applied: the row is frozen |
+| Resolution — the shop wins | the sheet received 44 |
+| D — restore | shop back to 0, sheet back to blank, no conflicts left open |
+
+Throughout: shelf 95, stock ledger 204 movements, orders and customers untouched.
+
 ## Two faults the first real run found
 
 **Google refuses a write past the edge of the grid.** The tab is exactly 39 columns wide, so
@@ -340,6 +419,37 @@ the next run simply does the sheet half again. Both cases are covered by tests i
 The agreement that the broken run recorded was removed, and its `sync_jobs` row was corrected
 from `applied` to `failed` with an explanation. The record of the run stays — it happened —
 but it no longer claims to have succeeded.
+
+## The one held description
+
+**`EP10-A02` — Shower Gel Bubblegum.** Held out of the sync at Ibrahim's
+instruction, pending content review.
+
+| | |
+| --- | --- |
+| Currently public | **yes** — it has a photograph, is active, and says Show |
+| Description in Supabase | **none.** `product_content` has no row for it at all |
+| Displayed anywhere | **no.** The product page shows no description, because there is none to show |
+| In the Google Sheet | preserved exactly as written, untouched by every run |
+
+The sheet's text, kept verbatim and not imported:
+
+> Bubbles hydrating shower gel awakens your senses as you take your shower with a
+> refreshing formula. Its rich lathering, moisturizing and cleaning properties
+> leaves your skin feeling nourished and silky soft. Bubbles Shower Gel is good
+> for everyday washing and is formulated to wash away bacteria, viruses and germs
+> keeping you feeling fresh and clean. It provides an intensive long-lasting
+> moisture without a greasy feeling. This nature-inspired fragrance will leave you
+> feeling refreshed and rejuvenated. Use Bubbles Shower Gel to kickstart your day
+> and at the end of a long day, before a truly restful night's sleep to soothe and
+> calm your senses.
+
+Worth noticing before it is approved: the copy calls the product *Bubbles*, while
+the catalogue name is *Shower Gel Bubblegum*. It also makes germ-killing claims,
+which are a regulatory question rather than a stylistic one.
+
+Every sync reports it as one outstanding change and applies nothing. It will keep
+being offered until somebody decides, which is what holding a field is for.
 
 ## Conflicts
 

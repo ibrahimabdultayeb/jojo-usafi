@@ -35,18 +35,39 @@ describe("the real catalogue reached the database", () => {
     expect(shelf).toHaveLength(95);
   });
 
-  it("keeps all 201 master rows, with 106 withheld", async () => {
+  it("keeps all 201 master rows, with 106 withheld for want of a photograph", async () => {
     // Counted with the service role, because a shopper is not allowed to know
     // how many products the shop is holding back — which is the point.
     const all = await db.from("products").select("sku", { count: "exact", head: true }).not("sku", "like", `${NAMES.skuPrefix}%`);
     expect(all.count).toBe(201);
 
-    const hidden = await db
-      .from("products")
-      .select("sku", { count: "exact", head: true })
-      .eq("storefront_visible", false)
-      .not("sku", "like", `${NAMES.skuPrefix}%`);
-    expect(hidden.count).toBe(106);
+    /*
+      This used to assert that 106 products had `storefront_visible = false`,
+      which was true only by coincidence: the Build 07 importer switched off
+      whatever had no photograph, so the flag and publishability agreed.
+
+      Ibrahim settled the question on 2026-09-10 and they are now different
+      things. `storefront_visible` is INTENT — "show this when it can be shown"
+      — and every product in the sheet says Show. What actually keeps a product
+      off the shelf is the independent requirement it fails, which for all 106
+      of these is the missing photograph.
+
+      So the count is taken where it belongs: against the shelf.
+    */
+    const shelf = await realShelf();
+    expect(shelf, "the shelf is what a shopper can see").toHaveLength(95);
+    expect(all.count! - shelf.length, "withheld from the shelf").toBe(106);
+
+    const { data: photographed } = await db
+      .from("product_media")
+      .select("products!inner(sku)")
+      .eq("role", "primary")
+      // This run's own fixtures are photographed too, and are not the catalogue.
+      .not("products.sku", "like", `${NAMES.skuPrefix}%`);
+    const withPhoto = new Set(
+      (photographed ?? []).map((row) => (row.products as unknown as { sku: string }).sku),
+    );
+    expect(withPhoto.size, "and the reason is the photograph, not the flag").toBe(95);
   });
 
   it("gives every shelf product a photograph filed under its own SKU", async () => {
@@ -67,7 +88,19 @@ describe("the real catalogue reached the database", () => {
       .single();
 
     // Imported exactly as the master states it. Never corrected by inference.
-    expect(data).toMatchObject({ price_tzs: 128, storefront_visible: false, lifecycle: "active" });
+    //
+    // `storefront_visible` is now true, because the sheet says Show and that is
+    // Ibrahim's intent for it. What keeps EP01-A01 off the shelf is the missing
+    // photograph — asserted above — and that is the stronger guarantee: the
+    // product stays hidden for a reason nobody can switch off by mistake.
+    expect(data).toMatchObject({ price_tzs: 128, lifecycle: "active" });
+
+    const { data: photo } = await db
+      .from("product_media")
+      .select("role, products!inner(sku)")
+      .eq("role", "primary")
+      .eq("products.sku", "EP01-A01");
+    expect(photo ?? [], "EP01-A01 has no approved photograph").toHaveLength(0);
   });
 
   it("never invented a product for the orphan photograph EP23-A02", async () => {

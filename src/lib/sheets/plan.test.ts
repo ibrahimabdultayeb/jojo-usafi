@@ -500,6 +500,34 @@ describe("EP01-A01, the suspicious price", () => {
   });
 });
 
+/* ------------------------------------------- a settled disagreement */
+
+describe("after a person settles a conflict in the shop's favour", () => {
+  /*
+    The base is deliberately recorded as the SHEET's rejected value, so the
+    database reads as changed and the sheet as unchanged — which is how the
+    decision travels out to the sheet. Without that, "use Jojo Usafi" would
+    leave the sheet asserting its rejected value for ever.
+  */
+  it("carries the shop's value to the sheet, and changes nothing in the shop", () => {
+    const rejected: CatalogueFields = { ...DB_FIELDS, sortPriority: 43 };
+
+    const plan = planSync(
+      makeInput({
+        rows: [sheetRow({ "PRODUCT PRIORITY": 43 })],
+        products: [dbProduct({ sortPriority: 44 })],
+        base: new Map([["EP01-A02", rejected]]),
+      }),
+    );
+
+    expect(plan.conflicts, "the disagreement is settled, not re-raised").toHaveLength(0);
+    expect(plan.toDatabase, "the shop keeps its value").toHaveLength(0);
+    expect(plan.toSheet).toHaveLength(1);
+    expect(plan.toSheet[0].fields).toContain("sortPriority");
+    expect(plan.toSheet[0].cells["PRODUCT PRIORITY"]).toBe(44);
+  });
+});
+
 /* ------------------------------------------------- the first meeting */
 
 describe("the first time the two sides meet", () => {

@@ -32,11 +32,10 @@ edits delivery areas. Every write is refused if the person's role does not allow
 database rather than by the screen. The invented orders, customers, zones and sales figures
 are deleted, not kept as a fallback.
 
-**The Google Sheet sync is connected and its baseline is synchronised.** On 2026-09-10 the
-first real run wrote 910 cells — the five read-only system columns and their headers — and
-recorded what the two sides agree on. Not one of Ibrahim's own cells was touched and nothing
-in the shop moved. **The catalogue itself has not been synced yet**: the second plan is
-calculated and waiting on one decision. See `docs/GOOGLE_SHEET_SYNC.md`.
+**The Google Sheet sync is live.** As of 2026-09-10 the sheet and the shop agree on every
+catalogue field they share, in both directions, with one deliberate exception — a single
+product description held for content review. Stock has never been synchronised and never will
+be. See `docs/GOOGLE_SHEET_SYNC.md`.
 
 What is still not true: the **Website** screen saves nothing and says so; Reports, Staff and
 Settings are empty; and no product has yet been synced to or from a real Google Sheet.
@@ -1500,6 +1499,103 @@ written to it. That was a reasonable fake for everything else and exactly wrong 
 After the two runs: 201 products, 95 visible, 95 on the shelf, 204 inventory movements, 2
 orders, 201 agreements, 0 conflicts. Nothing operational moved.
 
+## Build 09 complete — the sheet and the shop agree — 2026-09-10
+
+Ibrahim's approval was field-specific: apply the website visibility intent and the
+display order, hold the one product description for content review. The engine had
+no way to do that, so `runCatalogueSync` gained `applyFields` — it narrows what may
+flow **before** anything is written and before the agreement is computed, which is
+what makes holding a field safe rather than merely hopeful.
+
+### Two counts, and they are not the same
+
+| | |
+| --- | --- |
+| Products affected | **116** |
+| Field-level changes | **121** |
+
+A product can appear under more than one field, which is the whole difference.
+
+| Field | Products | |
+| --- | --- | --- |
+| Show on website | **106** | applied |
+| Display order | **14** | applied |
+| Description | **1** | **held** |
+
+### What was proved
+
+**Step D.** Verified as an end state rather than a count of deltas: for all 201
+rows, website intent agreeing **201/201**, display order agreeing **201/201**,
+nothing disagreeing. **The public shelf stayed at 95** — 106 products now say
+*Show* and not one reached a customer, because `product_shelf` still requires an
+approved photograph. Inventory, prices, the ledger, orders and customers were
+byte-identical.
+
+**Step E.** Two checks, a real run, another check: Sheet → Supabase stayed at
+exactly **1** every time — the held description. Blank ≡ no decision, proved on
+EP04-A01: blank cell, 0 in the shop, no difference and no write. And the
+`SYSTEM LAST SYNCED` timestamp cannot start a cycle, because the system columns
+are not in the comparison at all.
+
+**Step F.** A full round trip on display order, on one safe product: sheet → shop,
+shop → sheet, then both sides changed to different values → **conflict raised,
+neither applied**, row frozen across a further sync. Resolved in the shop's
+favour, the decision travelled to the sheet, and both sides were restored exactly.
+
+### Three more faults found by doing it for real
+
+**"Show" was doing two jobs.** It recorded a merchandising wish *and* stood in for
+"we have what we need to sell this", because the Build 07 importer set it from the
+second meaning. Ibrahim separated them: intent is intent, and publishability is
+decided independently. Two tests in `06-catalogue.test.ts` were asserting the old
+coincidence and now assert the shelf rule instead — a stronger claim that survives
+the flag changing meaning, which is exactly what happened to it.
+
+**PostgREST caps a response at 1000 rows and says nothing.** The agreed-base
+loader was one unbounded select ordered oldest-first. With 1993 base rows it read
+the OLDEST 1000, so every comparison used a stale base — invisibly, with no error.
+It surfaced as a settled conflict refusing to stick. Both state reads are now
+paged, the base read is newest-first, and superseded snapshots are pruned: 1792
+removed, 201 current ones kept.
+
+**Resolving a conflict recorded nothing.** Deleting `sync_state` left the base in
+`sync_events`, so the same disagreement returned on the next run for ever. A
+resolution now writes a fresh base — and when the *shop* wins, it records the
+sheet's rejected value on purpose, so the database reads as changed and the
+decision travels out to the sheet.
+
+Also: the agreement was written two round trips per product, 402 sequential calls
+to Mumbai, and the first attempt at Step D was killed by a timeout partway through
+— after every product update had already landed. It is batched now, and the run
+went from timing out at five minutes to finishing in ninety seconds.
+
+### The one held description
+
+**EP10-A02, Shower Gel Bubblegum.** Currently public, and has **no** description in
+Supabase at all — so nothing is displayed anywhere. The sheet's text is preserved
+untouched. Two things worth a look before it is approved: the copy calls the
+product *Bubbles* while the catalogue calls it *Shower Gel Bubblegum*, and it makes
+germ-killing claims that are a regulatory question rather than a stylistic one.
+
+Every run reports it as one outstanding change and applies nothing.
+
+### Verified
+
+`typecheck` · `lint` · `test` (**190**) · `schema:check` · `i18n:check` (267) ·
+`catalogue:check` · `db:types:check` · `build` · `qa:screenshots` (**127**, PASS) ·
+`test:db` (**215** passed, 3 skipped).
+
+Final state: 201 products, 95 on the public shelf, 201 with visibility intent, 204
+inventory movements, 2 orders, 201 agreements, **0 open conflicts**. EP01-A01 still
+TSh 128 and off the shelf for want of a photograph; EP23-A02 still not a product.
+
+### Known, and left alone deliberately
+
+`SYSTEM LAST SYNCED` is rewritten for all 201 rows on every run, so a sync that
+changes nothing still writes 201 cells. It is correct and harmless — the column
+cannot feed the comparison — but it is noise in the sheet's revision history and
+work nobody needs. Worth narrowing to rows that actually changed, in a later build.
+
 ## Next
 
 - Confirm the open business rules (delivery fee, served areas, retail prices). A global
@@ -1530,11 +1626,11 @@ orders, 201 agreements, 0 conflicts. Nothing operational moved.
   tested, 2026-09-09. Not connected.**
 - ~~**Ibrahim, to switch the sync on:** the Google service account and spreadsheet~~ — **done,
   2026-09-10.** Connected, read and checked; no sync run yet.
-- **Ibrahim, one decision before the catalogue sync:** the second plan proposes 106 website-
-  intent changes (approved), and also **14 display-order values** and **1 product description**
-  that the Sheet holds and the shop does not. None is destructive; all three fields are
-  two-way in the authority matrix. Say whether to apply all 116, or only the 106 visibility
-  changes, and the sync finishes.
+- ~~**Ibrahim, the catalogue sync decision**~~ — **done, 2026-09-10.** Visibility intent and
+  display order applied; the EP10-A02 description held for content review.
+- **Ibrahim, one small thing:** the held description for **EP10-A02 (Shower Gel Bubblegum)**
+  calls the product *Bubbles* and makes germ-killing claims. Confirm the wording and whether
+  those claims are safe to publish, and the next sync will carry it across.
 - **Build 10**, in this order:
   1. **The first real sync** — 905 system-column cells, then a second dry run to review the
      105 visibility edits the sheet is asking for

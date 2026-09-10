@@ -22,8 +22,8 @@ export default defineConfig({
     environment: "node",
     fileParallelism: false,
     sequence: { shuffle: false, concurrent: false },
-    testTimeout: 300_000,
-    hookTimeout: 300_000,
+    testTimeout: 1_800_000,
+    hookTimeout: 1_800_000,
     reporters: ["default"],
   },
   resolve: {

@@ -3,7 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { authorize } from "@/lib/admin/authorize";
 import { getServiceRoleSupabase } from "@/lib/supabase/admin";
-import { runCatalogueSync, ENTITY_TABLE, type RunReport } from "./run";
+import { runCatalogueSync, fieldsForSku, recordResolvedBase, type RunReport } from "./run";
 import { FIELD_LABELS, type CatalogueFields } from "./columns";
 
 /**
@@ -108,15 +108,25 @@ export async function resolveConflictAction(
     })
     .eq("id", conflictId);
 
-  // The base both sides agreed on is now stale — this row's next comparison
-  // must start from the decision, not from what they last agreed. Clearing the
-  // state makes the next run treat it as a first meeting, which brings the
-  // sheet up to the database rather than re-raising the same disagreement.
-  await db
-    .from("sync_state")
-    .delete()
-    .eq("entity_table", ENTITY_TABLE)
-    .eq("entity_key", conflict.entity_key);
+  /*
+    Record what the two sides now agree on, so the decision sticks.
+
+    Clearing `sync_state` alone was not enough and was a real defect: the base
+    lives in `sync_events`, so the same disagreement would be detected again on
+    the very next run and the person's decision would be asked for for ever.
+
+    When the shop wins, the base is recorded as the SHEET's rejected value on
+    purpose — that makes the database read as changed and the sheet as
+    unchanged, so the next run carries the decision out to the sheet.
+  */
+  const fields = await fieldsForSku(conflict.entity_key);
+  if (fields) {
+    const agreed: CatalogueFields = { ...fields };
+    if (side === "database") {
+      (agreed as unknown as Record<string, unknown>)[conflict.field] = conflict.sheet_value;
+    }
+    await recordResolvedBase(conflict.entity_key, agreed, side === "sheet" ? "sheet" : "admin");
+  }
 
   afterSync();
 

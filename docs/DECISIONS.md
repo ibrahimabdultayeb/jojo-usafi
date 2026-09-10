@@ -2047,3 +2047,137 @@ the whole point is that the figures sit beside the row they describe.
 Impact:
 `MemorySheet` gained `failHeadersWith` so the failure can be reproduced deliberately, which is
 how the "records no agreement" rule above is tested.
+
+---
+
+## 2026-09-10 — "Show" is intent, not proof
+
+Decision:
+`storefront_visible` means *Ibrahim wants this sold once it can be sold*. It is
+not, and must never become, the thing that decides whether a product is
+publishable. `product_shelf` continues to require an active lifecycle **and**
+the visibility intent **and** an approved photograph, independently.
+
+All 106 products that were hidden only for want of a photograph now carry the
+sheet's `Show`. Not one of them reached the storefront: the shelf stayed at 95.
+
+Reason:
+Ibrahim settled it, and it is the reading that makes the shop maintainable. Under
+the old arrangement the flag was doing two jobs — recording a merchandising wish
+and standing in for "we have what we need to sell this" — and the Build 07
+importer had quietly set it from the second meaning. That is why the first sync
+plan wanted to write `Hide` over 105 of his own `Show` cells.
+
+Separating them means a photograph arriving is enough: the product becomes
+eligible on its own, without anybody having to make the visibility decision a
+second time and without anybody remembering that they must.
+
+Alternatives:
+Keep the flag as the single gate and require a second manual Show once a photo
+lands. Rejected: it is a decision nobody would remember to make, and the product
+would sit invisible with no indication why.
+
+Impact:
+Two tests in `06-catalogue.test.ts` were asserting the old coincidence — 106
+products with `storefront_visible = false`, and EP01-A01 among them. They now
+assert the shelf rule instead, and count the withheld products by the photograph
+they lack. That is the stronger claim: it survives the flag changing meaning,
+which is exactly what just happened to it.
+
+---
+
+## 2026-09-10 — Approval is field-specific, so application is too
+
+Decision:
+`runCatalogueSync` takes `applyFields`. When set, only those fields may flow
+Sheet → Supabase; everything else the plan proposes is held — not applied, not
+recorded as agreed, and therefore offered again on the next run.
+
+Reason:
+Ibrahim approved website visibility and display order and deliberately held one
+product description for content review. Without this the choice was all three or
+none, and "none" would have meant re-deciding the other 120 changes later.
+
+Holding is only safe because the agreement is recorded from what was APPLIED.
+A held difference stays a difference. If the base were recorded from the plan
+instead, the description would have been marked agreed without ever being
+written, and the difference would have vanished silently — the exact failure the
+whole base mechanism exists to prevent.
+
+Alternatives:
+Apply everything and let a person undo the unwanted parts. Rejected: undo through
+a sync is a second edit that has to win a conflict. Edit the sheet to remove the
+unwanted change first. Rejected: it destroys the very content that is under
+review.
+
+Impact:
+Every run reports the held items — *"1 change on 1 product was left for a
+decision and not applied"* — so a held field is visible rather than forgotten.
+
+---
+
+## 2026-09-10 — PostgREST caps a response at 1000 rows, and says nothing
+
+Decision:
+Both `sync_state` and the agreed-base reads are paged, and the base read is
+ordered NEWEST first so the first row seen for a key is the current one.
+Superseded base snapshots are deleted after each run.
+
+Reason:
+The base loader was one unbounded select ordered oldest-first, taking the last
+row per key. PostgREST returns at most 1000 rows and reports no error. With 201
+products and a handful of runs there were 1993 base rows, so it read the OLDEST
+1000 — every base the sync compared against was stale, invisibly.
+
+It surfaced during the round-trip proof: a settled conflict would not stick. The
+decision was written, the next run read a base from before it, and the sheet
+went on asserting the value a person had just rejected. Nothing errored. The
+sync simply, quietly, used the wrong past.
+
+The pruning matters as much as the paging. `sync_events` holds two different
+kinds of row: an `update` row is history and is never touched, while an `upsert`
+row is a snapshot of what the two sides agreed at a moment, and only the newest
+per product means anything. Left alone they accumulated at 201 per run, which is
+what pushed the loader past the cap in the first place. 1792 superseded snapshots
+were removed; 201 current ones remain.
+
+Alternatives:
+Raise the PostgREST limit. Rejected: it moves the cliff rather than removing it,
+and the next person to hit it gets the same silent wrong answer. Keep every
+snapshot for the audit trail. Rejected: they are not an audit trail, they are a
+cache of one value, and the real history is in the `update` rows beside them.
+
+Impact:
+Anything that reads a table which grows without bound now pages. The lesson is
+worth generalising: an unpaged `select` is a correct-looking query with a size
+limit hidden in the transport.
+
+---
+
+## 2026-09-10 — Resolving a conflict must record what was decided
+
+Decision:
+Settling a conflict writes a fresh agreed base. When the sheet wins, the base is
+the chosen value and both sides hold it. When the **shop** wins, the base is
+recorded as the sheet's REJECTED value — so the database reads as changed, the
+sheet as unchanged, and the next run carries the decision out to the sheet.
+
+Reason:
+The original code only deleted the `sync_state` row, on the theory that the next
+run would treat the product as newly met. It would not: the base lives in
+`sync_events` and survived, so the same disagreement was detected again and the
+person would have been asked the same question for ever.
+
+And "use Jojo Usafi" has to mean the sheet is corrected. Leaving both sides as
+they were would leave the sheet asserting a rejected value indefinitely, which is
+how the disagreement comes back.
+
+Alternatives:
+Delete the base as well and let the pair meet again. Rejected: a first meeting
+lets neither side win, so the sheet would keep its rejected value and the
+decision would never travel.
+
+Impact:
+Proved end to end in the round-trip: shop 44 against sheet 43, resolved in the
+shop's favour, and the sheet received 44 on the next run. An offline test pins
+the planner half of it.

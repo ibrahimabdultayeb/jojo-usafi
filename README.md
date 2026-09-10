@@ -14,9 +14,9 @@ them — confirm, prepare, send out, complete with the payment actually collecte
 a delivery failed — and edits prices, stock and delivery areas, with every write refused if
 the signed-in person's role does not allow it.
 
-The **Google Sheet catalogue sync** is connected, and its baseline is synchronised: 910 cells
-of read-only system reporting, none of them one of the operator's own. The catalogue itself is
-not synced yet — see [`docs/GOOGLE_SHEET_SYNC.md`](./docs/GOOGLE_SHEET_SYNC.md).
+The **Google Sheet catalogue sync** is live: the sheet and the shop agree on every catalogue
+field they share, in both directions. Stock is never taken from the sheet — see
+[`docs/GOOGLE_SHEET_SYNC.md`](./docs/GOOGLE_SHEET_SYNC.md).
 
 What does not exist yet: online payments and the Website/Reports/Staff/Settings screens. See
 [`PROTOTYPE_NOTES.md`](./PROTOTYPE_NOTES.md) for what is still mocked in the UI and
@@ -79,7 +79,7 @@ Saved screenshots at every QA width, in both languages, are in
 | `npm run catalogue:build` | Rebuild the catalogue and photography from `imports/` |
 | `npm run catalogue:check` | Verify the committed catalogue still matches `imports/` |
 | `npm run i18n:check` | Verify English and Kiswahili carry the same copy keys |
-| `npm run test` | 189 unit tests — pure functions, **no database needed** |
+| `npm run test` | 190 unit tests — pure functions, **no database needed** |
 | `npm run schema:check` | Offline: the migrations are internally consistent and agree with the domain layer |
 | `npm run qa:screenshots` | Full QA gate — screenshots and behaviour checks at 390/430/768/1024/1440 in both languages, plus the signed-in admin dashboard and its dialogs (a server must be running; set `BASE_URL` for anything other than port 3000) |
 
@@ -145,7 +145,7 @@ src/components/cart/      cart drawer
 src/lib/catalogue/        catalogue types, generated data and the query layer
 src/lib/admin/            the dashboard: model, reads, the authorisation gate, the writes
 src/lib/sheets/           the Google Sheet sync: field authority, planner, gateway, audit
-src/lib/domain/           business rules as pure TypeScript, 189 unit tests, no I/O
+src/lib/domain/           business rules as pure TypeScript, 190 unit tests, no I/O
 src/lib/supabase/         the three clients, generated types, environment validation
 src/lib/i18n/             locale config, dictionaries, client hook
 src/lib/                  cart state, formatting, site settings, colour tones

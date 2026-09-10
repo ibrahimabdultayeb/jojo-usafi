@@ -7,7 +7,7 @@ Every one of these must pass before a commit:
 ```bash
 npm run typecheck        # TypeScript, no emit
 npm run lint             # ESLint
-npm run test             # 189 unit tests (vitest) — no database needed
+npm run test             # 190 unit tests (vitest) — no database needed
 npm run schema:check     # SQL is internally consistent and agrees with the domain layer
 npm run i18n:check       # en + sw key, placeholder and array parity
 npm run catalogue:check  # committed catalogue still matches imports/
@@ -39,7 +39,7 @@ migration path is `db push --dry-run`, read the plan, then `db push`.
 
 ## Domain unit tests
 
-`npm run test` — 189 tests over `src/lib/domain/`, the admin capability matrix and the Google Sheet sync planner, all pure
+`npm run test` — 190 tests over `src/lib/domain/`, the admin capability matrix and the Google Sheet sync planner, all pure
 TypeScript with no I/O:
 
 | Area | Covers |
