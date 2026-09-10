@@ -223,8 +223,14 @@ export function planSync(input: PlanInput): SyncPlan {
   const now = new Date().toISOString().slice(0, 16).replace("T", " ");
 
   for (const row of sheet.parsed) {
+    // A row that could not be READ is still a row that EXISTS. Marking it seen
+    // before skipping it keeps it out of "no longer in the sheet", which it is
+    // not — it is a row with a problem, already reported as one. The first real
+    // connection found EP04-A01 reported under both headings at once, which is
+    // the kind of double-count that turns into somebody archiving a product
+    // that was never missing.
+    if (row.sku) seenInSheet.add(row.sku);
     if (!row.ok) continue;
-    seenInSheet.add(row.sku);
 
     const product = bySku.get(row.sku);
 
@@ -306,12 +312,29 @@ export function planSync(input: PlanInput): SyncPlan {
       if (field === "variantLabel") continue;
 
       if (!baseRecord) {
-        // First meeting: the two have never agreed, so neither side has
-        // "changed" anything. The database is the operational truth — it is
-        // what the storefront is serving — so the sheet is brought up to it and
-        // the agreement is recorded. Nothing is written into the shop from a
-        // spreadsheet whose history we do not know.
-        if (differ(current[field], incoming[field])) dbWon.push(field);
+        /*
+          FIRST MEETING: NEITHER SIDE WINS.
+
+          The two have never agreed, so no field has "changed" — a difference
+          here is just a difference, and there is no way to tell a deliberate
+          one from an artefact of how the data got there. So nothing flows in
+          either direction. The run records what the database holds as the
+          agreed base and writes only the read-only system columns; from the
+          next run on, a real edit reads as a real edit.
+
+          This rule used to push the database's value into the sheet, and the
+          first connection to the real Product Master showed what that costs:
+          it would have overwritten 105 `WEBSITE STATUS` cells reading "Show"
+          with "Hide", and 14 `PRODUCT PRIORITY` cells with 0. Neither value was
+          a decision anybody made — the hidden flag came from the Build 07
+          importer noticing there was no photograph, and the 0 is a column
+          default for a field that was never imported. Ibrahim's "Show" is the
+          only stated intent in that pair, and it would have been destroyed
+          silently, in his own column, on the first press of the button.
+
+          The database is still the operational truth for what the SHOP does.
+          It is not automatically the truth about what the operator MEANT.
+        */
         continue;
       }
 

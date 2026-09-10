@@ -7,7 +7,7 @@ Every one of these must pass before a commit:
 ```bash
 npm run typecheck        # TypeScript, no emit
 npm run lint             # ESLint
-npm run test             # 185 unit tests (vitest) — no database needed
+npm run test             # 189 unit tests (vitest) — no database needed
 npm run schema:check     # SQL is internally consistent and agrees with the domain layer
 npm run i18n:check       # en + sw key, placeholder and array parity
 npm run catalogue:check  # committed catalogue still matches imports/
@@ -39,7 +39,7 @@ migration path is `db push --dry-run`, read the plan, then `db push`.
 
 ## Domain unit tests
 
-`npm run test` — 185 tests over `src/lib/domain/`, the admin capability matrix and the Google Sheet sync planner, all pure
+`npm run test` — 189 tests over `src/lib/domain/`, the admin capability matrix and the Google Sheet sync planner, all pure
 TypeScript with no I/O:
 
 | Area | Covers |
@@ -95,6 +95,20 @@ name order by a custom sequencer, sharing one database with `fileParallelism` of
 | `06-catalogue.test.ts` | 14 | the real catalogue as an anonymous shopper receives it: 95 on the shelf, 201 kept, EP01-A01 blocked, EP23-A02 not invented, photographs filed and fetchable, nothing newly readable or writable |
 | `10-sheet-sync.test.ts` | 20 | the catalogue sync against the real database and an in-memory spreadsheet: both directions applied, a `STOCK QTY` of 999,999 moving nothing and writing no ledger row, conflicts recorded and not re-raised, a deleted sheet row leaving the product alone, a second run writing nothing, Google being down leaving checkout working, and orders, ledgers and staff rows untouched |
 | `09-admin-operations.test.ts` | 24 | the dashboard's operations run as the people who use them: Order staff refused pricing, stock, zones and self-promotion; Manager allowed all four but refused Owner and refused to rewrite what an order sold for; stock moved only through the ledger, with an actor and a reason; the whole staff journey to Completed with cash and with a digital reference; cancellation and both delivery-failure answers; what each screen can read |
+
+### The real spreadsheet is never opened by the gate
+
+`tests/db/11-real-sheet-inspection.test.ts` and `12-real-sheet-detail.test.ts` read Ibrahim's
+actual Product Master, and are **skipped unless `INSPECT_REAL_SHEET=1`**. They exist as files
+rather than as throwaway commands so the first connection is repeatable and reviewable.
+
+Both wrap the Google gateway in a proxy whose write methods throw, so their safety does not
+depend on the `dryRun` flag being honoured: a write attempt fails loudly instead of landing in
+the sheet. Run them with:
+
+```bash
+INSPECT_REAL_SHEET=1 npx vitest run --config vitest.db.config.ts tests/db/11-real-sheet-inspection.test.ts
+```
 
 ### Fixtures are scoped to one run
 

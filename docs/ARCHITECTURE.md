@@ -36,7 +36,7 @@ What is real and what is not:
 | The 95 product photographs in Storage | **yes** — `product-media/<SKU>/` |
 | The catalogue in the database | **yes** — 201 products, 95 on the public shelf |
 | The application reading Supabase | **yes** — storefront and admin product screens |
-| Google Sheet synchronisation | **built and tested; not connected** — waiting on a Google service account. See `docs/GOOGLE_SHEET_SYNC.md` |
+| Google Sheet synchronisation | **built, tested and connected** — reads the real Product Master; no sync run yet. See `docs/GOOGLE_SHEET_SYNC.md` |
 | The stock reservation engine | **yes** — one transaction, concurrency proved |
 | Server-authoritative quotation and order creation | **yes** |
 | Cancellation with reservation release | **yes** — idempotent |
@@ -78,7 +78,7 @@ approximation of it. `supabase db reset` is never run against a hosted project �
 ```
 supabase/migrations/               the schema — 19 migrations, all applied
 supabase/seed.sql                  deliberately empty of business data
-src/lib/domain/                    the rules as pure TypeScript, 185 unit tests, no I/O
+src/lib/domain/                    the rules as pure TypeScript, 189 unit tests, no I/O
 src/lib/supabase/env.ts            environment validation — no defaults, no placeholders
 src/lib/supabase/client.ts         browser, as the visitor    — anon key, RLS applies
 src/lib/supabase/server.ts         server, as the visitor     — anon key, RLS applies

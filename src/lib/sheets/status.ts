@@ -25,6 +25,8 @@ export interface SyncOverview {
     readonly seen: number;
     readonly failed: number;
     readonly error: string | null;
+    /** A dry run is a check, not a sync. The screen must not conflate them. */
+    readonly checkOnly: boolean;
   } | null;
   readonly productCount: number;
   readonly openConflicts: number;
@@ -40,7 +42,7 @@ export async function getSyncOverview(): Promise<SyncOverview> {
       supabase.from("products").select("id", { count: "exact", head: true }),
       supabase
         .from("sync_jobs")
-        .select("finished_at, created_at, status, rows_applied, rows_seen, rows_failed, error_message")
+        .select("finished_at, created_at, status, rows_applied, rows_seen, rows_failed, error_message, idempotency_key")
         .eq("entity_table", ENTITY_TABLE)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -71,6 +73,9 @@ export async function getSyncOverview(): Promise<SyncOverview> {
           seen: job.rows_seen,
           failed: job.rows_failed,
           error: job.error_message,
+          // The run key carries ":dry" or ":live" — see runCatalogueSync. A
+          // check that changed nothing must not read as a completed sync.
+          checkOnly: String(job.idempotency_key ?? "").endsWith(":dry"),
         }
       : null,
     productCount: productCount ?? 0,

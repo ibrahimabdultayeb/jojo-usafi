@@ -1891,3 +1891,94 @@ way: teardown identifies rows by who made them, never by what they are. A rule t
 Impact:
 The suite leaves all four sync tables exactly as it found them, and the admin screen's "last
 sync" means what it says.
+
+---
+
+## 2026-09-10 — On a first meeting, neither side wins
+
+Decision:
+When the Sheet and Supabase have no agreed base for a product — the first time they are
+compared — **no field flows in either direction**. The run records what the database holds as
+the agreed base and writes only the read-only system columns. From the next run on, a
+difference reads as a real edit and flows normally.
+
+This replaces the rule written on 2026-09-09, which said the database was the operational
+truth on a first meeting and brought the Sheet up to it.
+
+Reason:
+The first read of the real Product Master showed exactly what the old rule would have cost.
+It would have rewritten **105 `WEBSITE STATUS` cells from `Show` to `Hide`** and **14
+`PRODUCT PRIORITY` cells to `0`** — in Ibrahim's own columns, on the first press of the
+button.
+
+Neither database value was a decision anybody had made. All 105 of those products are hidden
+because the Build 07 importer found no approved photograph; the flag records an absence of a
+photo, not a wish to hide anything. The `0` priorities are a column default for a field the
+importer never read at all. Ibrahim's `Show` and his 1–6 ordering were the only stated
+intentions in either pair.
+
+The old rule was defensible in the abstract and wrong in practice, and the difference only
+became visible against real data. "The database is the operational truth" is true about what
+the shop *does*. It is not true about what the operator *meant*.
+
+Alternatives:
+Let the Sheet win on a first meeting. Rejected: it writes into the shop from a spreadsheet
+whose history is unknown, which is the mirror of the same mistake. Special-case
+`storefrontVisible` and `sortPriority`. Rejected: the problem is not those two fields, it is
+that a difference with no base is not a change, and a rule that admits that is simpler than a
+list of exceptions.
+
+Impact:
+The first real sync becomes an introduction: 905 system-column cells written, zero of the
+operator's own. The 105 `Show` values then appear as genuine Sheet edits on the *next* dry
+run, where they can be read and applied deliberately. Nothing is decided by a machine that a
+person has not seen first.
+
+---
+
+## 2026-09-10 — A row that cannot be read is not a row that is missing
+
+Decision:
+`planSync` marks a SKU as seen in the Sheet **before** validating its row. A row that fails
+validation is reported as a problem and is not also reported as a product missing from the
+Sheet.
+
+Reason:
+EP04-A01 has the text `True` in its `PRODUCT PRIORITY` cell — a boolean pasted into a number
+column. The row was correctly refused, and then counted a second time under *no longer in the
+sheet*, which was simply false: the row is right there at line 50.
+
+Two counts for one fault is bad reporting on its own. It becomes dangerous the moment anything
+acts on "missing" — the plan deliberately does nothing with it today, but the whole point of
+recording that list is that a person eventually reads it and decides to retire something.
+Retiring a product because one of its cells had a typo would be an expensive way to learn this.
+
+Alternatives:
+Filter the missing list against the issues list when rendering. Rejected: it fixes the symptom
+in one place and leaves the plan itself wrong for the next reader.
+
+Impact:
+"Products missing from the sheet" fell from 1 to 0 against the real data, which is the true
+answer. The fixture products of a test run still appear there, correctly — they really are not
+in the Sheet.
+
+---
+
+## 2026-09-10 — A check is not a sync, and the screen says which
+
+Decision:
+`sync_jobs` rows carry `:dry` or `:live` in their idempotency key, and the Catalogue Sync
+screen reads it: a dry run shows **"Last checked — Checked, nothing changed"** rather than
+"Last sync — Finished".
+
+Reason:
+A dry run finishes with status `applied` and zero rows applied, which is accurate in the
+ledger and misleading on a screen. Somebody glancing at "Last sync: Finished" after only a
+check would reasonably believe the catalogue had been synchronised.
+
+Alternatives:
+Add a `dry_run` column, or a new `sync_status` enum member. Rejected for now: the information
+is already in the row, and a migration to restate it would be a schema change for a label.
+
+Impact:
+No schema change. The distinction is visible exactly where it matters and nowhere else.

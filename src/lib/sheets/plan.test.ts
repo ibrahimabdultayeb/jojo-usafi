@@ -500,6 +500,84 @@ describe("EP01-A01, the suspicious price", () => {
   });
 });
 
+/* ------------------------------------------------- the first meeting */
+
+describe("the first time the two sides meet", () => {
+  /*
+    Both of these come straight from the first connection to the real Product
+    Master. The rule as originally written would have overwritten 105 of
+    Ibrahim's own "Show" cells with "Hide" and 14 real display-order values
+    with 0 — none of which was a decision anybody had made.
+  */
+
+  it("changes nothing in either direction, whatever the two disagree about", () => {
+    const plan = planSync(
+      makeInput({
+        rows: [sheetRow({ "WEBSITE STATUS": "Show", "PRODUCT PRIORITY": 99 })],
+        // The shop has it hidden with a default priority — an importer artefact,
+        // not a merchandising decision.
+        products: [dbProduct({ storefrontVisible: false, sortPriority: 0 })],
+        base: new Map(), // never agreed
+      }),
+    );
+
+    expect(plan.toDatabase, "nothing is written into the shop").toHaveLength(0);
+    const cells = plan.toSheet[0]?.cells ?? {};
+    expect(cells["WEBSITE STATUS"], "the operator's own column is left alone").toBeUndefined();
+    expect(cells["PRODUCT PRIORITY"]).toBeUndefined();
+    expect(plan.toSheet[0]?.fields, "no bidirectional field is pushed").toEqual([]);
+  });
+
+  it("still writes the read-only system columns, which is the point of the round trip", () => {
+    const plan = planSync(
+      makeInput({
+        rows: [sheetRow({ "WEBSITE STATUS": "Show" })],
+        products: [dbProduct({ storefrontVisible: false })],
+        base: new Map(),
+      }),
+    );
+
+    expect(plan.toSheet).toHaveLength(1);
+    expect(plan.toSheet[0].cells["SYSTEM AVAILABLE STOCK"]).toBe(448);
+    expect(plan.toSheet[0].cells["SYSTEM ON WEBSITE"]).toBeDefined();
+  });
+
+  it("lets a genuine sheet edit through once the two have agreed", () => {
+    // The run after the introduction: the base exists, so "Show" is now a real
+    // difference the sheet is asserting, and it flows.
+    const agreedAsHidden: CatalogueFields = { ...DB_FIELDS, storefrontVisible: false };
+    const plan = planSync(
+      makeInput({
+        rows: [sheetRow({ "WEBSITE STATUS": "Show" })],
+        products: [dbProduct({ storefrontVisible: false })],
+        base: new Map([["EP01-A02", agreedAsHidden]]),
+      }),
+    );
+
+    expect(plan.toDatabase).toHaveLength(1);
+    expect(plan.toDatabase[0].changes).toEqual({ storefrontVisible: true });
+  });
+});
+
+describe("a row that cannot be read", () => {
+  it("is reported as a problem, and NOT as a product missing from the sheet", () => {
+    // EP04-A01 in the real sheet: a boolean pasted into the display-order cell.
+    const plan = planSync(
+      makeInput({
+        rows: [sheetRow({ "PRODUCT PRIORITY": "True" })],
+        products: [dbProduct()],
+        base: new Map([["EP01-A02", DB_FIELDS]]),
+      }),
+    );
+
+    expect(plan.issues.some((i) => i.field === "sortPriority")).toBe(true);
+    expect(
+      plan.missingFromSheet,
+      "its row exists — it just could not be read",
+    ).toHaveLength(0);
+  });
+});
+
 /* ------------------------------------------------------------------ headers */
 
 describe("the header row is checked before any row is read", () => {

@@ -9,10 +9,11 @@ Supabase; no customer request has ever touched Google, and none ever will. The S
 human-friendly control surface for the catalogue — it is not a second database, and it owns
 nothing operational.
 
-> **Status: built and tested, not yet connected.** The engine, the admin screen, the conflict
-> resolution and 43 tests are done. What is missing is a Google Cloud service account and the
-> spreadsheet ID, which only Ibrahim can create — see *Connecting it*, below. Until then the
-> Catalogue Sync screen says "Not connected" and the rest of the shop is entirely unaffected.
+> **Status: connected, read and checked. No sync has been run.** The service account can
+> open *Jojo Usafi Ecommerce Master Control* → *Product Master*, and a read-only dry run on
+> 2026-09-10 read all 201 rows, validated every header and compared them with the shop. What
+> a first real sync would write is **905 cells, every one of them a system report column** —
+> not one of the operator's own cells. See *The first connection* below.
 
 ---
 
@@ -158,6 +159,97 @@ product it was for. And a row can vanish for reasons that have nothing to do wit
 a bad sort, a filtered view, a row deleted by accident. Retiring a product is a deliberate
 act, done in the Product editor.
 
+
+## The first connection — 2026-09-10
+
+A read-only pass against the real *Product Master*. It wrote nothing: the gateway was wrapped
+in a proxy whose write methods throw, so the safety of the pass did not depend on the dry-run
+flag being honoured. Repeatable as
+`INSPECT_REAL_SHEET=1 npx vitest run --config vitest.db.config.ts tests/db/11-real-sheet-inspection.test.ts`.
+
+### What is there
+
+| | |
+| --- | --- |
+| Rows returned | 202, one of them the header row |
+| Data rows | 201 |
+| Columns | 39 — every one recognised, none unknown, none missing |
+| Rows read cleanly | 200 |
+| Unique SKUs | 200 |
+| Duplicate SKUs | 0 |
+| Rows with a problem | 1 |
+| Prices differing from the shop | **0** |
+
+The one problem is **EP04-A01**, row 50: its `PRODUCT PRIORITY` cell contains the text `True`
+— a boolean pasted into a number column. The row is refused, reported, and nothing about that
+product is touched. Its price, name and status are all fine; only the one cell is wrong.
+
+### Two faults this pass found, both now fixed
+
+**A first sync would have overwritten Ibrahim's own columns.** The original first-meeting rule
+was "the database is the operational truth, so bring the sheet up to it". Against real data
+that meant rewriting **105 `WEBSITE STATUS` cells from `Show` to `Hide`**, and **14
+`PRODUCT PRIORITY` cells to `0`**.
+
+Neither database value was a decision anybody had made. All 105 products are hidden because
+the Build 07 importer found no approved photograph — not because anyone chose to hide them.
+The `0` priorities are a column default for a field that was never imported at all. Ibrahim's
+`Show` and his 1–6 ordering were the only stated intentions in either pair, and they would
+have been destroyed silently, in his own columns, on the first press of the button. Worse:
+when photographs later arrived, the sheet would have said `Hide` and nothing would have put it
+back.
+
+**The rule is now: on a first meeting, neither side wins.** Nothing flows in either direction.
+The run records what the database holds as the agreed base and writes only the read-only
+system columns. From the second run on, a real edit reads as a real edit — so those 105 `Show`
+values will appear as genuine sheet changes, visible in a dry run, and can be applied
+deliberately.
+
+**A row that could not be read was also reported as missing from the sheet.** EP04-A01 was
+counted under both headings at once. A row with a problem is not an absent row, and conflating
+the two is how somebody ends up retiring a product that never went anywhere. Rows are now
+marked seen before they are validated.
+
+### What a first real sync would do today
+
+| | |
+| --- | --- |
+| Sheet → Supabase | **0 changes** |
+| Supabase → Sheet | 200 rows, **905 cells** |
+| Conflicts | 0 |
+| New SKUs in the sheet | 0 |
+| Products missing from the sheet | 0 |
+| Rows needing attention | 1 (EP04-A01) |
+
+Every one of those 905 cells is a system report column:
+
+| Column | Cells |
+| --- | --- |
+| `SYSTEM AVAILABLE STOCK` | 200 |
+| `SYSTEM IMAGE` | 200 |
+| `SYSTEM ON WEBSITE` | 200 |
+| `SYSTEM LAST SYNCED` | 200 |
+| `SYSTEM BLOCKED REASON` | 105 |
+
+Plus five header cells, appended to the right of the existing 39 columns. **No column of
+Ibrahim's is written, moved, renamed or reordered.**
+
+### Stock
+
+The dry run proposed **zero** changes of any kind to the shop, so the stock question is
+settled twice over: no inventory field appears in any proposed change, and `STOCK QTY` is not
+among the cells that would be written. The sheet's stock snapshot stays exactly as Ibrahim
+typed it, and the shop's real availability appears beside it in `SYSTEM AVAILABLE STOCK`.
+
+### The two watchlist SKUs
+
+**EP01-A01** — in the sheet at row 2 at TSh 128; in the shop at TSh 128, off the website,
+blocked for *no approved photo* and *switched off*. The sync proposes no change to it. The
+figure is neither corrected nor multiplied.
+
+**EP23-A02** — not in the sheet at all, and not in the shop. Still an approved photograph with
+no product. The sync proposes nothing; an image does not create a product.
+
 ## Conflicts
 
 A conflict is precisely one thing: **the same field changed on both sides since they last
@@ -170,6 +262,10 @@ agreed**. Not "the two differ" — differing is normal and is exactly what a syn
 The comparison is three-way: the Sheet's value, the database's value, and the **base** — what
 the two last agreed on. Without the base a change cannot be told apart from a value that was
 simply always different, which is the mistake that makes naive syncs lose data.
+
+**On a first meeting there is no base, so neither side wins.** Nothing flows either way; the
+run records the database's values as the agreed base and writes only the read-only system
+columns. From the next run on, a real edit reads as a real edit. See *The first connection*.
 
 An open conflict **freezes that product**. Later runs neither re-raise it nor quietly pick a
 side; the row waits for a person.
@@ -272,6 +368,13 @@ manual syncing on purpose, because automation nobody watches is worse than a but
 presses.
 
 ## Connecting it
+
+**This is done.** The Google Cloud project *Jojo Usafi Sheets Sync* exists, the Sheets API is
+enabled, and the service account `jojo-usafi-catalogue-sync@…` has Editor access to that one
+spreadsheet and nothing else. The four values live in the git-ignored `.env.local`, and the
+downloaded JSON key has been deleted. No billing account was involved at any point.
+
+The steps are kept below for the day the shop moves to a production project.
 
 Human-only setup, in this order. **Everything here is free** — the Google Sheets API has no
 cost at this scale and no billing account is required.

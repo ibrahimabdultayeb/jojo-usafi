@@ -32,9 +32,11 @@ edits delivery areas. Every write is refused if the person's role does not allow
 database rather than by the screen. The invented orders, customers, zones and sales figures
 are deleted, not kept as a fallback.
 
-**The Google Sheet sync is built.** Two-way, validated, conflict-aware and audited, with an
-admin screen and 43 tests — but **not connected**: it is waiting on a Google service account
-and a spreadsheet ID, which only Ibrahim can create. See `docs/GOOGLE_SHEET_SYNC.md`.
+**The Google Sheet sync is built and connected.** Two-way, validated, conflict-aware and
+audited, with an admin screen and 47 tests. As of 2026-09-10 it can read the real *Product
+Master* — 201 rows, 39 headers, all recognised — and a read-only dry run has been done. **No
+sync has been run yet**, deliberately: see `docs/GOOGLE_SHEET_SYNC.md` → *The first
+connection* for exactly what the first one would write.
 
 What is still not true: the **Website** screen saves nothing and says so; Reports, Staff and
 Settings are empty; and no product has yet been synced to or from a real Google Sheet.
@@ -1330,6 +1332,96 @@ reasons that are not defects.
 - **Media through the Sheet.** Images stay matched on exact SKU in Storage. A Sheet image URL
   never becomes a product photograph.
 
+## Build 09 continued — the real Sheet, connected and read — 2026-09-10
+
+The Google setup is done: project *Jojo Usafi Sheets Sync*, the Sheets API enabled, and a
+service account with Editor access to **one** spreadsheet — *Jojo Usafi Ecommerce Master
+Control* → *Product Master*. The four settings are in the git-ignored `.env.local`; the JSON
+key was deleted. No billing account was involved, and the private key was never read, printed
+or logged by anything in this session.
+
+**This pass was read-only and nothing was synced.** The gateway was wrapped in a proxy whose
+write methods throw, so the safety of the pass did not rest on the `dryRun` flag being
+honoured — a write attempt would have failed loudly rather than landing in the sheet. Zero
+were attempted.
+
+### What the real Product Master turned out to be
+
+201 data rows, 39 columns, **every header recognised, none unknown, none missing**. 200 rows
+read cleanly, 200 unique SKUs, no duplicates, and **not one price differs from the shop**.
+
+One row has a problem: **EP04-A01** at row 50 has the text `True` in its `PRODUCT PRIORITY`
+cell — a boolean pasted into a number column. The row is refused and reported; its price, name
+and status are all fine.
+
+### Two faults the first connection found
+
+Both would have damaged Ibrahim's own spreadsheet, and neither was visible without real data.
+
+**A first sync would have overwritten his columns.** The first-meeting rule was "the database
+is the operational truth, so bring the sheet up to it". Against the real sheet that meant
+rewriting **105 `WEBSITE STATUS` cells from `Show` to `Hide`** and **14 `PRODUCT PRIORITY`
+cells to `0`**.
+
+Neither database value was a decision anybody had made. All 105 of those products are hidden
+because the Build 07 importer found no approved photograph — the flag records a missing photo,
+not a wish to hide anything. The `0` priorities are a column default for a field never
+imported. His `Show` and his 1–6 ordering were the only stated intentions in either pair, and
+they would have gone silently. Worse, when photographs arrived the sheet would have read
+`Hide` and nothing would have put it back.
+
+The rule is now: **on a first meeting, neither side wins.** Nothing flows either way, the
+database's values are recorded as the agreed base, and only the read-only system columns are
+written. From the second run on, those 105 `Show` values read as genuine sheet edits — visible
+in a dry run, applied deliberately.
+
+**A row that could not be read was also counted as missing from the sheet.** EP04-A01 appeared
+under both headings at once. A row with a typo is not an absent row, and the "missing" list
+exists precisely so that a person eventually reads it and retires something.
+
+### What a first real sync would now do
+
+| | |
+| --- | --- |
+| Sheet → Supabase | **0 changes** |
+| Supabase → Sheet | 200 rows, **905 cells — every one a system report column** |
+| Conflicts | 0 |
+| New SKUs in the sheet | 0 |
+| Products missing from the sheet | 0 |
+| Rows needing attention | 1 |
+
+Plus five header cells appended to the right of the existing 39. **No column of Ibrahim's is
+written, moved, renamed or reordered.**
+
+### Stock, EP01-A01, EP23-A02
+
+The dry run proposes **zero** changes to the shop, so stock is protected twice over: no
+inventory field appears in any proposed change, and `STOCK QTY` is not among the cells to be
+written. The sheet's stock snapshot stays as typed; the shop's real availability appears
+beside it in `SYSTEM AVAILABLE STOCK`.
+
+**EP01-A01** — sheet row 2 at TSh 128, shop at TSh 128, off the website for *no approved
+photo* and *switched off*. No change proposed. Not corrected, not multiplied.
+
+**EP23-A02** — in neither the sheet nor the shop. Still an approved photograph with no
+product. Nothing proposed.
+
+### Also
+
+A dry run now reads as **"Last checked — Checked, nothing changed"** on the admin screen
+rather than "Last sync — Finished". The job row already carried the distinction; the screen
+was not reading it.
+
+### Verified
+
+`typecheck` · `lint` · `test` (**189**) · `build` · `qa:screenshots` (127, PASS) ·
+`test:db` (**213** passed, 3 skipped — the two real-sheet inspections are skipped unless
+`INSPECT_REAL_SHEET=1`).
+
+After the pass: 201 products, 95 visible, 95 on the shelf, all `sort_priority` still 0, 204
+inventory movements, 2 orders, and `sync_state` / `sync_events` / `sync_conflicts` all empty.
+Nothing moved.
+
 ## Next
 
 - Confirm the open business rules (delivery fee, served areas, retail prices). A global
@@ -1358,15 +1450,17 @@ reasons that are not defects.
   deletes them again. Your own Owner account is untouched by any of it.
 - ~~**Build 09:** the validated two-way Google Sheet ↔ Supabase catalogue sync~~ — **built and
   tested, 2026-09-09. Not connected.**
-- **Ibrahim, to switch the sync on:** six free steps in `docs/GOOGLE_SHEET_SYNC.md` →
-  *Connecting it*. A Google Cloud project, the Sheets API enabled, a service account, a JSON
-  key, share the Product Master with that service account's email as an Editor, and paste four
-  values into `.env.local`. No billing account is involved at any point. Then press **Check
-  first, change nothing** on *Admin → More → Catalogue sync* and read what it says before
-  running a real sync.
+- ~~**Ibrahim, to switch the sync on:** the Google service account and spreadsheet~~ — **done,
+  2026-09-10.** Connected, read and checked; no sync run yet.
+- **Ibrahim, one decision before the first real sync:** 105 products say **Show** in the sheet
+  and are hidden in the shop, every one of them because it has no approved photograph. The
+  first sync will not touch either side. The *second* will offer to set those 105 to visible —
+  which is what your sheet says you want, and they still will not appear on the website until
+  a photograph exists. Confirm that is right, and fix EP04-A01 row 50, whose display-order
+  cell contains  instead of a number.
 - **Build 10**, in this order:
-  1. **Connect and prove the sync against the real Product Master** — a dry run first, then a
-     real one, then the round trip
+  1. **The first real sync** — 905 system-column cells, then a second dry run to review the
+     105 visibility edits the sheet is asking for
   2. Creating products from the Sheet: brand, category and family resolution, and what happens
      when they do not resolve
   3. The **Website** screen wired to `shop_settings` — the last screen reading the mocks file

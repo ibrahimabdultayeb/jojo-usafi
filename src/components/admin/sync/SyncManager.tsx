@@ -75,9 +75,15 @@ export function SyncManager({
       <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <StatTile label="Products" value={String(overview.productCount)} sub="In Jojo Usafi" />
         <StatTile
-          label="Last sync"
+          label={overview.lastRun?.checkOnly ? "Last checked" : "Last sync"}
           value={overview.lastRun ? shortWhen(overview.lastRun.at) : "Never"}
-          sub={overview.lastRun ? outcomeWord(overview.lastRun.status) : "Not run yet"}
+          sub={
+            overview.lastRun
+              ? overview.lastRun.checkOnly
+                ? "Checked, nothing changed"
+                : outcomeWord(overview.lastRun.status)
+              : "Not run yet"
+          }
         />
         <StatTile label="Need a decision" value={String(overview.openConflicts)} sub="Sheet and shop disagree" />
         <StatTile label="Sync issues" value={String(overview.recentIssues)} sub="Rows to fix" />
