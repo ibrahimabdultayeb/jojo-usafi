@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Card, PrimaryAction, SectionTitle, StatTile } from "@/components/admin/ui";
 import { Icon } from "@/components/ui/Icon";
@@ -32,6 +32,9 @@ export function SyncManager({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<SyncActionResult | null>(null);
+  // Read here rather than at the point of use: hooks cannot be called inside a
+  // conditional, and the value is needed by one tile.
+  const lastRunWhen = useShortWhen(overview.lastRun?.at);
 
   const maySync = can(role, "catalogue.sync");
 
@@ -76,7 +79,7 @@ export function SyncManager({
         <StatTile label="Products" value={String(overview.productCount)} sub="In Jojo Usafi" />
         <StatTile
           label={overview.lastRun?.checkOnly ? "Last checked" : "Last sync"}
-          value={overview.lastRun ? shortWhen(overview.lastRun.at) : "Never"}
+          value={lastRunWhen}
           sub={
             overview.lastRun
               ? overview.lastRun.checkOnly
@@ -215,13 +218,44 @@ function ConflictChoice({
   );
 }
 
-function shortWhen(iso: string): string {
-  const then = new Date(iso);
-  if (Number.isNaN(then.getTime())) return "Unknown";
-  const sameDay = new Date().toDateString() === then.toDateString();
-  return sameDay
-    ? then.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
-    : then.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+/**
+ * When the last run happened, in the reader's own timezone.
+ *
+ * WHY THIS IS A HOOK AND NOT A FUNCTION
+ *
+ * This is a client component, so its first render happens on the SERVER — and a
+ * server in Virginia formats "14:22" where the same moment in Dar es Salaam is
+ * "17:22". React compares the two, finds different text, and throws hydration
+ * error #418.
+ *
+ * It never appeared in development because the server and the browser were the
+ * same laptop in the same timezone. It appeared on the first real deployment,
+ * at four of the five QA widths, which is exactly the class of defect a staging
+ * environment exists to find.
+ *
+ * So the first render — the one the server also produces — is deliberately
+ * timezone-free, and the local time is filled in once the component is running
+ * in the browser. One frame of "—" is a fair price for a dashboard that does
+ * not throw.
+ */
+function useShortWhen(iso: string | null | undefined): string {
+  const [local, setLocal] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!iso) return setLocal(null);
+    const then = new Date(iso);
+    if (Number.isNaN(then.getTime())) return setLocal("Unknown");
+
+    const sameDay = new Date().toDateString() === then.toDateString();
+    setLocal(
+      sameDay
+        ? then.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+        : then.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+    );
+  }, [iso]);
+
+  if (!iso) return "Never";
+  return local ?? "—";
 }
 
 function outcomeWord(status: string): string {

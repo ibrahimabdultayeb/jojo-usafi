@@ -2607,3 +2607,149 @@ with a window in which half the places say one thing. A table in
 Impact:
 Worth knowing before creating the production project: it will be issued
 new-format keys only, so there is no legacy variant to get wrong there.
+
+---
+
+## 2026-09-11 — Staging is public by exception, not by disabling protection
+
+Decision:
+Vercel Authentication stays ON for the `jojo-usafi` project. One **Deployment
+Protection Exception** makes exactly one domain public:
+`jojo-usafi-staging.vercel.app`. No bypass secret was created and no protection
+was switched off project-wide.
+
+Reason:
+The build had to be proved "from the public HTTPS deployment rather than
+localhost", and behind SSO neither gate could reach a single route — the
+storefront included. The three obvious ways out are not equal:
+
+  disable protection for all previews   makes every future preview public
+  a Protection Bypass for Automation    puts a long-lived secret in a chat log
+  an exception for one domain           opens exactly what needs opening
+
+The third is also free on every plan, so it attaches no billing.
+
+Staging is then kept out of search results by the three mechanisms already in
+place — robots.txt, the noindex meta tag, and the `/admin` header — rather than
+by Vercel's login, which was never the right tool for that job anyway.
+
+Impact:
+`qa:deployed` passes 38 checks against the real URL, including that the three
+password routes are reachable WITHOUT a session. That last one only means
+anything on a deployment: an allow-list that is right locally and wrong in
+production locks out every invited staff member with no way back.
+
+---
+
+## 2026-09-11 — The capability matrix has to match the database
+
+Decision:
+`website.manage` was removed from Manager, and both settings actions now count
+the rows they changed and refuse when the count is zero.
+
+Reason:
+A Manager had `website.manage` in the matrix, so the dashboard drew the Website
+screen as editable. `shop_settings` admits only an Owner, so PostgREST returned
+an update that matched no rows — which is **not an error**. The action checked
+only `error`, so it said "Saved. The website is updated." to somebody whose
+change had never happened.
+
+Two defects in one: a matrix that promised what the database refuses, and an
+action that could not tell a refusal from a success. `changeStaffRoleAction` has
+always counted rows for exactly this reason; these two did not.
+
+Alternatives:
+Widen the policy so Managers really can edit the website. That is a business
+decision, not a correctness fix — narrowing the application to match what is
+actually enforced is the safe half, and Ibrahim can reverse it with a one-line
+policy change if he wants Managers to have it.
+
+Impact:
+The Website entry no longer appears in a Manager's More menu, and
+`permissions.test.ts` now asserts the absence with the reason written beside it.
+
+---
+
+## 2026-09-11 — A conflicted row is frozen, and a test must say so
+
+Decision:
+The deployed sync operation settles pending conflicts **it can recognise as its
+own** — the subject SKU, the display-order field, and only the values it writes
+— and fails loudly on anything else.
+
+Reason:
+An aborted run left a pending conflict on one product. Every later run then
+reported a broken sync, because the row was correctly refusing to move until a
+person decided. The mechanism was working and the operation was lying about it.
+
+Clearing conflicts indiscriminately would be worse than the bug: it would mean
+an operation that silently resolves real disagreements between Ibrahim and the
+shop. Hence the narrow recognition test, and a hard stop otherwise.
+
+Impact:
+Step I is now re-runnable. The same trap is worth remembering for any future
+operation that writes to both sides of the sync.
+
+---
+
+## 2026-09-11 — A client component must not format a time on its first render
+
+Decision:
+`SyncManager` no longer formats the last-sync time during render. The first
+render — the one the server also produces — is deliberately timezone-free, and
+the local time is filled in by an effect once the component is running in a
+browser.
+
+Reason:
+It is a client component, so its first render happens on the SERVER. A server in
+Virginia formats "14:22" where the same moment in Dar es Salaam is "17:22".
+React compares the two, finds different text, and throws hydration error #418 —
+which it did, on the signed-in dashboard, at all five QA widths.
+
+It could not have been found locally. In development the server and the browser
+are the same laptop in the same timezone, so the two strings always matched.
+This is exactly the class of defect a staging environment exists to find, and it
+was found within minutes of there being one.
+
+Alternatives:
+`suppressHydrationWarning`. Rejected: it silences the report without fixing the
+mismatch, so the server's text is briefly shown to the reader as if it were
+theirs — a dashboard in Dar quietly displaying Virginia's clock.
+
+Impact:
+One frame of "—" before the real time appears, which is a fair price for a
+dashboard that does not throw. The pattern is worth applying to any other client
+component that formats a date: the ones in this repository that do are server
+components, whose output is never re-rendered in the browser.
+
+---
+
+## 2026-09-11 — A component declared inside a component is a new component
+
+Decision:
+`Pair`, the English/Kiswahili box pair on the Website screen, was moved out of
+`WebsiteSettings` to module scope and given the two values it used to close over
+as props.
+
+Reason:
+A component declared inside another component is a **new component type on every
+render**. React cannot match it to the one before, so it unmounts the old tree
+and mounts a fresh one. These inputs are controlled, so every keystroke
+re-rendered the parent, remounted the input and took the cursor with it: an
+Owner could type one character, then had to click back into the box. The blur
+that saves never fired on the element they were typing in, so nothing was ever
+saved either.
+
+It survived review because it reads tidily — the helper sits right beside the
+thing it helps. It survived the QA gate because that gate photographs screens
+and measures touch targets; it does not type. It was found in seconds by a
+script trying to fill in the announcement on the deployment.
+
+Alternatives:
+`useCallback` or `memo` around it. Neither helps: the problem is the identity of
+the component type, not the identity of a callback.
+
+Impact:
+The Website screen is usable for the first time. Worth checking for the same
+shape anywhere else a form grows a local helper — and worth remembering that a
+screenshot is not an interaction.

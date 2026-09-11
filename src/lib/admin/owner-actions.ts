@@ -205,7 +205,7 @@ export async function saveWebsiteAction(content: WebsiteContent): Promise<Action
   }
 
   const supabase = await getServerSupabase();
-  const { error } = await supabase
+  const { data: rows, error } = await supabase
     .from("shop_settings")
     .update({
       announcement_en: clean(content.announcementEn),
@@ -230,9 +230,25 @@ export async function saveWebsiteAction(content: WebsiteContent): Promise<Action
       show_brands: content.showBrands,
       show_how_it_works: content.showHowItWorks,
     })
-    .eq("id", true);
+    .eq("id", true)
+    .select("id");
 
   if (error) return failed(`It could not be saved: ${error.message}`);
+
+  /*
+   * A REFUSED WRITE IS NOT AN ERROR, AND THAT IS THE TRAP.
+   *
+   * `shop_settings` admits only an Owner. A Manager passes the grant, is stopped
+   * by the policy, and PostgREST reports that as an update which matched no rows
+   * — `error` is null. Without this check the screen said "Saved. The website is
+   * updated." to somebody whose change never happened.
+   *
+   * `changeStaffRoleAction` has always counted rows for exactly this reason;
+   * these two did not.
+   */
+  if (!rows || rows.length === 0) {
+    return failed("Your account cannot change the website. Ask the Owner.");
+  }
 
   // The storefront reads these, and a homepage that is a few minutes behind the
   // person who just edited it reads as broken.
@@ -274,7 +290,7 @@ export async function saveBusinessAction(
   }
 
   const supabase = await getServerSupabase();
-  const { error } = await supabase
+  const { data: rows, error } = await supabase
     .from("shop_settings")
     .update({
       whatsapp_e164: whatsapp,
@@ -284,9 +300,16 @@ export async function saveBusinessAction(
       reservation_warning_minutes: warningMinutes,
       reservation_expiry_minutes: expiryMinutes,
     })
-    .eq("id", true);
+    .eq("id", true)
+    .select("id");
 
   if (error) return failed(`It could not be saved: ${error.message}`);
+
+  // The same trap as above: only an Owner may write this row, and a refusal
+  // arrives as zero rows rather than as an error.
+  if (!rows || rows.length === 0) {
+    return failed("Your account cannot change the shop's settings. Ask the Owner.");
+  }
 
   revalidateTag("catalogue");
   revalidatePath("/", "layout");

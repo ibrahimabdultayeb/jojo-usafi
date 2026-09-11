@@ -379,6 +379,18 @@ Production is left empty so that a deployment reaching it fails its build with
 the name of the missing variable, rather than quietly serving the development
 database to the public as the real shop.
 
+**Staging is public by exception.** Vercel Authentication stays on for the
+project; one Deployment Protection Exception opens exactly
+`jojo-usafi-staging.vercel.app`. Every other deployment is still private, and
+staging is kept out of search results by `APP_ENV` rather than by Vercel's
+login.
+
+**Two Supabase keys, and the names are historical.**
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` carries the `sb_publishable_…` key and
+`SUPABASE_SERVICE_ROLE_KEY` the `sb_secret_…` one: the project's legacy JWT keys
+are disabled, and a legacy key compiles cleanly then fails at runtime with
+"Legacy API keys are disabled".
+
 **Staging is the production build against the development database.** That is
 what makes it worth having: the remaining class of defect this project cannot
 find locally is the deployment-only one — a missing variable, a header that never

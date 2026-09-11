@@ -44,7 +44,10 @@ describe("who may do what", () => {
   it("lets a Manager run the shop but never manage staff or settings", () => {
     expect(can("manager", "delivery.manage")).toBe(true);
     expect(can("manager", "catalogue.sync")).toBe(true);
-    expect(can("manager", "website.manage")).toBe(true);
+    // NOT website.manage: `shop_settings` admits only an Owner, proved in
+    // tests/db/14-website-and-safety.test.ts. The matrix says what the database
+    // will actually allow, or the dashboard draws controls that silently fail.
+    expect(can("manager", "website.manage")).toBe(false);
     expect(can("manager", "analytics.view")).toBe(true);
 
     // The two an Owner keeps. Staff management is how a Manager would promote

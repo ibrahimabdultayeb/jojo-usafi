@@ -354,8 +354,13 @@ commit, and the outcome of both gates against it.*
 | Staging URL | **https://jojo-usafi-staging.vercel.app** (a stable alias onto the latest preview deployment) |
 | Vercel environment | **Preview**. Production is deliberately left with no variables at all, so an accidental production deploy fails the build loudly instead of quietly serving the development database as the real shop |
 | Build | **succeeds** — 217 static pages, 95 product pages per language, read from the real catalogue at build time |
-| `qa:deployed` | **blocked** — see §11 |
-| `qa:screenshots` against the URL | **blocked** — see §11 |
+| Deployment protection | **Vercel Authentication stays on**, with a single **exception** for `jojo-usafi-staging.vercel.app`. Every other deployment is still private |
+| `qa:deployed` | **38 checks, 0 failures** |
+| `verify:password-link` | **passes** against the deployment |
+| `verify:commerce` | **28 checks, 0 failures** — a real order placed, tracked, amended, delivered and paid |
+| Step I sync | **passes** — both directions, and the Sheet still cannot move stock |
+| `verify:cache` | **passes** — a price saved in the dashboard reaches the shop immediately |
+| `verify:website` | **11 checks, 0 failures** — an Owner's announcement reaches both languages of the deployed shop; clearing it restores the site's own wording; a Manager is refused |
 
 ### Variables set so far
 
@@ -367,59 +372,147 @@ The two Supabase keys were moved directly from the Supabase CLI into Vercel
 through a pipe, so neither value was ever displayed, logged or written to disk.
 The spreadsheet id and tab were already committed in this repository.
 
-**Still unset, and each has a consequence:**
+`GOOGLE_SERVICE_ACCOUNT_EMAIL` and `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` were
+added by Ibrahim from his own `.env.local`, and the deployed Catalogue Sync
+screen now reaches Google — proved by Step I, which syncs the real Product
+Master in both directions from the deployed dashboard.
 
-| Variable | What does not work without it |
+**Still unset, deliberately:**
+
+| Variable | Consequence |
 | --- | --- |
-| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | the Catalogue Sync screen reports Google as not configured |
-| `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | the same — no sync in either direction |
-| `SHEET_SYNC_WEBHOOK_SECRET` | `/api/sync/catalogue` refuses every request, which is the correct closed state until something is scheduled |
+| `SHEET_SYNC_WEBHOOK_SECRET` | `/api/sync/catalogue` refuses every request — the correct closed state until something is scheduled |
 | `RESERVATION_EXPIRY_JOB_SECRET` | `/api/jobs/expire-reservations` likewise |
 
-The two Google values exist only in Ibrahim's `.env.local` and cannot be read
-from here. The two job secrets are deliberately left unset: nothing schedules
-either endpoint, and an endpoint with no secret is shut.
+Nothing schedules either endpoint, and an endpoint with no secret is shut.
+`qa:deployed` asserts both answer 401 to a request with no credential **and** to
+one with a wrong credential.
 
-## 11. What is blocking the deployed verification
+## 10. Deployment protection, and how automation reaches it
 
-**Vercel Deployment Protection.** Every route on the staging URL answers with a
-302 to `vercel.com/sso-api`, including the storefront. The application is fine —
-the build succeeded and prerendered the whole catalogue — but nothing is reachable
-without a Vercel login, so neither gate can run and no customer flow can be
+Vercel Authentication is **on** for this project, as it is by default for a
+team. Left alone it answers every route — the storefront included — with a 302
+to `vercel.com/sso-api`, so neither gate can run and no customer flow can be
 tested.
 
-This is Vercel's default for preview deployments on a team, and as a posture for
-an unfinished shop full of development data it is a reasonable one. There are two
-ways forward and they are a genuine choice:
+The resolution was a **Deployment Protection Exception** for exactly one domain:
 
-**Either — make staging publicly reachable.** Project Settings → Deployment
-Protection → turn **Vercel Authentication** off for Preview. Staging is then a
-public HTTPS site, protected from search engines by the three mechanisms in §2 but
-readable by anybody with the link. This is what "prove the full system from the
-public HTTPS deployment" assumes, and it is the only way Ibrahim can open the site
-on a phone that is not logged into Vercel, or show it to anybody else.
+```
+jojo-usafi-staging.vercel.app
+```
 
-**Or — keep it private and let automation through.** Project Settings →
-Deployment Protection → **Protection Bypass for Automation** → generate a secret.
-Both gates then send it as `x-vercel-protection-bypass`. Staging stays invisible
-to everybody without a Vercel account, and the automated checks still run.
+Every other deployment of this project stays private behind Vercel
+Authentication. No bypass secret was created, no protection was disabled
+project-wide, and no paid feature was enabled — exceptions are free on all
+plans.
 
-Nothing else in this build can proceed until one of the two is chosen.
+Staging is therefore publicly reachable, and is kept out of search results by
+the three mechanisms in §2 rather than by Vercel's login.
 
-## 10. What only Ibrahim can do
+## 11. What the deployment was actually proved to do
 
-1. **Choose one of the two options in §11** — deployment protection off, or a
-   bypass secret for automation.
-2. **Add the two Google variables** to the Preview environment, from his own
-   `.env.local`: `GOOGLE_SERVICE_ACCOUNT_EMAIL` and
-   `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`. Vercel's environment screen accepts a
-   pasted `.env` block. They are never sent to Claude.
-3. **Supabase Auth → URL Configuration**, once the staging URL is settled:
-   - **Site URL**: `https://jojo-usafi-staging.vercel.app`
-   - **Redirect URLs**: add `https://jojo-usafi-staging.vercel.app/admin/set-password`
-     and `https://jojo-usafi-staging.vercel.app/admin/auth/callback` — those two
-     exact paths, not a wildcard. A wildcard such as `https://*.vercel.app/**`
-     would let any deployment on Vercel receive a token minted for this project.
+Everything below ran against `https://jojo-usafi-staging.vercel.app`, not against
+localhost.
 
-   Until this is done, an invitation or reset email sent from the deployed site
-   still carries a link back to `http://localhost:3000`.
+| Gate | Result |
+| --- | --- |
+| `npm run qa:deployed -- <url>` | **38 checks, 0 failures** — headers over HTTPS, robots and noindex, five `/admin` routes redirecting a stranger, the three password routes reachable *without* a session, both job endpoints answering 401 with no credential and with a wrong one, no server secret in any downloadable bundle, real Storage photography, both languages |
+| `BASE_URL=<url> npm run verify:password-link` | an emailed link lets somebody choose a password and sign in; a switched-off staff member is shut out and told why |
+| `BASE_URL=<url> npm run verify:commerce` | **28 checks, 0 failures** |
+| `DEPLOY_URL=<url> SYNC_STEP_I=1 npm run sync:op -- tools/sync/i-deployed-round-trip.op.ts` | the deployed dashboard syncs the real Product Master both ways, and the Sheet still cannot move stock |
+| `BASE_URL=<url> npm run verify:cache` | a price saved in the dashboard reaches the shop immediately |
+| `BASE_URL=<url> npm run qa:screenshots` | layout, touch targets and locale stability at 390/430/768/1024/1440, storefront and dashboard |
+
+### The customer journey, on the deployment
+
+A real order placed through the deployed checkout — product page, cart,
+checkout, an authoritative quotation, an order number, and the confirmation. The
+total was priced by the shop, not the browser. It was then tracked with the
+number **and** the phone, and refused when the phone was wrong.
+
+Staff signed in, amended it before dispatch (the extra unit reserved, not
+conjured), and took it Confirmed → Preparing → Out for delivery → Completed with
+cash. The amend control was gone once it was with the rider. Four more orders
+covered the other endings: a digital payment with its reference, a cancellation
+that released the stock it held, and delivery failing both with the items
+returned and with them written off.
+
+Afterwards every product's running total still reconciled with its ledger, and
+the fixtures were removed by exact phone number, with the shelf provably back
+where it started.
+
+### Stock, once more, from the deployment
+
+`STOCK QTY` set to **999,999** in the real Product Master and synced from the
+deployed dashboard:
+
+```
+On hand            446 → 446
+Reserved             1 → 1
+Available          445 → 445
+Ledger movements    12 → 12
+```
+
+The operator's own cell is left exactly as they typed it — `STOCK QTY` is
+classified `database`, which means it is never READ as an instruction, not that
+it is overwritten — and the real figure is reported into
+`SYSTEM AVAILABLE STOCK` beside it.
+
+### Two defects only a deployment could have shown
+
+**An Owner could type exactly one character into any website copy field.**
+
+`Pair` — the English/Kiswahili box pair — was declared **inside**
+`WebsiteSettings`. A component declared inside another component is a new
+component type on every render, so React cannot match it to the one before: it
+unmounts the old tree and mounts a fresh one. The inputs are controlled, so every
+keystroke re-rendered the parent, remounted the input, and took the cursor with
+it. The blur that saves never fired on the element being typed in.
+
+It survived review because it looks tidy, and it survived local QA because the
+screenshot gate photographs screens rather than typing into them. It was found by
+a script trying to fill in the announcement on the deployment.
+
+
+
+**React hydration error #418, on the signed-in dashboard, at all five widths.**
+
+`SyncManager` is a client component, so its first render happens on the server.
+A server in Virginia formats the last-sync time as "14:22"; the same moment in
+Dar es Salaam is "17:22". React compared the two, found different text, and
+threw.
+
+It could not have been found locally: in development the server and the browser
+are the same laptop in the same timezone, so the strings always matched. The
+fix renders nothing timezone-dependent on the first pass and fills the local
+time in from an effect.
+
+This is the single best argument for staging existing at all. It was found
+within minutes of there being one.
+
+## 12. Three things this deployment taught
+
+**A conflicted row is frozen, and that will stop a test dead.** An aborted run of
+the sync operation left a pending conflict on one product, and every later run
+reported a broken sync — because the row was correctly refusing to move until a
+person decided. The operation now settles its own leftovers and **fails loudly**
+if it finds a disagreement that is not its own.
+
+**`BASE_URL` is reserved by Vite.** Vitest sets `process.env.BASE_URL` to an
+empty string, so a perfectly good `BASE_URL=https://…` arrives inside a
+`tools/` operation as `""`. Anything under `tools/` takes `DEPLOY_URL` instead;
+the plain Node scripts in `scripts/` still take `BASE_URL`, because none of them
+runs under Vitest.
+
+**Two gates must not share the QA staff account.** `qa:screenshots` and the
+verification scripts each reset the development QA Manager's password when they
+start. Run concurrently, the second one signs the first one out, and the first
+reports "QA STAFF COULD NOT SIGN IN" — which looks exactly like a broken
+dashboard. Run them one at a time, as `test:db` and `qa:screenshots` already
+must be.
+
+## 13. What only Ibrahim can do
+
+All three of the previous items are **done**. What remains is business input —
+see §8 — and, before any of this becomes production, the ordered procedure in
+§7.

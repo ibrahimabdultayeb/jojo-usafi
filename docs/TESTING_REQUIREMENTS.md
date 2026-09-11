@@ -15,6 +15,7 @@ npm run build            # production build
 npm run qa:screenshots   # needs a running server (npm run start)
 npm run qa:deployed      # only meaningful against a real deployment — see below
 npm run verify:password-link  # drives a real emailed link through a real browser
+npm run verify:commerce       # buys something, runs the order, and cleans up after itself
 npm run verify:cache     # a price saved in the editor reaches the shop immediately
 ```
 
@@ -31,9 +32,14 @@ on its own. `npm run test:db` proves nothing about business rules and everything
 whether PostgreSQL, PostgREST, Supabase Auth and Supabase Storage behave the way those rules
 assume. It needs `.env.local` and the CLI linked to the development project.
 
-**Run the two database-touching gates one at a time.** `npm run test:db` and
-`npm run qa:screenshots` share the one development project, and running them together fails
-both for reasons that are not defects: the QA gate photographs the suite's fixture products
+**Run the database-touching gates one at a time.** `npm run test:db`,
+`npm run qa:screenshots` and the three `verify:` scripts share the one
+development project — and `qa:screenshots`, `verify:commerce`,
+`verify:password-link` and the Step I sync operation each **reset the development
+QA Manager's password when they start**. Run two together and the second signs
+the first one out; the first then reports "QA STAFF COULD NOT SIGN IN", which
+looks exactly like a broken dashboard and is not. Running them together also
+fails for reasons that are not defects: the QA gate photographs the suite's fixture products
 and reports their torn-down images as broken, and the suite reads stock the browser has moved.
 
 `supabase db reset` is never part of the gate: it is not run against a hosted project. The
@@ -283,6 +289,29 @@ check in this repository is bypassed.
 `QA_ONLY=admin npm run qa:screenshots` runs only the admin passes — about four minutes
 rather than twenty-five, which is what makes re-checking a dialog cheap enough to actually
 do.
+
+## The commerce gate
+
+`BASE_URL=<url> npm run verify:commerce` — the whole shop, end to end, over
+HTTPS.
+
+It buys a product through the real checkout, tracks the order with the number
+and the phone (and proves a wrong phone is refused), signs in as the development
+QA Manager, amends the order before dispatch, takes it to Completed with cash,
+and then covers the other four endings on their own orders: a digital payment
+with its reference, a cancellation, and delivery failing with the items returned
+and with them written off. It finishes by checking every product's running total
+still reconciles with its ledger.
+
+**Cleanup is the interesting part.** Orders cannot simply be deleted: the
+movements that reference them are append-only, and the foreign key's
+`ON DELETE SET NULL` is an UPDATE the trigger refuses. So the movements go
+first, and the running total is restored in the same transaction — both sides of
+the ledger return to exactly where they started, which is why the reconciliation
+check afterwards is the proof it was clean surgery rather than a hole.
+
+Everything is matched on one phone number generated for the run. Never on a
+role, a name, a status or a business state.
 
 ## The password-link gate
 

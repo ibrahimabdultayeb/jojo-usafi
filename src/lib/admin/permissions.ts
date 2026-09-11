@@ -41,7 +41,10 @@ const MATRIX: Record<Role, Capability[]> = {
     "orders.view", "orders.advance", "orders.cancel", "orders.recordPayment",
     "customers.view", "customers.edit",
     "products.view", "products.editPricing", "products.editStock", "products.editVisibility",
-    "delivery.manage", "catalogue.sync", "website.manage", "analytics.view",
+    // NOT "website.manage": `shop_settings` admits only an Owner, by policy.
+    // A Manager who was offered that screen would type into it, be told "Saved",
+    // and change nothing — the matrix has to say what the database will allow.
+    "delivery.manage", "catalogue.sync", "analytics.view",
   ],
   order_staff: [
     "orders.view", "orders.advance", "orders.cancel", "orders.recordPayment",

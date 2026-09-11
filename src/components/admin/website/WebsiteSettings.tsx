@@ -20,6 +20,90 @@ import type { WebsiteContent } from "@/lib/admin/settings";
  * is better than a language tab, because an empty translation is invisible
  * behind a tab and obvious beside its English.
  */
+/**
+ * A pair of boxes for one piece of customer-facing copy.
+ *
+ * DEFINED HERE, AT MODULE SCOPE, AND THAT IS THE WHOLE POINT.
+ *
+ * It used to live inside `WebsiteSettings`. A component declared inside another
+ * component is a NEW COMPONENT TYPE on every render, so React cannot match it
+ * to the one before — it unmounts the old tree and mounts a fresh one. These
+ * inputs are controlled, so every keystroke re-rendered the parent, remounted
+ * the input, and took the cursor with it: an Owner could type one character at a
+ * time, and the blur that saves never fired on the element they were typing in.
+ *
+ * It survived review because it looks tidy, and it survived local QA because
+ * the screenshot gate photographs screens rather than typing into them. It was
+ * found by a script trying to fill in the announcement on the deployment.
+ */
+const Pair = ({
+  disabled,
+  onSave,
+  label,
+  hint,
+  en,
+  sw,
+  onEn,
+  onSw,
+  long,
+}: {
+  disabled: boolean;
+  onSave: () => void;
+  label: string;
+  hint?: string;
+  en: string | null;
+  sw: string | null;
+  onEn: (value: string) => void;
+  onSw: (value: string) => void;
+  long?: boolean;
+}) => (
+  <div className="grid gap-3 sm:grid-cols-2">
+    <Field label={`${label} — English`} hint={hint}>
+      {long ? (
+        <textarea
+          value={en ?? ""}
+          onChange={(event) => onEn(event.target.value)}
+          onBlur={onSave}
+          disabled={disabled}
+          rows={3}
+          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base font-semibold focus:border-brand-500 focus:outline-none disabled:bg-slate-100"
+        />
+      ) : (
+        <input
+          value={en ?? ""}
+          onChange={(event) => onEn(event.target.value)}
+          onBlur={onSave}
+          disabled={disabled}
+          className={inputClass}
+        />
+      )}
+    </Field>
+    <Field
+      label={`${label} — Kiswahili`}
+      hint={(sw ?? "").trim() === "" ? "Empty, so the English is shown instead." : undefined}
+    >
+      {long ? (
+        <textarea
+          value={sw ?? ""}
+          onChange={(event) => onSw(event.target.value)}
+          onBlur={onSave}
+          disabled={disabled}
+          rows={3}
+          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base font-semibold focus:border-brand-500 focus:outline-none disabled:bg-slate-100"
+        />
+      ) : (
+        <input
+          value={sw ?? ""}
+          onChange={(event) => onSw(event.target.value)}
+          onBlur={onSave}
+          disabled={disabled}
+          className={inputClass}
+        />
+      )}
+    </Field>
+  </div>
+);
+
 export function WebsiteSettings({ content, role }: { content: WebsiteContent; role: Role }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -48,71 +132,6 @@ export function WebsiteSettings({ content, role }: { content: WebsiteContent; ro
     });
   }
 
-  /** A pair of boxes for one piece of customer-facing copy. */
-  const Pair = ({
-    label,
-    hint,
-    en,
-    sw,
-    onEn,
-    onSw,
-    long,
-  }: {
-    label: string;
-    hint?: string;
-    en: string | null;
-    sw: string | null;
-    onEn: (value: string) => void;
-    onSw: (value: string) => void;
-    long?: boolean;
-  }) => (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <Field label={`${label} — English`} hint={hint}>
-        {long ? (
-          <textarea
-            value={en ?? ""}
-            onChange={(event) => onEn(event.target.value)}
-            onBlur={() => submit()}
-            disabled={!mayEdit || pending}
-            rows={3}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base font-semibold focus:border-brand-500 focus:outline-none disabled:bg-slate-100"
-          />
-        ) : (
-          <input
-            value={en ?? ""}
-            onChange={(event) => onEn(event.target.value)}
-            onBlur={() => submit()}
-            disabled={!mayEdit || pending}
-            className={inputClass}
-          />
-        )}
-      </Field>
-      <Field
-        label={`${label} — Kiswahili`}
-        hint={(sw ?? "").trim() === "" ? "Empty, so the English is shown instead." : undefined}
-      >
-        {long ? (
-          <textarea
-            value={sw ?? ""}
-            onChange={(event) => onSw(event.target.value)}
-            onBlur={() => submit()}
-            disabled={!mayEdit || pending}
-            rows={3}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base font-semibold focus:border-brand-500 focus:outline-none disabled:bg-slate-100"
-          />
-        ) : (
-          <input
-            value={sw ?? ""}
-            onChange={(event) => onSw(event.target.value)}
-            onBlur={() => submit()}
-            disabled={!mayEdit || pending}
-            className={inputClass}
-          />
-        )}
-      </Field>
-    </div>
-  );
-
   return (
     <>
       {problem && (
@@ -134,6 +153,8 @@ export function WebsiteSettings({ content, role }: { content: WebsiteContent; ro
           }}
         />
         <Pair
+          disabled={!mayEdit || pending}
+          onSave={() => submit()}
           label="Announcement"
           hint="One short line. Leave it empty to use the website's own wording."
           en={draft.announcementEn}
@@ -146,6 +167,8 @@ export function WebsiteSettings({ content, role }: { content: WebsiteContent; ro
       <SectionTitle>The top of the homepage</SectionTitle>
       <Card className="mb-5 space-y-4 p-4">
         <Pair
+          disabled={!mayEdit || pending}
+          onSave={() => submit()}
           label="Headline"
           en={draft.heroHeadingEn}
           sw={draft.heroHeadingSw}
@@ -153,6 +176,8 @@ export function WebsiteSettings({ content, role }: { content: WebsiteContent; ro
           onSw={(value) => set("heroHeadingSw", value)}
         />
         <Pair
+          disabled={!mayEdit || pending}
+          onSave={() => submit()}
           label="Supporting line"
           long
           en={draft.heroSubEn}
@@ -161,6 +186,8 @@ export function WebsiteSettings({ content, role }: { content: WebsiteContent; ro
           onSw={(value) => set("heroSubSw", value)}
         />
         <Pair
+          disabled={!mayEdit || pending}
+          onSave={() => submit()}
           label="Button words"
           en={draft.heroCtaLabelEn}
           sw={draft.heroCtaLabelSw}
@@ -192,6 +219,8 @@ export function WebsiteSettings({ content, role }: { content: WebsiteContent; ro
           }}
         />
         <Pair
+          disabled={!mayEdit || pending}
+          onSave={() => submit()}
           label="Promotion"
           hint="e.g. Free delivery in Mikocheni this week."
           en={draft.promoBannerEn}
@@ -237,7 +266,7 @@ export function WebsiteSettings({ content, role }: { content: WebsiteContent; ro
       {!mayEdit && (
         <Card className="mb-5 p-4">
           <p className="text-sm font-medium text-slate-500">
-            The website is looked after by the Owner and Managers.
+            The website&rsquo;s words are the Owner&rsquo;s to change.
           </p>
         </Card>
       )}

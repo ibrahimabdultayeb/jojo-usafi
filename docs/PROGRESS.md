@@ -1851,6 +1851,92 @@ qa:deployed             37 checks against the local production build
 verify:password-link    the whole journey, in a real browser
 ```
 
+## Build 11 complete — staging, proved from the internet — 2026-09-11
+
+```
+https://jojo-usafi-staging.vercel.app
+```
+
+Publicly reachable, not indexed, and everything below was run against that URL
+rather than against localhost.
+
+### What the deployment was proved to do
+
+**A customer bought something.** Product page → cart → checkout → an
+authoritative quotation → an order number → the confirmation, then tracked with
+the number **and** the phone, and refused when the phone was wrong. The total
+was priced by the shop, not by the browser.
+
+**Staff ran it.** Signed in, amended the order before dispatch — the extra unit
+reserved, not conjured — then Confirmed → Preparing → Out for delivery →
+Completed with cash. The amend control was gone once it was with the rider. Four
+more orders covered the other endings: a digital payment with its reference, a
+cancellation that released the stock it held, and delivery failing both with the
+items returned and with them written off. Afterwards every product's running
+total still reconciled with its ledger.
+
+**The Sheet round trip, from the deployed dashboard.** Shop → Sheet and Sheet →
+shop, both ways, on the real Product Master. And `STOCK QTY` set to 999,999 in
+the Sheet moved nothing: on hand 446 → 446, reserved 1 → 1, available 445 → 445,
+ledger movements 12 → 12.
+
+**Nobody else got in.** Five `/admin` routes redirect a stranger; both job
+endpoints answer 401 with no credential and with a wrong one; and no server
+secret appears in any bundle a browser can download — a check proved by planting
+one and watching it fail.
+
+### The defects that prove staging was worth building
+
+**An Owner could type exactly one character into any website copy field.** The
+English/Kiswahili box pair was declared inside its parent component, so React
+treated it as a new component type on every render, remounted the input on every
+keystroke and took the cursor with it. It looks tidy, which is why it survived
+review, and the screenshot gate photographs screens rather than typing into them,
+which is why it survived local QA. A script trying to fill in the announcement on
+the deployment found it in seconds.
+
+
+
+**React hydration error #418**, on the signed-in dashboard, at all five widths.
+`SyncManager` is a client component, so its first render happens on the server —
+and a server in Virginia formats the last-sync time as "14:22" where the same
+moment in Dar es Salaam is "17:22". React compared them, found different text,
+and threw.
+
+It could not have been found locally, because in development the server and the
+browser are the same laptop in the same timezone. It was found within minutes of
+there being a deployment.
+
+### Two more defects found by doing it
+
+**A Manager was told "Saved" when nothing had been saved.** The capability matrix
+gave Manager `website.manage`; the database admits only an Owner. PostgREST
+returns a refused update as **zero rows, not an error**, and the action checked
+only the error. Fixed both ways: the matrix now matches the database, and both
+settings actions count the rows they changed.
+
+**The staging URL was invisible to everything.** Vercel Authentication answered
+every route with a redirect to its own login. Resolved with a **Deployment
+Protection Exception** for that one domain — no bypass secret, no
+protection disabled project-wide, no paid feature.
+
+### Three things worth remembering
+
+- **A conflicted row is frozen.** An aborted sync run left a pending conflict,
+  and every later run reported a broken sync — the mechanism working while the
+  operation lied about it. Step I now settles only leftovers it can recognise as
+  its own and stops hard on anything else.
+- **`BASE_URL` is reserved by Vite**, so Vitest blanks it. Anything under
+  `tools/` takes `DEPLOY_URL`.
+- **Two gates cannot share the QA staff account.** Both reset its password on
+  start; run together, the second signs the first one out and the first reports
+  a broken dashboard.
+
+### Cost
+
+Free tier throughout. No billing attached anywhere, no domain bought, no paid
+add-on, no production Supabase, no DNS.
+
 ## Next
 
 - Confirm the open business rules (delivery fee, served areas, retail prices). A global
