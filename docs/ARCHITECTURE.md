@@ -362,6 +362,28 @@ every row empty, but the application was still telling a stranger they were in
 the back office. It now asks for an active `admin_profiles` row and sends anybody
 else to the sign-in screen, which explains both cases.
 
+## Product photography (Build 12)
+
+```
+src/lib/admin/media.ts          pure validation — format, size, shape, path
+src/lib/admin/media-actions.ts  the server action that reads bytes and stores them
+ProductPhoto.tsx                the screen
+```
+
+**The bytes go through the server.** A signed upload URL would hand the browser
+the right to write a file this server has never seen, and every rule in
+`media.ts` would become advice. The path is the sharpest case: it is built from
+a SKU that arrives from a URL, and is scrubbed to letters, digits and hyphens so
+there is no character left to traverse with.
+
+**Nothing is transformed.** An image the wrong shape is refused with a sentence
+rather than cropped into one. The format is read from the file's own bytes; the
+declared MIME type and the filename are ignored.
+
+**A photograph publishes nothing on its own.** `product_shelf` decides, and the
+action asks it afterwards rather than recomputing the rule — so a photograph on
+`EP01-A01` does not unblock a price nobody has confirmed.
+
 ## Deployment (Build 11)
 
 Full detail in [`STAGING.md`](./STAGING.md). The shape:

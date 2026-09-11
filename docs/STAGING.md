@@ -195,18 +195,22 @@ It exits non-zero on any failure. Rehearsed against `http://localhost:3000`:
 
 ## 6. What is deliberately not done
 
-**No Content-Security-Policy yet.** This application loads photography from
-Supabase Storage, opens XHR and websockets to a Supabase project, and serves two
-Google fonts. A CSP written without measuring those origins breaks images,
-sign-in or both, and a broken CSP is normally discovered by a customer. The
-headers that cannot break anything are shipped; the CSP is final-hardening work
-with a real measurement pass behind it.
+**~~No Content-Security-Policy yet.~~ Shipped in Build 12, measured first.** A
+browser was driven through nine deployed pages and every request recorded; the
+whole inventory was self, the Supabase origin, and `vercel.live`. Fonts turned
+out to be self-hosted by `next/font`, so the guessed policy would have allowed
+fonts.gstatic.com for nothing. One forced compromise — `script-src
+'unsafe-inline'` — is documented in `next.config.ts` and in the launch
+checklist.
 
-**No sitemap.** `robots.ts` deliberately does not name one rather than point a
-crawler at a 404. It belongs with the production domain.
+**~~No sitemap.~~ Shipped in Build 12.** Empty on staging, complete on
+production, both languages cross-referencing each other, built from
+`product_shelf` so there is no second definition of "published".
 
 **No schedule for anything.** Neither job endpoint is called by a cron, a Vercel
-schedule, a Supabase job or anything else.
+schedule, a Supabase job or anything else. The zero-cost option when one is
+wanted is Vercel Cron, which is included on every plan; the setup and its
+caveats are in `LAUNCH_CHECKLIST.md` section C.
 
 ## 7. Production architecture — the plan, not the execution
 

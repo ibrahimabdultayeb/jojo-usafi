@@ -1,5 +1,9 @@
 import type { MetadataRoute } from "next";
 import { isStaging } from "@/lib/environment";
+import { site } from "@/lib/site";
+
+/** No trailing slash, so the sitemap URL below never doubles one. */
+const SITE_BASE = site.url.replace(/\/+$/, "");
 
 /**
  * What a search engine may look at.
@@ -24,7 +28,25 @@ export default function robots(): MetadataRoute.Robots {
     return { rules: [{ userAgent: "*", disallow: "/" }] };
   }
 
-  // No `sitemap:` line: this shop has no sitemap route yet, and pointing a
-  // crawler at a 404 is worse than saying nothing. It is on the launch list.
-  return { rules: [{ userAgent: "*", allow: "/", disallow: ["/admin", "/api"] }] };
+  /*
+   * The private routes, by name.
+   *
+   * `/admin` is also covered by an `X-Robots-Tag` header in `next.config.ts`,
+   * deliberately: this file can be edited, and a rule that only lives in a text
+   * file a crawler may choose to ignore is not a boundary.
+   *
+   * `/cart`, `/checkout` and `/track-order` are excluded because they are
+   * personal and transient. A crawler indexing an empty checkout helps nobody
+   * and spends the crawl budget that the 95 product pages need.
+   */
+  return {
+    rules: [
+      {
+        userAgent: "*",
+        allow: "/",
+        disallow: ["/admin", "/api", "/cart", "/checkout", "/track-order", "/sw/cart", "/sw/checkout", "/sw/track-order"],
+      },
+    ],
+    sitemap: `${SITE_BASE}/sitemap.xml`,
+  };
 }

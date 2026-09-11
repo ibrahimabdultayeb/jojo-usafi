@@ -47,10 +47,9 @@ const ITEMS: {
   {
     href: "/admin/more/analytics",
     label: "Reports",
-    hint: "Sales and product performance",
+    hint: "Sales, what is selling, and what needs a photograph",
     icon: "star",
     capability: "analytics.view",
-    soon: true,
   },
   {
     href: "/admin/more/staff",

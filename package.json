@@ -26,6 +26,8 @@
     "verify:password-link": "node scripts/verify-password-link.mjs",
     "verify:commerce": "node scripts/verify-deployed-commerce.mjs",
     "verify:website": "node scripts/verify-deployed-website.mjs",
+    "launch:check": "node scripts/launch-check.mjs",
+    "rehearse:production": "node scripts/rehearse-production.mjs",
     "sync:op": "vitest run --config vitest.tools.config.ts"
   },
   "dependencies": {

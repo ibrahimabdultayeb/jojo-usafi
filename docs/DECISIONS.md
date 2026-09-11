@@ -2753,3 +2753,132 @@ Impact:
 The Website screen is usable for the first time. Worth checking for the same
 shape anywhere else a form grows a local helper — and worth remembering that a
 screenshot is not an interaction.
+
+---
+
+## 2026-09-11 — A product photograph is validated, never transformed
+
+Decision:
+Uploads are checked and stored byte-for-byte. Nothing is resized, re-encoded or
+cropped. An image that is the wrong format, too small, too large or too far from
+square is refused with a sentence saying what to fix.
+
+Reason:
+The obvious design — accept anything, re-encode to a square WebP — is the design
+that quietly ruins photographs. Re-encoding crops labels when the aspect ratio
+does not match, shifts a white background off-white, and costs a native image
+library on every deployment. The 95 photographs already on the shelf were
+processed once, deterministically, by `scripts/build-catalogue.mjs`, and they are
+correct.
+
+Validating instead means nothing is distorted, because nothing is resized, and
+the one transformation that exists — none — cannot be applied twice.
+
+The format is read from the file's own bytes. The declared MIME type and the
+filename are ignored entirely: both are supplied by whoever is uploading, and a
+file called `photo.webp` announcing itself as `image/webp` while containing
+something else is the reason the check exists at all.
+
+Alternatives:
+Add `sharp` and normalise everything. Rejected for the reasons above, and because
+"avoid unnecessary duplicate transformations" was an explicit requirement.
+
+Impact:
+18 offline tests over bytes built in the test file, including a PNG, a JPEG with
+600 bytes of metadata before its frame header, all three WebP layouts, and the
+path-traversal case. No new dependency.
+
+---
+
+## 2026-09-11 — The bytes go through the server, not to a signed URL
+
+Decision:
+Product images are posted to a server action, which reads them and then writes to
+Storage. No signed upload URL is issued to the browser.
+
+Reason:
+A signed URL hands the browser the right to write a file this server has never
+seen. Every rule in `media.ts` — the format, the size, the shape, the path —
+would become advice rather than a boundary, enforceable only by a client that
+could simply not call it.
+
+The path is the sharpest example. It is built from the SKU, which arrives from a
+URL; a SKU containing `../` would write into another product's folder. The server
+scrubs it to letters, digits and hyphens, so there is no character left that a
+path can be traversed with. That check is worth nothing if the browser is the one
+choosing the path.
+
+Alternatives:
+A signed URL plus a server-side verification pass afterwards. Rejected: the file
+is already in the bucket by then, and "we will check it later" is how a bucket
+fills with things nobody checked.
+
+Impact:
+An 8MB ceiling on a server action, which is well within limits. Storage writes
+stay restricted to `jojo_manages_catalogue()`, proved in
+`tests/db/16-media.test.ts`: a stranger and an Order staff account are both
+refused, a Manager and an Owner are not.
+
+---
+
+## 2026-09-11 — A Content-Security-Policy, measured then written
+
+Decision:
+A CSP is enforced on every route, derived from a recorded inventory of what the
+deployed application actually loads. `script-src` and `style-src` carry
+`'unsafe-inline'`; nothing else is loosened.
+
+Reason:
+Build 11 deliberately shipped no CSP because one written without measuring would
+break images or sign-in. So it was measured: a browser was driven through the
+deployed storefront, cart, checkout, Track Order, contact, the Kiswahili site and
+the sign-in screen, and every request recorded. The whole inventory was self,
+the Supabase origin for images and fetch, and `vercel.live` for the preview
+toolbar. Notably **fonts are self-hosted** by `next/font` — a guessed policy
+would have allowed `fonts.gstatic.com` for nothing.
+
+`'unsafe-inline'` for scripts is the one compromise and it is forced. The App
+Router emits inline scripts carrying the flight payload on every page, and the
+usual answer — a per-request nonce — cannot work on statically prerendered pages
+served from a cache. Buying it would mean making 217 static pages dynamic: a real
+performance property traded for a partial mitigation.
+
+What remains is not nothing. `connect-src` means an injected script cannot send
+what it steals anywhere; `object-src 'none'` kills plugin vectors; `base-uri
+'self'` stops a tag rewriting every relative URL; `form-action 'self'` stops a
+form being repointed.
+
+Impact:
+Verified with zero violations across nine pages before deploying, and
+`qa:deployed` passes 38 checks against staging with it enforcing. The Supabase
+origin is read from the environment, so a production project with a different ref
+needs no edit.
+
+---
+
+## 2026-09-11 — Production is rehearsed by evidence, not by a throwaway project
+
+Decision:
+`npm run rehearse:production` proves the migration set could build production
+from zero, without creating anything.
+
+Reason:
+The honest rehearsal is applying the migrations to an empty database. There is no
+local PostgreSQL on this machine, and creating a second hosted project to throw
+away is the exact thing this build was told not to do.
+
+But the rehearsal has already happened: the development project was itself built
+from zero by these files, in this order, and nothing has been applied to it by
+hand. So the checks are the ones that make that evidence hold — that the file set
+is ordered and gap-free, that every file is applied on the live project **and
+nothing is applied that is not in the files**, that none of them drops a table,
+names the development project or seeds business data, and that the order-number
+sequence starts at 1 with no migration moving it.
+
+The script says plainly what it cannot prove, rather than implying it proved it.
+
+Impact:
+12 checks, 0 failures. It also found the shape of a false alarm worth
+remembering: a naive search for `insert into public.orders` flags
+`jojo_place_order`, the function that creates orders, as though it seeded some.
+Only statements at the left margin are seeds.

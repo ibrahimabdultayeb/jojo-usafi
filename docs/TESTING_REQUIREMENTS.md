@@ -16,6 +16,8 @@ npm run qa:screenshots   # needs a running server (npm run start)
 npm run qa:deployed      # only meaningful against a real deployment — see below
 npm run verify:password-link  # drives a real emailed link through a real browser
 npm run verify:commerce       # buys something, runs the order, and cleans up after itself
+npm run launch:check          # is this shop ready to OPEN — business data, not code
+npm run rehearse:production   # could these migration files build production from zero
 npm run verify:cache     # a price saved in the editor reaches the shop immediately
 ```
 
@@ -32,14 +34,26 @@ on its own. `npm run test:db` proves nothing about business rules and everything
 whether PostgreSQL, PostgREST, Supabase Auth and Supabase Storage behave the way those rules
 assume. It needs `.env.local` and the CLI linked to the development project.
 
-**Run the database-touching gates one at a time.** `npm run test:db`,
-`npm run qa:screenshots` and the three `verify:` scripts share the one
-development project — and `qa:screenshots`, `verify:commerce`,
-`verify:password-link` and the Step I sync operation each **reset the development
-QA Manager's password when they start**. Run two together and the second signs
-the first one out; the first then reports "QA STAFF COULD NOT SIGN IN", which
-looks exactly like a broken dashboard and is not. Running them together also
-fails for reasons that are not defects: the QA gate photographs the suite's fixture products
+**Run the database-touching gates ONE AT A TIME. All of them.**
+
+They share the one development project, and there are two separate ways they
+collide.
+
+**They fight over the QA Manager's password.** `qa:screenshots`,
+`verify:cache`, `verify:commerce`, `verify:website`, `verify:password-link` and
+the Step I sync operation each reset it when they start. Run two together and the
+second signs the first one out; the first reports "QA STAFF COULD NOT SIGN IN",
+which looks exactly like a broken dashboard and is not.
+
+**They write rows the suite is watching.** `05-real-data-untouched.test.ts`
+compares every real staff and audit row against a snapshot taken before the suite
+began. `verify:cache` changes a product price and changes it back, which writes
+two `product.updated` audit rows — so running it during `test:db` fails that test
+with "expected 10 to deeply equal 8", and nothing is wrong with the shop at all.
+This was done twice, once in Build 11 and once in Build 12, which is why it is
+written down here in this much detail.
+
+Running them together also fails for reasons that are not defects: the QA gate photographs the suite's fixture products
 and reports their torn-down images as broken, and the suite reads stock the browser has moved.
 
 `supabase db reset` is never part of the gate: it is not run against a hosted project. The
@@ -289,6 +303,42 @@ check in this repository is bypassed.
 `QA_ONLY=admin npm run qa:screenshots` runs only the admin passes — about four minutes
 rather than twenty-five, which is what makes re-checking a dialog cheap enough to actually
 do.
+
+## The launch check
+
+`npm run launch:check` answers a question no other gate does: **would opening
+this shop today embarrass anybody?** A placeholder telephone number passes
+typecheck, lint, 221 unit tests and 271 database tests, and then a customer
+cannot reach anybody.
+
+It reads the live database and reports **PASS**, **WARNING** or **BLOCKED** for
+the shop's own contact details, the reservation durations, whether the delivery
+areas are still development placeholders, the catalogue and shelf counts, how
+many products have no photograph, `EP01-A01`'s unconfirmed price, whether stock
+reconciles with its ledger, whether an opening count exists, the Owner, whether
+development staff fixtures are present, and `APP_ENV`.
+
+Against development it is **expected to be BLOCKED** — every blocked line is
+business input Ibrahim has yet to supply, not a defect.
+`LAUNCH_MODE=production` makes it strict about the things that are only wrong in
+production: a non-empty order table, staff fixtures, a missing opening count, and
+`APP_ENV` not being `production`.
+
+It never prints a secret and exits 1 when anything is blocked.
+
+## The production rehearsal
+
+`npm run rehearse:production` checks that these migration files could build
+production from nothing — that the set is ordered and gap-free, that every file
+is applied on the live project **and nothing is applied that is not in the
+files**, that none of them drops a table or seeds business data, and that the
+order-number sequence starts at 1 with no migration moving it, so production's
+first order really is **JU-000001**.
+
+It says plainly what it cannot prove: there is no local PostgreSQL here, so no
+migration is actually replayed against an empty database. The evidence is that
+the development project WAS built from these files, in this order, and the two
+lists still match.
 
 ## The commerce gate
 

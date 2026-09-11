@@ -1937,6 +1937,84 @@ protection disabled project-wide, no paid feature.
 Free tier throughout. No billing attached anywhere, no domain bought, no paid
 add-on, no production Supabase, no DNS.
 
+## Build 12 — final engineering and hardening — 2026-09-11
+
+The last engineering build before production setup. Seven gaps closed, no
+redesign, no new features.
+
+### Product photography
+
+The dashboard can now put a picture on a product. 106 of the 201 products are
+held off the website for want of one, so this is where most of the remaining
+catalogue work happens — and the Reports screen lists every one of them, each
+linking straight to its product.
+
+**The bytes go through the server, not to a signed URL.** A signed URL hands the
+browser the right to write a file the server has never seen, and every validation
+rule would become advice. The path is the sharpest case: it is built from a SKU
+that arrives from a URL, and is scrubbed to letters, digits and hyphens so there
+is no character left to traverse with.
+
+**Nothing is transformed.** Re-encoding crops labels when the aspect ratio does
+not match and shifts a white background off-white. An image that is the wrong
+format, too small, too large or too far from square is refused with a sentence
+saying what to fix. The format is read from the file's own bytes; the declared
+MIME type and the filename are ignored entirely.
+
+**A photograph publishes nothing on its own.** `product_shelf` decides, and the
+action asks it rather than recomputing the rule — so a photograph on EP01-A01
+does not unblock a price nobody has confirmed. That is asserted directly.
+
+### A measured Content-Security-Policy
+
+Build 11 shipped none, deliberately, because one written without measuring breaks
+images or sign-in. So it was measured: a browser was driven through nine deployed
+pages and every request recorded. The whole inventory was self, the Supabase
+origin, and `vercel.live` — **fonts are self-hosted**, which a guessed policy
+would have got wrong by allowing fonts.gstatic.com for nothing.
+
+One compromise, forced and documented: `script-src 'unsafe-inline'`, because the
+App Router emits inline scripts on every page and a per-request nonce cannot
+work on statically prerendered pages. Buying it would mean making 217 static
+pages dynamic.
+
+### Reports, a sitemap, and a launch check
+
+**Reports** is the last "Coming soon" screen gone: sales today, this week and
+this month, order counts and averages, how orders ended, the cash/digital split,
+what is selling, what is running out, and what has no photograph. Server-side
+aggregates, no chart library, no customer names anywhere on it.
+
+**A sitemap** — empty on staging, complete on production, both languages
+cross-referencing each other, built from `product_shelf` so there is no second
+definition of "published" to drift.
+
+**`npm run launch:check`** answers the question no other gate does: would opening
+this shop today embarrass anybody? Against development it reports **7 blocked, 5
+warnings**, every one of them business input rather than a defect.
+
+### The production rehearsal
+
+`npm run rehearse:production` — 12 checks, 0 failures. It proves the migration
+set is ordered and gap-free, that every file is applied on the live project **and
+nothing is applied that is not in the files**, that none of them seeds business
+data, and that the order-number sequence starts at 1 with no migration moving
+it — so production's first order really is **JU-000001**.
+
+It says plainly what it cannot prove: there is no local PostgreSQL here, so
+nothing is replayed against an empty database. The evidence is that the
+development project WAS built from these files, in this order.
+
+### Where it stands
+
+```
+typecheck · lint · test 221 · schema · i18n · catalogue · db:types · build
+test:db            271 passing
+qa:deployed        38 checks against staging
+launch:check       7 pass · 5 warning · 7 blocked (all business input)
+rehearse:production 12 checks, 0 failures
+```
+
 ## Next
 
 - Confirm the open business rules (delivery fee, served areas, retail prices). A global

@@ -81,6 +81,8 @@ Saved screenshots at every QA width, in both languages, are in
 | `npm run i18n:check` | Verify English and Kiswahili carry the same copy keys |
 | `npm run test` | 203 unit tests — pure functions, **no database needed** |
 | `npm run schema:check` | Offline: the migrations are internally consistent and agree with the domain layer |
+| `npm run launch:check` | Is this shop ready to open? Reads the database and reports PASS / WARNING / BLOCKED. `LAUNCH_MODE=production` makes it strict |
+| `npm run rehearse:production` | Proves the migration files could build production from zero, without creating anything |
 | `npm run qa:deployed -- https://host` | The checks that only mean something against a real deployment — headers, indexing, admin redirects, closed job endpoints, and a scan of every downloadable bundle for a leaked server secret |
 | `npm run qa:screenshots` | Full QA gate — screenshots and behaviour checks at 390/430/768/1024/1440 in both languages, plus the signed-in admin dashboard and its dialogs (a server must be running; set `BASE_URL` for anything other than port 3000) |
 
