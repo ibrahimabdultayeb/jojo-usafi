@@ -1,5 +1,6 @@
 "use client";
 
+import { Spinner } from "@/components/ui/Spinner";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { switchLocale } from "@/components/layout/LanguageSwitcher";
@@ -86,6 +87,8 @@ export function LanguageGate() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, locale]);
 
+  const [changing, setChanging] = useState<Locale | null>(null);
+
   function choose(chosen: Locale) {
     try {
       window.localStorage.setItem(LOCALE_STORAGE_KEY, chosen);
@@ -97,6 +100,7 @@ export function LanguageGate() {
       setOpen(false);
       return;
     }
+    setChanging(chosen);
     switchLocale(chosen, pathname);
   }
 
@@ -139,6 +143,7 @@ export function LanguageGate() {
               type="button"
               lang={option}
               onClick={() => choose(option)}
+              disabled={Boolean(changing)} aria-busy={changing === option}
               className="flex min-h-14 w-full items-center justify-between gap-3 rounded-2xl border-2 border-slate-200 px-5 text-left transition-colors hover:border-brand-500 hover:bg-brand-50"
             >
               <span>
@@ -150,7 +155,7 @@ export function LanguageGate() {
                 </span>
               </span>
               <span className="shrink-0 rounded-full bg-slate-900 px-3 py-1 text-[11px] font-black tracking-widest text-white uppercase">
-                {option}
+                {changing === option ? <Spinner /> : option}
               </span>
             </button>
           ))}

@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { productName } from "@/lib/catalogue/format";
 import type { Catalogue, Product } from "@/lib/catalogue/types";

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { useEffect } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";

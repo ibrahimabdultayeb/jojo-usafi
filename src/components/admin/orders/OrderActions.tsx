@@ -105,7 +105,7 @@ export function OrderActions({
     <>
       <div className="space-y-2.5">
         {next && can(role, "orders.advance") ? (
-          <PrimaryAction onClick={advance} disabled={pending}>
+          <PrimaryAction busy={pending} onClick={advance} disabled={pending}>
             {pending ? "Working…" : next.label}
           </PrimaryAction>
         ) : writtenOff ? (

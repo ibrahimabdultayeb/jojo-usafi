@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { useEffect, useRef, useState } from "react";
 import { useShowroomMotion } from "@/components/layout/ShowroomMotion";
 import { Icon } from "@/components/ui/Icon";

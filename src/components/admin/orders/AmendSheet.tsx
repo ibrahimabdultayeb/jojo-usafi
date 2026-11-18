@@ -267,7 +267,7 @@ export function AmendSheet({
         <Button variant="secondary" onClick={onClose} full disabled={pending}>
           Leave it as it was
         </Button>
-        <Button
+        <Button busy={pending}
           variant="accent"
           full
           disabled={!ready || pending}

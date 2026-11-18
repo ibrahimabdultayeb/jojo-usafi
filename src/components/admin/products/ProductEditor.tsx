@@ -325,7 +325,7 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
                 <Button variant="secondary" onClick={() => setStockOpen(false)} full>
                   Cancel
                 </Button>
-                <Button variant="accent" onClick={applyStock} disabled={!canApplyStock} full>
+                <Button busy={pending} variant="accent" onClick={applyStock} disabled={!canApplyStock} full>
                   {pending ? "Working…" : stockMode === "add" ? "Add to stock" : "Save count"}
                 </Button>
               </div>

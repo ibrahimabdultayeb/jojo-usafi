@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { Icon } from "@/components/ui/Icon";
 import { getDictionary, localePath, type Locale } from "@/lib/i18n";
 

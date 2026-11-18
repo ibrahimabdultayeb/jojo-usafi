@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { Spinner } from "@/components/ui/Spinner";
 import { Icon } from "@/components/ui/Icon";
 import { StableText } from "@/components/ui/StableText";
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
@@ -31,6 +32,7 @@ export function Header() {
   const { t, path } = useLocale();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searching, startSearch] = useTransition();
   const [term, setTerm] = useState("");
 
   // `pick` is how each slot finds its own translations, so the reserved width
@@ -50,8 +52,7 @@ export function Header() {
   function submitSearch(event: FormEvent) {
     event.preventDefault();
     const q = term.trim();
-    router.push(q ? `${path("/shop")}?q=${encodeURIComponent(q)}` : path("/shop"));
-    setSearchOpen(false);
+    startSearch(() => router.push(q ? `${path("/shop")}?q=${encodeURIComponent(q)}` : path("/shop")));
   }
 
   // Compared without the language prefix so the active state is the same in both.
@@ -86,19 +87,20 @@ export function Header() {
             onSubmit={submitSearch}
             data-qa-anchor="search"
             className="showroom-header-search relative hidden md:block"
-            role="search"
+            role="search" aria-busy={searching}
           >
             <Icon
               name="search"
               className="pointer-events-none absolute top-1/2 left-0 h-[19px] w-[19px] -translate-y-1/2 text-slate-500"
             />
+            {searching && <span className="absolute right-1 top-3"><Spinner /></span>}
             <input
               value={term}
               onChange={(e) => setTerm(e.target.value)}
               type="search"
               placeholder={t.header.searchPlaceholder}
               aria-label={t.header.searchLabel}
-              className="min-h-11 w-full py-2 pl-7 pr-2 text-sm placeholder:text-slate-500"
+              className="min-h-11 w-full py-2 pl-7 pr-7 text-sm placeholder:text-slate-500"
             />
           </form>
 
@@ -152,6 +154,7 @@ export function Header() {
                 name="search"
                 className="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-slate-400"
               />
+              {searching && <span className="absolute right-4 top-4"><Spinner /></span>}
               <input
                 autoFocus
                 value={term}

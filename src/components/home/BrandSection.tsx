@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { getBrands } from "@/lib/catalogue/queries";
 import { getDictionary, localePath, type Locale } from "@/lib/i18n";
 import { toneSet } from "@/lib/tones";

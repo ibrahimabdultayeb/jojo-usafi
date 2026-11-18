@@ -102,7 +102,7 @@ export function SyncManager({
       {/* The action */}
       {maySync ? (
         <div className="mb-5 space-y-2.5">
-          <PrimaryAction icon="sparkle" onClick={() => run(() => runSyncAction(false))} disabled={pending}>
+          <PrimaryAction busy={pending} icon="sparkle" onClick={() => run(() => runSyncAction(false))} disabled={pending}>
             {pending ? "Working…" : "Sync now"}
           </PrimaryAction>
           <Button variant="secondary" full disabled={pending} onClick={() => run(() => runSyncAction(true))}>

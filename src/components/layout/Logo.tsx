@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import Image from "next/image";
 import { useLocale } from "@/lib/i18n/client";
 

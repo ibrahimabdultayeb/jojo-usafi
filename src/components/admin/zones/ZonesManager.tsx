@@ -239,7 +239,7 @@ function ZoneEditor({
           <Button variant="secondary" onClick={onCancel} full>
             Cancel
           </Button>
-          <Button
+          <Button busy={pending}
             variant="accent"
             onClick={() => onSave(draft)}
             disabled={draft.name.trim() === "" || pending}

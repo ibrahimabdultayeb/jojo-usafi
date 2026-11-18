@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useTransition } from "react";
+import { Spinner } from "@/components/ui/Spinner";
 import { Icon } from "@/components/ui/Icon";
 import { StableText, WidthReserver } from "@/components/ui/StableText";
 import type { Category } from "@/lib/catalogue/types";
@@ -30,6 +31,7 @@ interface ShopControlsProps {
 
 export function ShopControls({ categories, activeCategory, activeBrand, kitchen, activeSort }: ShopControlsProps) {
   const router = useRouter();
+  const [sorting, startSort] = useTransition();
   const pathname = usePathname();
   const params = useSearchParams();
   const { locale, t } = useLocale();
@@ -76,7 +78,7 @@ export function ShopControls({ categories, activeCategory, activeBrand, kitchen,
     <div className="mb-8 flex flex-col gap-4 border-y border-slate-100 py-5 md:flex-row md:items-center md:justify-between md:gap-6">
       <div
         data-qa-anchor="shop-filters"
-        className="no-scrollbar -mx-4 flex gap-2.5 overflow-x-auto px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0"
+        className="no-scrollbar min-w-0 -mx-4 flex gap-2.5 overflow-x-auto px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0"
       >
         <Link
           href={hrefWith("category")}
@@ -107,13 +109,15 @@ export function ShopControls({ categories, activeCategory, activeBrand, kitchen,
         data-qa-anchor="shop-sort"
         className="relative grid w-full shrink-0 grid-cols-1 grid-rows-1 md:w-auto"
       >
+        {sorting && <span role="status" className="absolute right-10 top-4"><Spinner /><span className="sr-only">{locale === "sw" ? "Inapakia…" : "Loading…"}</span></span>}
         <label htmlFor="sort" className="sr-only">
           {t.shop.sortLabel}
         </label>
         <select
           id="sort"
           value={activeSort}
-          onChange={(e) => router.push(hrefWith("sort", e.target.value))}
+          onChange={(e) => startSort(() => router.push(hrefWith("sort", e.target.value)))}
+          disabled={sorting} aria-busy={sorting}
           className="col-start-1 row-start-1 h-12 w-full cursor-pointer appearance-none rounded-full border border-slate-200 bg-white pr-11 pl-5 text-sm font-bold shadow-sm outline-none focus:border-brand-500"
         >
           {sortOptions.map((option) => (

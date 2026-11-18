@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { AddToCartControl } from "@/components/product/AddToCartControl";
 import { ProductPhoto } from "@/components/product/ProductPhoto";
 import { getBrand, productName } from "@/lib/catalogue/queries";

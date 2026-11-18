@@ -1,5 +1,6 @@
 "use client";
 
+import { Spinner } from "@/components/ui/Spinner";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getBrowserSupabase } from "@/lib/supabase/client";
@@ -236,9 +237,10 @@ export function SetPasswordForm({ alreadySignedIn }: { alreadySignedIn: boolean 
 
       <button
         type="submit"
-        disabled={stage === "saving"}
+        disabled={stage === "saving"} aria-busy={stage === "saving"}
         className="min-h-12 w-full rounded-full bg-slate-900 px-6 text-base font-bold text-white transition hover:bg-slate-800 disabled:opacity-60"
       >
+        {stage === "saving" && <Spinner className="mr-2" />}
         {stage === "saving" ? "Saving…" : "Save password"}
       </button>
     </form>

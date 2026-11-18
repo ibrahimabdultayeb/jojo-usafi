@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { Logo } from "./Logo";
 import { MotionPreference } from "./ShowroomMotion";
 import { showroomCopy } from "@/components/home/showroom-copy";

@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { useActionState } from "react";
+import { Spinner } from "@/components/ui/Spinner";
 import { useFormStatus } from "react-dom";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
@@ -200,8 +201,10 @@ function TrackButton({ label, checking }: { label: string; checking: string }) {
     <button
       type="submit"
       disabled={pending}
+      aria-busy={pending}
       className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-6 font-display text-base font-bold text-white shadow-lg transition-colors hover:bg-brand-600 disabled:opacity-60"
     >
+      {pending && <Spinner />}
       {pending ? checking : label}
       {!pending && <Icon name="arrowRight" className="h-5 w-5" />}
     </button>

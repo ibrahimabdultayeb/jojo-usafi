@@ -136,7 +136,7 @@ export function ProductPhoto({
               aria-hidden="true"
               tabIndex={-1}
             />
-            <Button
+            <Button busy={pending}
               variant="accent"
               icon="plus"
               full

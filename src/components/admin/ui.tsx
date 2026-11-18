@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { Spinner } from "@/components/ui/Spinner";
 import { Icon, type IconName } from "@/components/ui/Icon";
 
 /**
@@ -86,6 +87,7 @@ interface ButtonProps {
   icon?: IconName;
   full?: boolean;
   disabled?: boolean;
+  busy?: boolean;
   type?: "button" | "submit";
   className?: string;
   title?: string;
@@ -98,6 +100,7 @@ export function Button({
   icon,
   full,
   disabled,
+  busy,
   type = "button",
   className = "",
   title,
@@ -106,13 +109,14 @@ export function Button({
     <button
       type={type}
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || busy}
+      aria-busy={busy}
       title={title}
       className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 font-display text-sm font-bold transition-colors disabled:pointer-events-none disabled:opacity-40 ${
         BUTTONS[variant]
       } ${full ? "w-full" : ""} ${className}`}
     >
-      {icon && <Icon name={icon} className="h-4 w-4 shrink-0" />}
+      {busy ? <Spinner /> : icon && <Icon name={icon} className="h-4 w-4 shrink-0" />}
       {children}
     </button>
   );
@@ -124,21 +128,24 @@ export function PrimaryAction({
   onClick,
   icon = "arrowRight",
   disabled,
+  busy,
 }: {
   children: ReactNode;
   onClick?: () => void;
   icon?: IconName;
   disabled?: boolean;
+  busy?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || busy}
+      aria-busy={busy}
       className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-brand-600 px-5 font-display text-base font-bold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-40"
     >
       {children}
-      <Icon name={icon} className="h-5 w-5" />
+      {busy ? <Spinner /> : <Icon name={icon} className="h-5 w-5" />}
     </button>
   );
 }
@@ -183,19 +190,22 @@ export function Toggle({
   checked,
   onChange,
   disabled,
+  busy,
 }: {
   label: string;
   hint?: string;
   checked: boolean;
   onChange: (next: boolean) => void;
   disabled?: boolean;
+  busy?: boolean;
 }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
-      disabled={disabled}
+      disabled={disabled || busy}
+      aria-busy={busy}
       onClick={() => onChange(!checked)}
       className="flex min-h-14 w-full items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 text-left transition-colors hover:bg-slate-50 disabled:opacity-40"
     >
@@ -316,7 +326,7 @@ export function SaveState({
   const { tone, icon, text } = map[state];
   return (
     <Badge tone={tone}>
-      <Icon name={icon} className="mr-1 h-3 w-3" />
+      {state === "saving" ? <Spinner className="mr-1" /> : <Icon name={icon} className="mr-1 h-3 w-3" />}
       {text}
     </Badge>
   );

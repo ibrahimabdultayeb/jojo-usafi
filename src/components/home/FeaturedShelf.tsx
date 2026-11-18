@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
-import { useRef } from "react";
+import Link from "@/components/ui/LoadingLink";
+import { useEffect, useRef, useState } from "react";
 import { AddToCartControl } from "@/components/product/AddToCartControl";
 import { Icon } from "@/components/ui/Icon";
 import { productName } from "@/lib/catalogue/format";
@@ -25,11 +25,22 @@ const curatedProducts = [
 export function FeaturedShelf({ products, locale }: { products: Product[]; locale: Locale }) {
   const copy = showroomCopy(locale);
   const rail = useRef<HTMLUListElement>(null);
+  const [edges, setEdges] = useState({ start: true, end: false });
   const { reduced } = useShowroomMotion();
   const items = curatedProducts.flatMap(([sku, brand, image]) => {
     const product = products.find((candidate) => candidate.sku === sku);
     return product ? [{ product, brand, image }] : [];
   });
+  useEffect(() => {
+    const element = rail.current;
+    if (!element) return;
+    const update = () => setEdges({ start: element.scrollLeft < 2, end: element.scrollLeft + element.clientWidth >= element.scrollWidth - 2 });
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    element.addEventListener("scroll", update, { passive: true });
+    return () => { observer.disconnect(); element.removeEventListener("scroll", update); };
+  }, [items.length]);
   if (!items.length) return null;
 
   function scrollRail(direction: number) {
@@ -47,8 +58,8 @@ export function FeaturedShelf({ products, locale }: { products: Product[]; local
               {copy.browseAll}<Icon name="arrowUpRight" />
             </Link>
             <div className="showroom-shelf-buttons">
-              <button type="button" aria-label={copy.previous} onClick={() => scrollRail(-1)}><Icon name="arrowLeft" /></button>
-              <button type="button" aria-label={copy.more} onClick={() => scrollRail(1)}><Icon name="arrowRight" /></button>
+              <button type="button" disabled={edges.start} aria-label={copy.previous} onClick={() => scrollRail(-1)}><Icon name="arrowLeft" /></button>
+              <button type="button" disabled={edges.end} aria-label={copy.more} onClick={() => scrollRail(1)}><Icon name="arrowRight" /></button>
             </div>
           </div>
         </header>
@@ -57,7 +68,7 @@ export function FeaturedShelf({ products, locale }: { products: Product[]; local
             <li className="showroom-shelf-card" key={product.sku}>
               <Link className="showroom-shelf-product" href={localePath(locale, `/product/${product.slug}`)}>
                 <div className="showroom-shelf-image">
-                  <Image src={showroomAsset(image)} width={124} height={212} alt="" />
+                  <Image src={showroomAsset(image)} fill sizes="(max-width: 639px) 196px, 240px" alt="" />
                 </div>
                 <span>{brand} <small>· {product.packSize}</small></span>
                 <h3>{productName(product)}</h3>

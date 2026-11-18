@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
+import { Spinner } from "@/components/ui/Spinner";
 import { useFormStatus } from "react-dom";
 import { ROLE_LABELS } from "@/lib/admin/permissions";
 import { claimOwnerAction, type ClaimState } from "./actions";
@@ -11,9 +12,10 @@ function SubmitButton() {
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending} aria-busy={pending}
       className="min-h-12 w-full rounded-full bg-brand-600 px-6 text-base font-bold text-white transition hover:bg-brand-700 disabled:opacity-60"
     >
+      {pending && <Spinner className="mr-2" />}
       {pending ? "Setting up…" : "Make this the Owner account"}
     </button>
   );

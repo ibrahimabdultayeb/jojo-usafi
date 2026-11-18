@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { useActionState, useEffect, useMemo, useState } from "react";
+import { Spinner } from "@/components/ui/Spinner";
 import { useFormStatus } from "react-dom";
 import { Icon } from "@/components/ui/Icon";
 import { useCart } from "@/lib/cart";
@@ -391,7 +392,7 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
               </dl>
 
               <div className="mt-3 text-xs font-semibold text-slate-600" aria-live="polite">
-                {quoting && <p>{t.checkout.checkingPrices}</p>}
+                {quoting && <p className="flex items-center gap-2"><Spinner />{t.checkout.checkingPrices}</p>}
                 {currentQuote && !quote && (
                   <div className="rounded-xl bg-amber-50 p-3 text-amber-900">
                     <p>{t.checkout.pricesUnavailable}</p>
@@ -514,9 +515,11 @@ function PlaceOrderButton({
     <button
       type="submit"
       disabled={disabled || pending}
+      aria-busy={pending}
       data-qa-anchor="checkout-place-order"
       className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-brand-600 px-6 text-base font-bold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
     >
+      {pending && <Spinner />}
       {pending ? placing : total ? fill(label, { total }) : fallback}
       {!pending && <Icon name="arrowRight" className="h-5 w-5" />}
     </button>

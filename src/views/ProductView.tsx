@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { notFound } from "next/navigation";
 import { AddToCartButton } from "@/components/product/AddToCartControl";
 import { ProductGrid } from "@/components/product/ProductGrid";

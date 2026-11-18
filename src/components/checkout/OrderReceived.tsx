@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { Icon } from "@/components/ui/Icon";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { formatPrice } from "@/lib/format";

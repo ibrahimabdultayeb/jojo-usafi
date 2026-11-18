@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { Spinner } from "@/components/ui/Spinner";
 import { usePathname } from "next/navigation";
 import { useLocale } from "@/lib/i18n/client";
 import {
@@ -49,6 +51,7 @@ export function LanguageSwitcher({
 }) {
   const { locale, t } = useLocale();
   const pathname = usePathname();
+  const [changing, setChanging] = useState<Locale | null>(null);
 
   return (
     <div
@@ -64,7 +67,10 @@ export function LanguageSwitcher({
             key={option}
             type="button"
             lang={option}
-            onClick={() => !active && switchLocale(option, pathname)}
+            onClick={() => { if (!active && !changing) { setChanging(option); switchLocale(option, pathname); } }}
+            disabled={Boolean(changing)}
+            aria-busy={changing === option}
+            aria-label={localeShortName[option]}
             aria-pressed={active}
             className={`min-h-11 min-w-11 rounded-full px-3 text-xs font-black tracking-wide transition-colors ${
               active
@@ -72,7 +78,7 @@ export function LanguageSwitcher({
                 : "text-slate-500 hover:text-slate-900"
             }`}
           >
-            {localeShortName[option]}
+            {changing === option ? <Spinner /> : localeShortName[option]}
           </button>
         );
       })}

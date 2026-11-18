@@ -301,7 +301,7 @@ function InviteSheet({
           <Button variant="secondary" onClick={onClose} full>
             Cancel
           </Button>
-          <Button
+          <Button busy={pending}
             variant="accent"
             full
             disabled={pending || name.trim().length < 2 || email.trim() === ""}

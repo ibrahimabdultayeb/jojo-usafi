@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { Spinner } from "@/components/ui/Spinner";
 import { useFormStatus } from "react-dom";
 import { requestPasswordLinkAction, type ForgotState } from "./actions";
 
@@ -20,9 +21,10 @@ function SubmitButton() {
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending} aria-busy={pending}
       className="min-h-12 w-full rounded-full bg-slate-900 px-6 text-base font-bold text-white transition hover:bg-slate-800 disabled:opacity-60"
     >
+      {pending && <Spinner className="mr-2" />}
       {pending ? "Sending…" : "Email me a link"}
     </button>
   );

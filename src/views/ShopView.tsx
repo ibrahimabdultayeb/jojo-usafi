@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { Suspense } from "react";
 import { ProductGrid } from "@/components/product/ProductGrid";
 import { ShopControls } from "@/components/shop/ShopControls";
