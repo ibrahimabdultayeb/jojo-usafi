@@ -37,7 +37,7 @@
 
 .showroom-wrap {
   width: 100%;
-  max-width: 1440px;
+  max-width: 1280px;
   margin-inline: auto;
   padding-inline: 24px;
 }
@@ -144,22 +144,33 @@
 .showroom-section-heading > p { max-width: 300px; color: #22355c; font-size: 15px; line-height: 1.6; }
 
 .showroom-hero {
+  --showroom-stage-width: clamp(1280px, 100vw, 1680px);
+  --showroom-canvas-width: calc(var(--showroom-stage-width) * 1.716);
   position: relative;
   display: grid;
   align-items: center;
-  min-height: max(720px, min(56.28vw, 945px), 25vw);
+  min-height: clamp(720px, 56.28vw, 945px);
   isolation: isolate;
   background: radial-gradient(ellipse at 15% 20%, #dce9ee, transparent 55%), #afc7d6;
   overflow: clip;
 }
 
-/* Cover the hero with one panoramic coordinate system so the photograph and
-   product hotspots scale and crop together, including on ultrawide screens. */
+/* Keep the original bounded showroom composition. The generated panorama's
+   subject maps back to the original stage at 1.716x width and a 53.3% origin. */
 .showroom-scene { position: absolute; inset: 0; overflow: hidden; container-type: size; }
-.showroom-canvas { position: absolute; top: 50%; left: 50%; width: max(100cqw, 300cqh); aspect-ratio: 3 / 1; transform: translate(-50%, -50%); }
+.showroom-canvas { position: absolute; bottom: 0; left: 50%; width: var(--showroom-canvas-width); aspect-ratio: 3 / 1; transform: translateX(-53.3%); }
 .showroom-backdrop { object-fit: contain; }
+.showroom-scene-edge { display: none; }
+/* Extend only the empty outer wall/floor on very wide displays. Matching
+   source slices keep the horizon continuous without scaling the product stage. */
+@media (min-width: 2680px) {
+  .showroom-backdrop { clip-path: inset(0 15% 0 25%); }
+  .showroom-scene-edge { display: block; position: absolute; bottom: 0; height: calc(var(--showroom-canvas-width) / 3); background-image: url("/showroom/showroom-panorama.webp"); background-repeat: no-repeat; pointer-events: none; }
+  .showroom-scene-edge-left { left: 0; width: calc(50% - var(--showroom-canvas-width) * 0.283); background-size: 400% 100%; background-position: left bottom; }
+  .showroom-scene-edge-right { right: 0; width: calc(50% - var(--showroom-canvas-width) * 0.317); background-size: 666.666667% 100%; background-position: right bottom; }
+}
 .showroom-hero-overlay { position: relative; pointer-events: none; }
-.showroom-hero-copy { width: min(40%, 490px); padding-block: 52px 84px; pointer-events: auto; }
+.showroom-hero-copy { width: min(44%, 490px); padding-block: 52px 84px; pointer-events: auto; }
 .showroom-hero-copy .showroom-label { color: #12406f; }
 .showroom-hero-copy .showroom-label::before { background: var(--showroom-blue); }
 .showroom-hero h1 { margin-top: 20px; font-size: clamp(52px, 5.4vw, 80px); font-weight: 820; line-height: 0.95; letter-spacing: -0.045em; }
@@ -466,9 +477,9 @@
 
 @media (min-width: 900px) and (max-width: 1199px) {
   .showroom-hero { min-height: 600px; }
-  .showroom-canvas { left: calc(50% - 40px); }
+  .showroom-canvas { top: 50%; bottom: auto; left: calc(50% - 40px); width: max(100cqw, 300cqh); transform: translate(-50%, -50%); }
   .showroom-stand-ozone .showroom-stand-cue { right: 0; }
-  .showroom-hero-copy { padding-block: 32px; }
+  .showroom-hero-copy { width: 40%; padding-block: 32px; }
   .showroom-hero h1 { font-size: 52px; }
   .showroom-hero-lede { font-size: 15px; }
   .showroom-hero .showroom-actions { gap: 16px; }
@@ -487,7 +498,7 @@
   .showroom-hero .showroom-actions { margin-top: 21px; }
   .showroom-stand-list { margin-top: 23px; }
   .showroom-scene { position: relative; height: clamp(240px, 56vw, 600px); overflow: hidden; }
-  .showroom-canvas { width: max(200cqw, 300cqh); transform: translate(-63.5%, -50%); }
+  .showroom-canvas { top: 50%; bottom: auto; width: max(200cqw, 300cqh); transform: translate(-63.5%, -50%); }
 }
 
 @media (max-width: 899px) {
