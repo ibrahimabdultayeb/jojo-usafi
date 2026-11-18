@@ -464,7 +464,19 @@
   .showroom-need-tile { padding: 21px; }
 }
 
-@media (max-width: 1199px) {
+@media (min-width: 900px) and (max-width: 1199px) {
+  .showroom-hero { min-height: 600px; }
+  .showroom-canvas { left: calc(50% - 40px); }
+  .showroom-hero-copy { padding-block: 32px; }
+  .showroom-hero h1 { font-size: 52px; }
+  .showroom-hero-lede { font-size: 15px; }
+  .showroom-hero .showroom-actions { gap: 16px; }
+  .showroom-hero .showroom-button { padding-inline: 16px; font-size: 13px; }
+  .showroom-hero .showroom-text-link { font-size: 13px; }
+  .showroom-stand-list { display: none; }
+}
+
+@media (max-width: 899px) {
   .showroom-hero { min-height: 0; background: #d2e3ec; }
   .showroom-hero-overlay { order: -1; pointer-events: auto; background: radial-gradient(90% 140% at 32% 0%, #f3f9fb, #c9deeb); }
   .showroom-hero-copy { width: min(100%, 530px); padding-block: 43px 28px; }
