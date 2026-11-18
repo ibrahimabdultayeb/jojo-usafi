@@ -230,6 +230,11 @@ describe("a delivery that did not arrive", () => {
       on_hand: before.on_hand,
       reserved: before.reserved,
     });
+    await advance(order.order_id, "out_for_delivery");
+    expect(await stock()).toMatchObject({
+      on_hand: before.on_hand,
+      reserved: before.reserved,
+    });
   });
 
   it("writes the loss off when the items did not", async () => {
@@ -262,6 +267,14 @@ describe("a delivery that did not arrive", () => {
     expect(loss.on_hand_delta).toBe(-2);
     expect(loss.reserved_delta, "damage_loss may only move on_hand").toBe(0);
     expect(loss.reason).toContain("not returned");
+
+    const retry = await db.rpc("jojo_advance_order", {
+      p_order_id: order.order_id,
+      p_to_state: "out_for_delivery",
+    });
+    expect(retry.error?.code).toBe("23514");
+    expect(retry.error?.message).toContain("orders_dispatch_requires_stock_reservation");
+    expect(await stock()).toMatchObject({ on_hand: after.on_hand, reserved: after.reserved });
   });
 
   it("insists on an answer about the items", async () => {

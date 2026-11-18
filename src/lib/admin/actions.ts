@@ -35,6 +35,9 @@ const done = (message: string): ActionResult => ({ ok: true, message });
 
 /** Database messages are already written for a person. Show them as they are. */
 function readable(error: { message: string }): string {
+  if (error.message.includes("orders_dispatch_requires_stock_reservation")) {
+    return "The items were written off. Cancel this order before arranging a replacement.";
+  }
   return error.message.replace(/^INSUFFICIENT_STOCK:\s*/, "");
 }
 

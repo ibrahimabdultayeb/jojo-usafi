@@ -117,6 +117,7 @@ export interface AdminOrder {
   id: string;
   number: string;
   stage: OrderStage;
+  stockReservationReleased: boolean;
   placed: string;
   customer: { id: string; name: string; phone: string };
   delivery: { zone: string; address: string; fee: number; freeDelivery: boolean };

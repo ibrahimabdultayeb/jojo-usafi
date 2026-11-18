@@ -31,7 +31,7 @@ const ORDER_SELECT = `
   payment_preference, payment_status, payment_method, payment_reference,
   customer_note, staff_note,
   confirmed_at, preparing_at, dispatched_at, completed_at, cancelled_at, failed_at,
-  cancellation_reason, delivery_failure_reason,
+  cancellation_reason, delivery_failure_reason, reservation_released_at,
   order_items ( sku, product_name, variant_label, pack_size_label, quantity, unit_price_tzs, line_total_tzs, position )
 `;
 
@@ -39,6 +39,7 @@ type OrderRow = {
   id: string;
   order_number: string;
   state: string;
+  reservation_released_at: string | null;
   placed_at: string;
   customer_id: string | null;
   customer_name: string;
@@ -72,6 +73,7 @@ function toAdminOrder(row: OrderRow): AdminOrder {
     id: row.id,
     number: row.order_number,
     stage: row.state as OrderStage,
+    stockReservationReleased: row.reservation_released_at !== null,
     placed: row.placed_at,
     customer: {
       id: row.customer_id ?? "",

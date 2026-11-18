@@ -63,8 +63,10 @@ export function OrderActions({
   // mean the screen could disagree with the database about what happened, which
   // is exactly the disagreement these operations exist to prevent.
   const stage: OrderStage = order.stage;
-  const next = NEXT_ACTION[stage];
-  const closed = stage === "completed" || stage === "cancelled" || stage === "delivery_failed";
+  const writtenOff = stage === "delivery_failed" && order.stockReservationReleased;
+  const next = writtenOff ? undefined : NEXT_ACTION[stage];
+  const mayCancel = stage !== "completed" && stage !== "cancelled" && stage !== "out_for_delivery";
+  const mayFailDelivery = stage === "out_for_delivery";
   const mayAmend = AMENDABLE.includes(stage) && can(role, "orders.advance");
 
   function announce(message: string, bad = false) {
@@ -106,6 +108,10 @@ export function OrderActions({
           <PrimaryAction onClick={advance} disabled={pending}>
             {pending ? "Working…" : next.label}
           </PrimaryAction>
+        ) : writtenOff ? (
+          <p className="rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+            The items were written off. Cancel this order before arranging a replacement.
+          </p>
         ) : (
           <div className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-slate-100 px-5 text-sm font-bold text-slate-500">
             <Icon name="check" className="h-4 w-4" />
@@ -131,19 +137,23 @@ export function OrderActions({
           </p>
         )}
 
-        {!closed && can(role, "orders.cancel") && (
+        {(mayCancel || mayFailDelivery) && can(role, "orders.cancel") && (
           <details className="group rounded-2xl border border-slate-200 bg-white">
             <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-sm font-bold text-slate-600 hover:text-slate-900">
               Something went wrong with this order
               <Icon name="chevronDown" className="h-4 w-4 transition-transform group-open:rotate-180" />
             </summary>
             <div className="grid gap-2 border-t border-slate-100 p-3 sm:grid-cols-2">
-              <Button variant="secondary" icon="close" onClick={() => setCancelOpen(true)} full>
-                Cancel order
-              </Button>
-              <Button variant="danger" icon="truck" onClick={() => setFailedOpen(true)} full>
-                Delivery failed
-              </Button>
+              {mayCancel && (
+                <Button variant="secondary" icon="close" onClick={() => setCancelOpen(true)} full>
+                  Cancel order
+                </Button>
+              )}
+              {mayFailDelivery && (
+                <Button variant="danger" icon="truck" onClick={() => setFailedOpen(true)} full>
+                  Delivery failed
+                </Button>
+              )}
             </div>
           </details>
         )}
