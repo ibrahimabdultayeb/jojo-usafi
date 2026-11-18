@@ -68,7 +68,7 @@
 .admin-auth-forgot { margin-block: -14px -10px; }
 .admin-auth-submit { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 50px; width: 100%; padding: 12px 18px; border: 1px solid transparent; border-radius: 10px; background: #3077ce; color: #fff; font-size: 14px; line-height: 1.5; font-weight: 700; cursor: pointer; text-align: center; text-decoration: none; transition: background 180ms, transform 180ms, box-shadow 180ms; }
 .admin-auth-submit svg { width: 17px; height: 17px; }
-.admin-auth-submit:hover:not(:disabled) { background: #3987e6; box-shadow: 0 6px 22px rgb(31 115 224 / 18%); }
+.admin-auth-submit:hover:not(:disabled) { background: #2568bd; box-shadow: 0 6px 22px rgb(31 115 224 / 18%); }
 .admin-auth-submit:active:not(:disabled) { transform: translateY(1px); }
 .admin-auth-submit:disabled { opacity: .7; cursor: wait; }
 .admin-auth-secondary { color: #becce0; background: transparent; border-color: #33465f; }
