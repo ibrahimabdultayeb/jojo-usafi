@@ -57,7 +57,7 @@ export function Header() {
 
   // Compared without the language prefix so the active state is the same in both.
   const here = stripLocale(pathname);
-  const isActive = (href: string) => (href === "/" ? here === "/" : here.startsWith(href));
+  const isActive = (href: string) => href === "/" ? here === "/" : here === href || here.startsWith(`${href}/`) || (href === "/shop" && here.startsWith("/product/"));
 
   return (
     <>

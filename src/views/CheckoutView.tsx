@@ -313,6 +313,8 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
 
           <PlaceOrderButton
             disabled={!canOrder}
+            quoting={quoting}
+            checking={t.checkout.checkingPrices}
             total={canOrder && quote ? formatPrice(quote.total_tzs) : ""}
             label={t.checkout.placeOrderWithTotal}
             placing={t.checkout.placing}
@@ -497,12 +499,16 @@ function PaymentChoice({
  * component has to remember to reset.
  */
 function PlaceOrderButton({
+  quoting,
+  checking,
   disabled,
   total,
   label,
   placing,
   fallback,
 }: {
+  quoting: boolean;
+  checking: string;
   disabled: boolean;
   total: string;
   label: string;
@@ -515,13 +521,13 @@ function PlaceOrderButton({
     <button
       type="submit"
       disabled={disabled || pending}
-      aria-busy={pending}
+      aria-busy={pending || quoting}
       data-qa-anchor="checkout-place-order"
       className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-brand-600 px-6 text-base font-bold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
     >
-      {pending && <Spinner />}
-      {pending ? placing : total ? fill(label, { total }) : fallback}
-      {!pending && <Icon name="arrowRight" className="h-5 w-5" />}
+      {(pending || quoting) && <Spinner />}
+      {pending ? placing : quoting ? checking : total ? fill(label, { total }) : fallback}
+      {!pending && !quoting && <Icon name="arrowRight" className="h-5 w-5" />}
     </button>
   );
 }

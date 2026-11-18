@@ -79,7 +79,7 @@ export async function ProductCard({ product, locale, priority = false }: Product
         </div>
 
         <h3 className="mb-2 line-clamp-2 font-display text-base leading-tight font-bold text-slate-900 lg:text-lg">
-          <Link href={href} className="transition-colors hover:text-brand-700">
+          <Link href={href} className="product-card-title-link transition-colors hover:text-brand-700">
             <span className="absolute inset-0 z-0" aria-hidden />
             {name}
           </Link>

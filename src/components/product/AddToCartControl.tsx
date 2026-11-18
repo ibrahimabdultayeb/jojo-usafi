@@ -1,5 +1,6 @@
 "use client";
 
+import { Spinner } from "@/components/ui/Spinner";
 import { Icon } from "@/components/ui/Icon";
 import { useCart } from "@/lib/cart";
 import { fullProductNameWith } from "@/lib/catalogue/format";
@@ -33,10 +34,11 @@ export function AddToCartControl({ product }: { product: Product }) {
       <button
         type="button"
         onClick={() => add(product.sku)}
+        disabled={!hydrated} aria-busy={!hydrated}
         aria-label={fill(t.product.addAria, { name })}
         className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-sm transition-colors hover:bg-brand-600"
       >
-        <Icon name="plus" className="h-4 w-4" />
+        {!hydrated ? <Spinner /> : <Icon name="plus" className="h-4 w-4" />}
       </button>
     );
   }
@@ -57,6 +59,7 @@ export function AddToCartControl({ product }: { product: Product }) {
       <button
         type="button"
         onClick={() => add(product.sku)}
+        disabled={!hydrated} aria-busy={!hydrated}
         aria-label={fill(t.product.increaseAria, { name })}
         className="flex h-full w-11 items-center justify-center text-brand-700 transition-colors hover:bg-brand-200"
       >
@@ -87,9 +90,10 @@ export function AddToCartButton({ product }: { product: Product }) {
       <button
         type="button"
         onClick={() => add(product.sku)}
+        disabled={!hydrated} aria-busy={!hydrated}
         className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-6 font-display text-base font-bold text-white shadow-lg transition-colors hover:bg-brand-600"
       >
-        <Icon name="cart" className="h-5 w-5" />
+        {!hydrated ? <Spinner /> : <Icon name="cart" className="h-5 w-5" />}
         {t.product.addToCart}
       </button>
     );
@@ -115,10 +119,11 @@ export function AddToCartButton({ product }: { product: Product }) {
         <button
           type="button"
           onClick={() => add(product.sku)}
+        disabled={!hydrated} aria-busy={!hydrated}
           aria-label={fill(t.product.increaseAria, { name })}
           className="flex h-full w-14 items-center justify-center text-brand-700 transition-colors hover:bg-brand-200"
         >
-          <Icon name="plus" className="h-4 w-4" />
+          {!hydrated ? <Spinner /> : <Icon name="plus" className="h-4 w-4" />}
         </button>
       </div>
       <button

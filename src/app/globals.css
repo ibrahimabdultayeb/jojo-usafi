@@ -203,6 +203,7 @@
 .action-spinner { display: inline-block; width: 1.1em; height: 1.1em; flex: 0 0 1.1em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; vertical-align: middle; animation: action-spin 700ms linear infinite; }
 @keyframes action-spin { to { transform: rotate(360deg); } }
 .loading-link { position: relative; }
+.loading-link.product-card-title-link { position: static; }
 .link-status:empty { display: none; }
 .link-status-indicator { position: absolute; z-index: 4; top: 3px; right: 3px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #fff; color: #1e5fd0; box-shadow: 0 1px 8px rgb(10 27 61 / 18%); pointer-events: none; }
 .loading-link:has(.link-status-indicator) { cursor: progress; }

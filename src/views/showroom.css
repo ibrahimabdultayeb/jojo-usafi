@@ -539,4 +539,5 @@
   .showroom-logo > span { font-size: 14px; }
   .showroom-logo > img { width: 28px; height: 28px; }
   .showroom-wrap { padding-inline: 12px; }
+  .showroom-shelf-rail { margin-inline: -12px; padding-inline: 12px; scroll-padding: 12px; }
 }
