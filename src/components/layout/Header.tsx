@@ -129,7 +129,7 @@ export function Header() {
             >
               <Icon name="bag" className="h-5 w-5" />
               {hydrated && count > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-500 px-1 text-[11px] font-black text-white ring-2 ring-white">
+                <span key={count} className="cart-count-feedback absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-500 px-1 text-[11px] font-black text-white ring-2 ring-white">
                   {count}
                 </span>
               )}

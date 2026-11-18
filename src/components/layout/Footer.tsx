@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "@/components/ui/LoadingLink";
 import { Logo } from "./Logo";
 import { MotionPreference } from "./ShowroomMotion";
@@ -29,7 +28,6 @@ export async function Footer({ locale }: { locale: Locale }) {
       <div className="showroom-wrap showroom-footer-grid">
         <div className="showroom-footer-brand">
           <Logo compact />
-          <div className="showroom-footer-parent"><Image src="/showroom/ecoplus.webp" width={66} height={29} alt="EcoPlus Brands" /></div>
           <p>{fill(t.footer.blurb, { area: site.serviceArea })}</p>
         </div>
         <div>

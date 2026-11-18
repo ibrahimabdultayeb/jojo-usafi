@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { LogoLoop } from "./LogoLoop";
 import Link from "@/components/ui/LoadingLink";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { productName } from "@/lib/catalogue/format";
@@ -117,29 +118,11 @@ export function BrandMarquee({ locale, brands }: { locale: Locale; brands: Catal
   const copy = showroomCopy(locale);
   const logos = brandLogos.filter(([slug]) => brands.some((brand) => brand.slug === slug));
   if (!logos.length) return null;
-  return (
-    <section className="showroom-brands" aria-label={copy.brandFamily}>
-      <div className="showroom-wrap showroom-brands-label">
-        <ShowroomLabel>{copy.brandFamily}</ShowroomLabel>
-        <Image src={showroomAsset("ecoplus")} width={59} height={26} alt="EcoPlus Brands" />
-      </div>
-      <div className="showroom-marquee">
-        <div className="showroom-marquee-track" style={{ animationDuration: "52s" }}>
-          {[false, true].map((duplicate) => (
-            <div className="showroom-marquee-cycle" key={String(duplicate)} aria-hidden={duplicate || undefined}>
-              {logos.map(([slug, name, height]) => (
-                <Link key={slug} href={`${localePath(locale, "/shop")}?brand=${slug}`}
-                  tabIndex={duplicate ? -1 : undefined} aria-label={name}>
-                  <Image src={showroomAsset(slug)} width={128} height={height} alt={duplicate ? "" : name}
-                    style={{ height, width: "auto", maxWidth: 128 }} />
-                </Link>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
+  return <LogoLoop heading={copy.brandFamily}
+    pauseLabel={locale === "sw" ? "Sitisha nembo" : "Pause logos"}
+    playLabel={locale === "sw" ? "Endeleza nembo" : "Play logos"}
+    logos={logos.map(([slug, name, height]) => ({ slug, name, height,
+      src: showroomAsset(slug), href: `${localePath(locale, "/shop")}?brand=${slug}` }))} />;
 }
 
 export function ShopByNeed({ locale, categories, order }: {

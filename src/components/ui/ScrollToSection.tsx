@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useShowroomMotion } from "@/components/layout/ShowroomMotion";
 
 /**
  * The hero's down control.
@@ -21,13 +22,10 @@ interface ScrollToSectionProps {
 }
 
 export function ScrollToSection({ targetId, label, className, children }: ScrollToSectionProps) {
+  const { reduced } = useShowroomMotion();
   function scrollToTarget() {
     const target = document.getElementById(targetId);
     if (!target) return;
-
-    const reduced =
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     target.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
 

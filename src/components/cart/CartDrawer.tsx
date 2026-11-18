@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "@/components/ui/LoadingLink";
-import { useEffect } from "react";
+import { SlideOver } from "@/components/ui/SlideOver";
 import { Icon } from "@/components/ui/Icon";
 import { ProductPhoto } from "@/components/product/ProductPhoto";
 import { useCart } from "@/lib/cart";
@@ -18,32 +18,8 @@ export function CartDrawer() {
   const { t, path } = useLocale();
   const { brandsById } = useCatalogue();
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeCart();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, closeCart]);
-
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-60">
-      <button
-        type="button"
-        aria-label={t.cart.closeCart}
-        onClick={closeCart}
-        className="fade-in absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-      />
-
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={t.cart.title}
-        className="sheet-in absolute inset-y-0 right-0 flex w-full max-w-md flex-col bg-white shadow-2xl"
-      >
+    <SlideOver open={isOpen} onClose={closeCart} label={t.cart.title} closeLabel={t.cart.closeCart}>
         <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-100 px-4 sm:px-5">
           <h2 className="font-display text-lg font-bold text-slate-900">
             {t.cart.title} {count > 0 && <span className="text-slate-400">({count})</span>}
@@ -80,7 +56,7 @@ export function CartDrawer() {
             {items.map(({ product, quantity, lineTotal }) => {
               const name = productName(product);
               return (
-                <li key={product.sku} className="flex gap-3 py-4">
+                <li key={product.sku} className="cart-line-enter flex gap-3 py-4">
                   <Link
                     href={path(`/product/${product.slug}`)}
                     onClick={closeCart}
@@ -116,7 +92,7 @@ export function CartDrawer() {
                         >
                           <Icon name={quantity === 1 ? "trash" : "minus"} className="h-3.5 w-3.5" />
                         </button>
-                        <span className="w-8 text-center text-sm font-black text-slate-900">
+                        <span key={quantity} className="cart-count-feedback w-8 text-center text-sm font-black text-slate-900">
                           {quantity}
                         </span>
                         <button
@@ -182,7 +158,6 @@ export function CartDrawer() {
             </p>
           </div>
         )}
-      </div>
-    </div>
+    </SlideOver>
   );
 }

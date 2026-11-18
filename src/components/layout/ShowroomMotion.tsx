@@ -7,7 +7,7 @@ const MotionContext = createContext({ reduced: false, systemReduced: false, togg
 
 export function ShowroomMotion({ children }: { children: ReactNode }) {
   const [systemReduced, setSystemReduced] = useState(false);
-  const [preference, setPreference] = useState(false);
+  const [preference, setPreference] = useState<boolean | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -15,21 +15,27 @@ export function ShowroomMotion({ children }: { children: ReactNode }) {
     update();
     media.addEventListener("change", update);
     try {
-      setPreference(window.localStorage.getItem(storageKey) === "true");
+      const saved = window.localStorage.getItem(storageKey);
+      setPreference(saved === "true" ? true : saved === "false" ? false : null);
     } catch {
       // The control still works for this visit.
     }
     return () => media.removeEventListener("change", update);
   }, []);
 
-  const reduced = systemReduced || preference;
+  const reduced = preference ?? systemReduced;
   useEffect(() => {
     document.documentElement.toggleAttribute("data-showroom-reduced", reduced);
-    return () => document.documentElement.removeAttribute("data-showroom-reduced");
-  }, [reduced]);
+    if (preference !== null) document.documentElement.dataset.showroomMotion = reduced ? "reduced" : "full";
+    else delete document.documentElement.dataset.showroomMotion;
+    return () => {
+      document.documentElement.removeAttribute("data-showroom-reduced");
+      delete document.documentElement.dataset.showroomMotion;
+    };
+  }, [reduced, preference]);
 
   function toggle() {
-    const next = !preference;
+    const next = !reduced;
     setPreference(next);
     try {
       window.localStorage.setItem(storageKey, String(next));
@@ -46,9 +52,9 @@ export function useShowroomMotion() {
 }
 
 export function MotionPreference({ label }: { label: string }) {
-  const { reduced, systemReduced, toggle } = useShowroomMotion();
+  const { reduced, toggle } = useShowroomMotion();
   return (
-    <button type="button" className="showroom-motion-toggle" aria-pressed={reduced} onClick={toggle} disabled={systemReduced}>
+    <button type="button" className="showroom-motion-toggle" aria-pressed={reduced} onClick={toggle}>
       <span aria-hidden="true" /><span>{label}</span>
     </button>
   );

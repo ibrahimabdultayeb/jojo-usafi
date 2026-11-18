@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "@/components/ui/LoadingLink";
-import { useEffect } from "react";
+import { SlideOver } from "@/components/ui/SlideOver";
 import { Icon } from "@/components/ui/Icon";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
@@ -23,25 +23,7 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
   const { t, path } = useLocale();
   const helpHref = useWhatsAppLink(t.support.orderHelpMessage);
 
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = previous;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open, onClose]);
-
-  // Hooks before the early return: the menu is unmounted when closed, and a
-  // hook called after  would change order between renders.
   const categories = useCategories();
-
-  if (!open) return null;
 
   const nav = [
     { label: t.nav.home, href: "/" },
@@ -51,19 +33,7 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
   ];
 
   return (
-    <div className="fixed inset-0 z-60 lg:hidden">
-      <button
-        type="button"
-        aria-label={t.header.closeMenu}
-        onClick={onClose}
-        className="fade-in absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={t.header.menuTitle}
-        className="sheet-in absolute inset-y-0 right-0 flex w-full max-w-sm flex-col bg-white shadow-2xl"
-      >
+    <SlideOver open={open} onClose={onClose} label={t.header.menuTitle} closeLabel={t.header.closeMenu} narrow>
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-slate-100 px-4 sm:h-16">
           <Logo compact />
           <button
@@ -150,7 +120,6 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
             {fill(t.footer.delivering, { area: site.serviceArea })}
           </p>
         </div>
-      </div>
-    </div>
+    </SlideOver>
   );
 }

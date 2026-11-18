@@ -148,9 +148,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  :root:not([data-showroom-motion="full"]) *,
+  :root:not([data-showroom-motion="full"]) *::before,
+  :root:not([data-showroom-motion="full"]) *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -200,8 +200,7 @@
 }
 
 /* Real request feedback, with no layout shift or artificial wait. */
-.action-spinner { display: inline-block; width: 1.1em; height: 1.1em; flex: 0 0 1.1em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; vertical-align: middle; animation: action-spin 700ms linear infinite; }
-@keyframes action-spin { to { transform: rotate(360deg); } }
+.action-spinner { display: inline-flex; align-items: center; justify-content: center; min-width: 15px; height: 1.1em; flex: 0 0 auto; vertical-align: middle; }
 .loading-link { position: relative; }
 .loading-link.product-card-title-link { position: static; }
 .link-status:empty { display: none; }
@@ -210,4 +209,16 @@
 .loading-skeleton { animation: loading-pulse 1.5s ease-in-out infinite; }
 @keyframes loading-pulse { 50% { opacity: 0.45; } }
 :root[data-showroom-reduced] *, :root[data-showroom-reduced] *::before, :root[data-showroom-reduced] *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
-@media (prefers-reduced-motion: reduce) { .action-spinner, .loading-skeleton { animation: none; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-showroom-motion="full"]) .loading-skeleton { animation: none; } }
+
+/* Shared modal presence: the page stays inert until the exit has finished. */
+.slide-over { position: fixed; inset: 0; width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; border: 0; overflow: hidden; background: transparent; color: #0f172a; }
+.slide-over::backdrop { background: transparent; }
+.slide-over-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: rgb(15 23 42 / 40%); backdrop-filter: blur(4px); opacity: 0; transition: opacity 300ms ease; }
+.slide-over-panel { position: absolute; inset-block: 0; right: 0; display: flex; flex-direction: column; width: 100%; max-width: 28rem; background: #fff; box-shadow: -12px 0 48px rgb(10 27 61 / 18%); transform: translateX(105%); transition: transform 360ms cubic-bezier(.22,.75,.24,1); }
+.slide-over-panel-narrow { max-width: 24rem; }
+.slide-over[data-entered] .slide-over-backdrop { opacity: 1; }
+.slide-over[data-entered] .slide-over-panel { transform: translateX(0); }
+.cart-count-feedback { animation: cart-count-pop 260ms ease-out; }
+.cart-line-enter { animation: rise 260ms ease-out both; }
+@keyframes cart-count-pop { 0% { transform: scale(.72); } 55% { transform: scale(1.16); } 100% { transform: scale(1); } }

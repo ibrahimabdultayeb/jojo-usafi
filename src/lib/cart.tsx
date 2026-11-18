@@ -92,16 +92,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [lines, hydrated]);
 
-  // The drawer is a modal surface: hold the page still while it is open.
-  useEffect(() => {
-    if (!isOpen) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [isOpen]);
-
   const setQuantity = useCallback((sku: string, quantity: number) => {
     setLines((current) => {
       const next = Math.max(0, Math.min(MAX_PER_LINE, Math.round(quantity)));
