@@ -119,8 +119,6 @@ export function BrandMarquee({ locale, brands }: { locale: Locale; brands: Catal
   const logos = brandLogos.filter(([slug]) => brands.some((brand) => brand.slug === slug));
   if (!logos.length) return null;
   return <LogoLoop heading={copy.brandFamily}
-    pauseLabel={locale === "sw" ? "Sitisha nembo" : "Pause logos"}
-    playLabel={locale === "sw" ? "Endeleza nembo" : "Play logos"}
     logos={logos.map(([slug, name, height]) => ({ slug, name, height,
       src: showroomAsset(slug), href: `${localePath(locale, "/shop")}?brand=${slug}` }))} />;
 }
