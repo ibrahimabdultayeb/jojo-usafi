@@ -2,9 +2,7 @@
 
 import Image from "next/image";
 import { useMemo } from "react";
-import Link from "@/components/ui/LoadingLink";
 import ReactBitsLogoLoop, { type LogoItem } from "@/components/ui/LogoLoop";
-import { useShowroomMotion } from "@/components/layout/ShowroomMotion";
 
 function renderLogo(item: LogoItem) {
   if (!("src" in item)) return item.node;
@@ -17,9 +15,9 @@ export function LogoLoop({ logos, heading }: {
   logos: { slug: string; name: string; height: number; src: string; href: string }[];
   heading: string;
 }) {
-  // This strip is explicitly intended to autoplay. Only the visitor's in-site
-  // choice stops it; an inherited OS preference must not silently replace it.
-  const { explicitlyReduced } = useShowroomMotion();
+  // Autoplay is an explicit storefront requirement. Do not replace this with
+  // a static list based on saved/OS motion preferences: that was the cause of
+  // the frozen, wrapped brand grid. React Bits handles hover/focus pause.
   const items = useMemo<LogoItem[]>(() => logos.map(({ name, height, src, href }) => ({
     src, alt: name, height, href,
   })), [logos]);
@@ -30,19 +28,9 @@ export function LogoLoop({ logos, heading }: {
         <p className="showroom-label">{heading}</p>
       </div>
       <div className="showroom-logo-strip">
-        {explicitlyReduced ? (
-          <div className="showroom-logos-static">
-            <ul>{logos.map(({ slug, name, height, src, href }) => (
-              <li key={slug}><Link href={href} aria-label={name}>
-                {renderLogo({ src, alt: name, height })}
-              </Link></li>
-            ))}</ul>
-          </div>
-        ) : (
-          <ReactBitsLogoLoop logos={items} speed={80} direction="left"
-            logoHeight={36} gap={44} pauseOnHover scaleOnHover fadeOut fadeOutWidth={0.06}
-            intro={false} draggable renderItem={renderLogo} ariaLabel={heading} reducedMotion={false} />
-        )}
+        <ReactBitsLogoLoop logos={items} speed={80} direction="left"
+          logoHeight={36} gap={44} pauseOnHover scaleOnHover fadeOut fadeOutWidth={0.06}
+          intro={false} draggable renderItem={renderLogo} ariaLabel={heading} reducedMotion={false} />
       </div>
     </section>
   );

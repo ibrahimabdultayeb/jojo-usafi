@@ -282,9 +282,6 @@
 .showroom-logo-strip { margin-top: 6px; padding-block: 8px 18px; }
 .showroom-logo-strip .logoloop__content { justify-content: center; min-width: 44px; min-height: 52px; }
 .showroom-logo-strip .logoloop__content:focus-visible { outline: 2px solid var(--showroom-blue); outline-offset: 3px; }
-.showroom-logos-static { padding: 5px 24px; }
-.showroom-logos-static > ul { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 24px 44px; width: 100%; max-width: 1280px; margin: 0 auto; padding: 0; list-style: none; }
-.showroom-logos-static a { display: grid; place-items: center; min-width: 44px; min-height: 52px; }
 
 .showroom-needs {
   color: #fff;
