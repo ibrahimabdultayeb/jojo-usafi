@@ -60,13 +60,13 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full border-b border-slate-200/60 bg-white/85 backdrop-blur-xl">
-        <div className="shell flex h-14 items-center gap-1 sm:h-16 sm:gap-4 lg:h-20 lg:gap-6">
+      <header className="showroom-header sticky top-0 z-40 w-full">
+        <div className="showroom-wrap showroom-header-row flex items-center">
           <Logo />
 
           <nav
             data-qa-anchor="nav"
-            className="hidden shrink-0 items-center gap-1 lg:flex"
+            className="showroom-header-nav hidden shrink-0 items-center lg:flex"
             aria-label="Main"
           >
             {nav.map((item) => (
@@ -75,11 +75,7 @@ export function Header() {
                 href={path(item.href)}
                 data-qa-anchor={`nav-${item.key}`}
                 aria-current={isActive(item.href) ? "page" : undefined}
-                className={`rounded-full px-4 py-2 text-sm font-bold transition-colors ${
-                  isActive(item.href)
-                    ? "bg-brand-50 text-brand-700"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                }`}
+                className="showroom-nav-link transition-colors"
               >
                 <StableText pick={item.pick}>{item.label}</StableText>
               </Link>
@@ -89,12 +85,12 @@ export function Header() {
           <form
             onSubmit={submitSearch}
             data-qa-anchor="search"
-            className="relative hidden max-w-md flex-1 md:block"
+            className="showroom-header-search relative hidden md:block"
             role="search"
           >
             <Icon
               name="search"
-              className="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute top-1/2 left-0 h-[19px] w-[19px] -translate-y-1/2 text-slate-500"
             />
             <input
               value={term}
@@ -102,14 +98,14 @@ export function Header() {
               type="search"
               placeholder={t.header.searchPlaceholder}
               aria-label={t.header.searchLabel}
-              className="min-h-11 w-full rounded-full border border-transparent bg-slate-100/80 py-2.5 pr-5 pl-11 text-sm font-semibold transition-all placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:outline-none"
+              className="min-h-11 w-full py-2 pl-7 pr-2 text-sm placeholder:text-slate-500"
             />
           </form>
 
           <div className="flex-1 md:hidden" />
 
-          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            <LanguageSwitcher className="hidden lg:inline-flex" anchor="language" />
+          <div className="showroom-header-actions flex shrink-0 items-center gap-1 sm:gap-2">
+            <LanguageSwitcher className="showroom-language hidden lg:inline-flex" anchor="language" />
 
             <button
               type="button"
@@ -127,14 +123,9 @@ export function Header() {
               onClick={openCart}
               aria-label={t.meta.cartTitle}
               data-qa-anchor="cart"
-              className="relative flex h-11 items-center gap-2 rounded-full bg-slate-900 px-3.5 text-xs font-bold tracking-wide text-white shadow-md transition-colors hover:bg-brand-600 sm:px-5"
+              className="showroom-cart-button relative flex h-11 w-11 items-center justify-center rounded-xl text-white transition-colors"
             >
-              <Icon name="cart" className="h-4 w-4" />
-              {/* CART / KIKAPU. Reserved, or the language control to its left
-                  moves every time the language changes. */}
-              <span className="hidden lg:inline">
-                <StableText pick={(d) => d.header.cart}>{t.header.cart}</StableText>
-              </span>
+              <Icon name="bag" className="h-5 w-5" />
               {hydrated && count > 0 && (
                 <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-500 px-1 text-[11px] font-black text-white ring-2 ring-white">
                   {count}

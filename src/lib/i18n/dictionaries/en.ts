@@ -45,7 +45,7 @@ export const en = {
   announcements: [
     "Delivery across selected Dar es Salaam areas",
     "Lipa ukipokea — pay when your order arrives",
-    "Order online in about a minute",
+    "Order in a few simple steps",
   ],
 
   hero: {

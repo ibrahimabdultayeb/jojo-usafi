@@ -1,12 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useLocale } from "@/lib/i18n/client";
 
-/**
- * PLACEHOLDER BRAND MARK — a typographic lockup standing in until the real
- * Jojo Usafi logo exists.
- */
 export function Logo({ compact = false }: { compact?: boolean }) {
   const { t, path } = useLocale();
 
@@ -14,18 +11,16 @@ export function Logo({ compact = false }: { compact?: boolean }) {
     <Link
       href={path("/")}
       data-qa-anchor={compact ? undefined : "logo"}
-      className="group flex min-h-11 shrink-0 items-center gap-2 lg:gap-2.5"
+      className="showroom-logo flex min-h-11 shrink-0 items-center gap-2 lg:gap-2.5"
       aria-label={t.header.homeLabel}
     >
-      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-emerald-500 shadow-lg shadow-brand-600/25 transition-shadow group-hover:shadow-brand-600/40 lg:h-10 lg:w-10">
-        <span className="font-display text-lg leading-none font-bold text-white lg:text-xl">J</span>
-      </span>
+      <Image src="/showroom/jojo-usafi.webp" alt="" width={42} height={42} />
       <span
-        className={`font-display leading-none font-bold tracking-tight text-slate-900 ${
+        className={`font-display leading-none font-extrabold tracking-tight ${
           compact ? "text-lg" : "hidden text-lg min-[360px]:block lg:text-xl"
         }`}
       >
-        JOJO <span className="text-brand-600">USAFI</span>
+        JOJO <span>USAFI</span>
       </span>
     </Link>
   );

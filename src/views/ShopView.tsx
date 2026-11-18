@@ -4,14 +4,13 @@ import { ProductGrid } from "@/components/product/ProductGrid";
 import { ShopControls } from "@/components/shop/ShopControls";
 import { Icon } from "@/components/ui/Icon";
 import {
-  getBrands,
-  getCategories,
-  getProducts,
+  getCatalogue,
   searchProducts,
   sortProducts,
   type SortKey,
 } from "@/lib/catalogue/queries";
 import { fill, getDictionary, localePath, type Locale } from "@/lib/i18n";
+import { showroomCopy } from "@/components/home/showroom-copy";
 
 export type ShopSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -29,26 +28,27 @@ export async function ShopView({ locale, searchParams }: ShopViewProps) {
   const params = await searchParams;
   const categorySlug = first(params.category);
   const brandSlug = first(params.brand);
+  const kitchen = first(params.need) === "kitchen" && !categorySlug && !brandSlug;
   const query = first(params.q) ?? "";
   const sort = (first(params.sort) ?? "featured") as SortKey;
 
-  const [categories, brands, allProducts] = await Promise.all([
-    getCategories(),
-    getBrands(),
-    getProducts(),
-  ]);
+  const { categories, brands, products: allProducts } = await getCatalogue();
   const category = categorySlug ? categories.find((c) => c.slug === categorySlug) : undefined;
   const brand = brandSlug ? brands.find((b) => b.slug === brandSlug) : undefined;
 
   let list = allProducts;
   if (category) list = list.filter((p) => p.categoryId === category.id);
   if (brand) list = list.filter((p) => p.brandId === brand.id);
+  if (kitchen) {
+    const kitchenBrands = new Set(brands.filter((item) => ["chap-chap", "greez-off", "multix"].includes(item.slug)).map((item) => item.id));
+    list = list.filter((product) => kitchenBrands.has(product.brandId));
+  }
   list = sortProducts(searchProducts(list, query, new Map(brands.map((b) => [b.id, b]))), sort);
 
-  const heading = category?.name ?? brand?.name ?? t.shop.allProducts;
+  const heading = category?.name ?? brand?.name ?? (kitchen ? showroomCopy(locale).categories[1][0] : t.shop.allProducts);
   const blurb =
     category?.blurb ??
-    (brand ? fill(t.shop.brandBlurb, { brand: brand.name }) : t.shop.allBlurb);
+    (brand ? fill(t.shop.brandBlurb, { brand: brand.name }) : kitchen ? showroomCopy(locale).categories[1][1] : t.shop.allBlurb);
   const shop = localePath(locale, "/shop");
 
   return (
@@ -64,7 +64,7 @@ export async function ShopView({ locale, searchParams }: ShopViewProps) {
         <Link href={shop} className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-slate-700">
           {t.shop.breadcrumbShop}
         </Link>
-        {(category || brand) && (
+        {(category || brand || kitchen) && (
           <>
             <Icon name="chevronRight" className="h-3 w-3" />
             <span className="text-slate-700">{heading}</span>
@@ -80,7 +80,7 @@ export async function ShopView({ locale, searchParams }: ShopViewProps) {
       </header>
 
       <Suspense fallback={<div className="mb-8 h-24 border-y border-slate-100" />}>
-        <ShopControls categories={categories} activeCategory={categorySlug} activeSort={sort} />
+        <ShopControls categories={categories} activeCategory={categorySlug} activeBrand={brandSlug} kitchen={kitchen} activeSort={sort} />
       </Suspense>
 
       <p className="mb-5 text-xs font-bold text-slate-400">

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
 import type { ReactNode } from "react";
 import "@/app/globals.css";
+import "./showroom.css";
 
 import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { Footer } from "@/components/layout/Footer";
@@ -9,6 +9,7 @@ import { Header } from "@/components/layout/Header";
 import { LanguageGate } from "@/components/layout/LanguageGate";
 import { MobileDock } from "@/components/layout/MobileDock";
 import { SupportButton } from "@/components/layout/SupportButton";
+import { ShowroomMotion } from "@/components/layout/ShowroomMotion";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { CartProvider } from "@/lib/cart";
 import { CatalogueProvider } from "@/lib/catalogue/CatalogueContext";
@@ -21,18 +22,11 @@ import { isStaging } from "@/lib/environment";
 import { getSiteContent } from "@/lib/site-content";
 import { site } from "@/lib/site";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
-});
-
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#16a34a",
+  themeColor: "#0A1B3D",
 };
 
 /** Root metadata for one language, including its hreflang alternates. */
@@ -81,9 +75,10 @@ export async function StorefrontLayout({
   const contact = await getContact();
 
   return (
-    <html lang={localeTag[locale]} className={`${inter.variable} ${spaceGrotesk.variable}`}>
-      <body className="min-h-screen bg-slate-50 font-sans antialiased selection:bg-brand-100">
+    <html lang={localeTag[locale]}>
+      <body className="jojo-storefront min-h-screen antialiased selection:bg-brand-100">
         <LocaleProvider locale={locale}>
+        <ShowroomMotion>
           <CatalogueProvider catalogue={catalogue}>
           <ContactProvider contact={contact}>
           <CartProvider>
@@ -98,14 +93,15 @@ export async function StorefrontLayout({
             <main id="main" className="relative z-0 flex w-full flex-col bg-white">
               {children}
             </main>
-            <Footer locale={locale} contact={contact} />
+            <Footer locale={locale} />
             <MobileDock />
-            <SupportButton />
+            {contact.whatsappNumber !== site.whatsappNumber && <SupportButton />}
             <CartDrawer />
             <LanguageGate />
           </CartProvider>
           </ContactProvider>
           </CatalogueProvider>
+        </ShowroomMotion>
         </LocaleProvider>
       </body>
     </html>

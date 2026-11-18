@@ -53,7 +53,7 @@ export const sw: Dictionary = {
   announcements: [
     "Tunafikisha katika maeneo teule ya Dar es Salaam",
     "Lipa ukipokea — lipa agizo lako linapowasili",
-    "Agiza mtandaoni kwa dakika moja",
+    "Agiza kwa hatua chache",
   ],
 
   hero: {

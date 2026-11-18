@@ -8,10 +8,13 @@ import { StableText, WidthReserver } from "@/components/ui/StableText";
 import type { Category } from "@/lib/catalogue/types";
 import { localeVariants } from "@/lib/i18n";
 import { useLocale } from "@/lib/i18n/client";
+import { showroomCopy } from "@/components/home/showroom-copy";
 
 interface ShopControlsProps {
   categories: Category[];
   activeCategory?: string;
+  activeBrand?: string;
+  kitchen: boolean;
   activeSort: string;
 }
 
@@ -25,11 +28,11 @@ interface ShopControlsProps {
  *   languages.
  */
 
-export function ShopControls({ categories, activeCategory, activeSort }: ShopControlsProps) {
+export function ShopControls({ categories, activeCategory, activeBrand, kitchen, activeSort }: ShopControlsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
 
   const sortOptions = [
     { value: "featured", label: t.shop.sortFeatured },
@@ -41,6 +44,11 @@ export function ShopControls({ categories, activeCategory, activeSort }: ShopCon
   const hrefWith = useCallback(
     (key: string, value?: string) => {
       const next = new URLSearchParams(params.toString());
+      if (key === "category" || key === "need") {
+        next.delete("category");
+        next.delete("need");
+        next.delete("brand");
+      }
       if (value) next.set(key, value);
       else next.delete(key);
       const qs = next.toString();
@@ -73,7 +81,7 @@ export function ShopControls({ categories, activeCategory, activeSort }: ShopCon
         <Link
           href={hrefWith("category")}
           data-qa-anchor="shop-filter-all"
-          className={chip(!activeCategory)}
+          className={chip(!activeCategory && !activeBrand && !kitchen)}
         >
           <StableText pick={(d) => d.shop.filterAll}>{t.shop.filterAll}</StableText>
         </Link>
@@ -86,6 +94,9 @@ export function ShopControls({ categories, activeCategory, activeSort }: ShopCon
             {category.name}
           </Link>
         ))}
+        <Link href={hrefWith("need", "kitchen")} className={chip(kitchen)}>
+          {showroomCopy(locale).categories[1][0]}
+        </Link>
       </div>
 
       {/* A `<select>` cannot hold the hidden alternates itself, so they share

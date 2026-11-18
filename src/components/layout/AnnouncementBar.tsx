@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useLocale } from "@/lib/i18n/client";
+import { useShowroomMotion } from "./ShowroomMotion";
 
 /**
  * Thin bar above the header. On phones there is only room for one message at a
@@ -16,20 +17,21 @@ import { useLocale } from "@/lib/i18n/client";
  */
 export function AnnouncementBar({ override }: { override?: string | null }) {
   const { t } = useLocale();
+  const { reduced } = useShowroomMotion();
   const announcements = override ? [override] : t.announcements;
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
-    if (announcements.length < 2) return;
+    if (announcements.length < 2 || reduced) return;
     const id = window.setInterval(() => {
       setIndex((i) => (i + 1) % announcements.length);
     }, 4000);
     return () => window.clearInterval(id);
-  }, [announcements.length]);
+  }, [announcements.length, reduced]);
 
   return (
-    <div className="relative z-10 bg-gradient-to-r from-brand-700 via-brand-600 to-emerald-500 text-white">
-      <div className="shell flex h-9 items-center justify-center overflow-hidden">
+    <div className="showroom-utility relative z-10">
+      <div className="showroom-wrap flex h-[38px] items-center justify-center overflow-hidden">
         {/* Modulo, not the raw index: an Owner saving an override takes the
             list from three messages to one while the timer may be on 2. */}
         <p key={index} className="fade-in text-center text-[11px] font-bold tracking-wide sm:hidden">
@@ -38,7 +40,7 @@ export function AnnouncementBar({ override }: { override?: string | null }) {
         <div className="hidden items-center gap-3 text-[11px] font-bold tracking-wide sm:flex md:gap-5 md:text-xs">
           {announcements.map((message, i) => (
             <span key={message} className="flex items-center gap-3 md:gap-5">
-              {i > 0 && <span aria-hidden className="h-1 w-1 rounded-full bg-white/50" />}
+              {i > 0 && <span aria-hidden className="h-3 w-px bg-white/25" />}
               <span>{message}</span>
             </span>
           ))}
