@@ -1,4 +1,7 @@
 import type { NextConfig } from "next";
+import { validateProductionEnvironment } from "./src/lib/environment";
+
+validateProductionEnvironment();
 
 /**
  * The Content-Security-Policy, written from a MEASUREMENT rather than a guess.

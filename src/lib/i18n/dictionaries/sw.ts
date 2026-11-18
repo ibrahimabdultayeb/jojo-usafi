@@ -260,6 +260,8 @@ export const sw: Dictionary = {
     total: "Jumla",
     placeOrderWithTotal: "Weka agizo — {total}",
     placing: "Tunaweka agizo lako…",
+    checkingPrices: "Tunakagua bei na bidhaa zilizopo…",
+    pricesUnavailable: "Hatukuweza kukagua kikapu chako kwa sasa.",
     priceUpdated: "Bei zilizo hapa chini ni za leo, zimechukuliwa dukani sasa hivi.",
     basketProblem: "Hatukuweza kukamilisha agizo hilo",
     fixBasket: "Badilisha kikapu changu",

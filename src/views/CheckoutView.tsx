@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Icon } from "@/components/ui/Icon";
 import { useCart } from "@/lib/cart";
@@ -12,8 +12,7 @@ import { useLocale } from "@/lib/i18n/client";
 import { site } from "@/lib/site";
 import { placeOrderAction, quoteAction } from "@/lib/commerce/actions";
 import { emptyCheckoutState } from "@/lib/commerce/state";
-import type { Quote } from "@/lib/commerce/checkout";
-import type { CheckoutZone } from "@/lib/commerce/checkout";
+import type { CartLine, CheckoutZone, Quote } from "@/lib/commerce/checkout";
 import { OrderReceived } from "@/components/checkout/OrderReceived";
 
 /**
@@ -38,38 +37,43 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
   const { t, path, locale } = useLocale();
 
   const [zoneSlug, setZoneSlug] = useState("");
-  const [quote, setQuote] = useState<Quote | null>(null);
-  const [quoting, setQuoting] = useState(false);
+  const [details, setDetails] = useState({ fullName: "", phone: "", email: "", address: "", instructions: "" });
+  const [paymentPreference, setPaymentPreference] = useState("cash_on_delivery");
+  const [quoteAttempt, setQuoteAttempt] = useState(0);
+  const [state, formAction, placingOrder] = useActionState(placeOrderAction, emptyCheckoutState);
 
-  const [state, formAction] = useActionState(placeOrderAction, emptyCheckoutState);
+  const cartField = JSON.stringify(items.map((item) => ({ sku: item.product.sku, quantity: item.quantity })));
+  const quoteRequest = useMemo(
+    () => ({ lines: JSON.parse(cartField) as CartLine[], zoneSlug: zoneSlug || null, attempt: quoteAttempt }),
+    [cartField, zoneSlug, quoteAttempt],
+  );
+  const [quoted, setQuoted] = useState<{ request: typeof quoteRequest; result: Quote | null } | null>(null);
+  const currentQuote = quoted?.request === quoteRequest ? quoted : null;
+  const quote = currentQuote?.result ?? null;
+  const needsQuote = hydrated && items.length > 0;
+  const quoting = needsQuote && !currentQuote;
 
-  const lines = items.map((item) => ({ sku: item.product.sku, quantity: item.quantity }));
-  const cartField = JSON.stringify(lines);
+  function changeDetail(field: keyof typeof details, value: string) {
+    setDetails((previous) => ({ ...previous, [field]: value }));
+  }
 
   // Re-price whenever the basket or the area changes. The server is asked; the
   // browser never computes a total it then asks somebody to agree to.
   useEffect(() => {
-    if (!hydrated || lines.length === 0) {
-      setQuote(null);
-      return;
-    }
+    if (!needsQuote) return;
+
     let cancelled = false;
-    setQuoting(true);
-    quoteAction(lines, zoneSlug || null)
+    quoteAction(quoteRequest.lines, quoteRequest.zoneSlug)
       .then((result) => {
-        if (!cancelled) setQuote(result);
+        if (!cancelled) setQuoted({ request: quoteRequest, result });
       })
       .catch(() => {
-        if (!cancelled) setQuote(null);
-      })
-      .finally(() => {
-        if (!cancelled) setQuoting(false);
+        if (!cancelled) setQuoted({ request: quoteRequest, result: null });
       });
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartField, zoneSlug, hydrated]);
+  }, [needsQuote, quoteRequest]);
 
   // The basket has done its job once the order exists in the database.
   useEffect(() => {
@@ -85,8 +89,7 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
     "h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-semibold placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:outline-none";
   const label = "mb-1.5 block text-sm font-bold text-slate-900";
 
-  const selectedZone = zones.find((zone) => zone.slug === zoneSlug);
-  const canOrder = hydrated && count > 0 && zones.length > 0 && Boolean(quote?.ok);
+  const canOrder = hydrated && count > 0 && Boolean(zoneSlug && quote?.ok && quote.zone?.slug === zoneSlug);
 
   return (
     <div className="shell py-8 md:py-12">
@@ -112,7 +115,13 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
       </p>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-        <form action={formAction} className="space-y-6">
+        <form
+          action={formAction}
+          onSubmit={(event) => {
+            if (!canOrder || placingOrder) event.preventDefault();
+          }}
+          className="space-y-6"
+        >
           <input type="hidden" name="cart" value={cartField} />
           <input type="hidden" name="locale" value={locale} />
 
@@ -155,6 +164,8 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                   name="fullName"
                   required
                   autoComplete="name"
+                  value={details.fullName}
+                  onChange={(event) => changeDetail("fullName", event.target.value)}
                   className={field}
                   placeholder={t.checkout.fullNamePlaceholder}
                 />
@@ -171,6 +182,8 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                   required
                   inputMode="tel"
                   autoComplete="tel"
+                  value={details.phone}
+                  onChange={(event) => changeDetail("phone", event.target.value)}
                   className={field}
                   placeholder={t.checkout.phonePlaceholder}
                 />
@@ -191,6 +204,8 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                   name="email"
                   type="email"
                   autoComplete="email"
+                  value={details.email}
+                  onChange={(event) => changeDetail("email", event.target.value)}
                   className={field}
                   placeholder={t.checkout.emailPlaceholder}
                 />
@@ -244,6 +259,8 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                     name="address"
                     required
                     rows={3}
+                    value={details.address}
+                    onChange={(event) => changeDetail("address", event.target.value)}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-base font-semibold placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:outline-none"
                     placeholder={t.checkout.directionsPlaceholder}
                   />
@@ -259,6 +276,8 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                   <input
                     id="instructions"
                     name="instructions"
+                    value={details.instructions}
+                    onChange={(event) => changeDetail("instructions", event.target.value)}
                     className={field}
                     placeholder={t.checkout.notesPlaceholder}
                   />
@@ -276,12 +295,15 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
             <div className="mt-4 space-y-3">
               <PaymentChoice
                 value="cash_on_delivery"
-                defaultChecked
+                checked={paymentPreference === "cash_on_delivery"}
+                onSelect={setPaymentPreference}
                 title={t.checkout.paymentCash}
                 note={t.checkout.paymentCashNote}
               />
               <PaymentChoice
                 value="digital_on_delivery"
+                checked={paymentPreference === "digital_on_delivery"}
+                onSelect={setPaymentPreference}
                 title={t.checkout.paymentDigital}
                 note={t.checkout.paymentDigitalNote}
               />
@@ -290,7 +312,7 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
 
           <PlaceOrderButton
             disabled={!canOrder}
-            total={quote ? formatPrice(quote.total_tzs) : ""}
+            total={canOrder && quote ? formatPrice(quote.total_tzs) : ""}
             label={t.checkout.placeOrderWithTotal}
             placing={t.checkout.placing}
             fallback={t.checkout.placeOrder}
@@ -350,11 +372,11 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                 <Row
                   label={t.checkout.deliveryRow}
                   value={
-                    !selectedZone
+                    !zoneSlug
                       ? t.checkout.deliveryValue
-                      : selectedZone.freeDelivery
-                        ? t.checkout.free
-                        : formatPrice(quote?.delivery_fee_tzs ?? selectedZone.feeTzs)
+                      : quote?.zone
+                        ? quote.zone.free_delivery ? t.checkout.free : formatPrice(quote.delivery_fee_tzs)
+                        : "—"
                   }
                 />
                 {quote && quote.discount_tzs > 0 && (
@@ -363,14 +385,40 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                 <div className="flex justify-between gap-3 border-t border-slate-100 pt-2.5 text-base">
                   <dt className="font-bold text-slate-900">{t.checkout.total}</dt>
                   <dd className="font-black whitespace-nowrap text-slate-900">
-                    {quote ? formatPrice(quote.total_tzs) : "—"}
+                    {canOrder && quote ? formatPrice(quote.total_tzs) : "—"}
                   </dd>
                 </div>
               </dl>
 
-              <p className="mt-3 text-xs font-semibold text-slate-400" aria-live="polite">
-                {quoting ? t.checkout.placing : t.checkout.priceUpdated}
-              </p>
+              <div className="mt-3 text-xs font-semibold text-slate-600" aria-live="polite">
+                {quoting && <p>{t.checkout.checkingPrices}</p>}
+                {currentQuote && !quote && (
+                  <div className="rounded-xl bg-amber-50 p-3 text-amber-900">
+                    <p>{t.checkout.pricesUnavailable}</p>
+                    <button
+                      type="button"
+                      className="inline-flex min-h-11 items-center font-bold underline"
+                      onClick={() => setQuoteAttempt((attempt) => attempt + 1)}
+                    >
+                      {t.checkout.tryAgain}
+                    </button>
+                  </div>
+                )}
+                {quote && !quote.ok && (
+                  <div className="rounded-xl bg-amber-50 p-3 text-amber-900">
+                    <p>{t.checkout.basketProblem}</p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                      {quote.problems.map((problem, index) => (
+                        <li key={`${problem.kind}-${index}`}>{problem.message}</li>
+                      ))}
+                    </ul>
+                    <Link href={path("/cart")} className="inline-flex min-h-11 items-center font-bold underline">
+                      {t.checkout.fixBasket}
+                    </Link>
+                  </div>
+                )}
+                {quote?.ok && <p>{t.checkout.priceUpdated}</p>}
+              </div>
             </>
           )}
 
@@ -401,12 +449,14 @@ function PaymentChoice({
   value,
   title,
   note,
-  defaultChecked,
+  checked,
+  onSelect,
 }: {
   value: string;
   title: string;
   note: string;
-  defaultChecked?: boolean;
+  checked: boolean;
+  onSelect: (value: string) => void;
 }) {
   return (
     <label className="relative flex min-h-14 cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-4 transition-colors has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
@@ -421,7 +471,8 @@ function PaymentChoice({
         type="radio"
         name="paymentPreference"
         value={value}
-        defaultChecked={defaultChecked}
+        checked={checked}
+        onChange={() => onSelect(value)}
         required
         className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
       />

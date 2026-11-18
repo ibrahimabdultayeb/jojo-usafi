@@ -42,6 +42,10 @@ indexed. That default is deliberate and its cost is asymmetric — see the comme
 in `src/lib/environment.ts`, and note that `APP_ENV=production` is a numbered
 step in the launch checklist rather than an assumption.
 
+An `APP_ENV=production` build requires the production HTTPS site origin and a
+separate HTTPS Supabase origin. The build rejects the known development
+project and rejects production mode on a Vercel Preview deployment.
+
 There is no development banner on the storefront. It would be visible to anybody
 Ibrahim shows the site to, and the three mechanisms above already stop the only
 audience that matters.

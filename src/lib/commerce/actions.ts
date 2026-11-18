@@ -1,6 +1,6 @@
 "use server";
 
-import { checkoutSchema, placeOrder, quoteCart, type CartLine, type Quote } from "./checkout";
+import { checkoutLinesSchema, checkoutSchema, placeOrder, quoteCart, type CartLine, type Quote } from "./checkout";
 import { getPublicSupabase } from "@/lib/supabase/public";
 import type { CheckoutState, TrackState, TrackedOrder } from "./state";
 import { emptyCheckoutState } from "./state";
@@ -17,19 +17,17 @@ import { parseTanzanianPhone } from "@/lib/domain/phone";
 
 
 /** Read the cart the browser posted. Shape only — never its opinion of price. */
-function readLines(formData: FormData): CartLine[] {
+function readLines(formData: FormData) {
   try {
     const raw = JSON.parse(String(formData.get("cart") ?? "[]")) as unknown;
-    if (!Array.isArray(raw)) return [];
-    return raw
-      .map((line) => {
-        const item = line as { sku?: unknown; quantity?: unknown };
-        return { sku: String(item.sku ?? ""), quantity: Number(item.quantity ?? 0) };
-      })
-      .filter((line) => line.sku.length > 0 && Number.isInteger(line.quantity) && line.quantity > 0);
+    if (Array.isArray(raw) && raw.length === 0) return { status: "empty" } as const;
+
+    const parsed = checkoutLinesSchema.safeParse(raw);
+    if (parsed.success) return { status: "valid", lines: parsed.data } as const;
   } catch {
-    return [];
+    return { status: "invalid" } as const;
   }
+  return { status: "invalid" } as const;
 }
 
 /** What the basket costs, for the summary beside the form. */
@@ -41,10 +39,14 @@ export async function placeOrderAction(
   _previous: CheckoutState,
   formData: FormData,
 ): Promise<CheckoutState> {
-  const lines = readLines(formData);
-  if (lines.length === 0) {
+  const cart = readLines(formData);
+  if (cart.status === "empty") {
     return { ...emptyCheckoutState, error: "Your basket is empty." };
   }
+  if (cart.status === "invalid") {
+    return { ...emptyCheckoutState, error: "Review the items and quantities in your basket before trying again." };
+  }
+  const { lines } = cart;
 
   const parsed = checkoutSchema.safeParse({
     fullName: formData.get("fullName"),
@@ -72,7 +74,10 @@ export async function placeOrderAction(
   // Quoted first so the summary shown on the confirmation screen is the same
   // set of figures the database is about to write, and so a basket problem is
   // reported as a list rather than as one raised exception.
-  const quote = await quoteCart(lines, parsed.data.zoneSlug);
+  const quote = await quoteCart(lines, parsed.data.zoneSlug).catch(() => null);
+  if (!quote) {
+    return { ...emptyCheckoutState, error: "We couldn’t check your basket right now. Please try again." };
+  }
   if (!quote.ok) {
     return {
       ...emptyCheckoutState,

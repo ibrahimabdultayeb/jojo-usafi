@@ -31,6 +31,7 @@ export const cartLineSchema = z.object({
 });
 
 export type CartLine = z.infer<typeof cartLineSchema>;
+export const checkoutLinesSchema = z.array(cartLineSchema).min(1).max(100);
 
 export interface QuoteLine {
   product_id: string;
@@ -120,7 +121,7 @@ export async function placeOrder(
   lines: CartLine[],
   input: CheckoutInput,
 ): Promise<PlaceOrderResult> {
-  const items = z.array(cartLineSchema).min(1).max(100).safeParse(lines);
+  const items = checkoutLinesSchema.safeParse(lines);
   if (!items.success) {
     return { ok: false, message: "Your basket is empty." };
   }

@@ -248,6 +248,8 @@ export const en = {
     total: "Total",
     placeOrderWithTotal: "Place order — {total}",
     placing: "Placing your order…",
+    checkingPrices: "Checking prices and stock…",
+    pricesUnavailable: "We couldn’t check your basket right now.",
     priceUpdated: "Prices below are today's, taken from the shop just now.",
     basketProblem: "We could not complete that order",
     fixBasket: "Change my basket",
