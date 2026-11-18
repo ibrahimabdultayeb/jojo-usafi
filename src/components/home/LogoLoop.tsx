@@ -1,37 +1,29 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useMemo, useState } from "react";
 import Link from "@/components/ui/LoadingLink";
+import ReactBitsLogoLoop, { type LogoItem } from "@/components/ui/LogoLoop";
 import { useShowroomMotion } from "@/components/layout/ShowroomMotion";
 
+function renderLogo(item: LogoItem) {
+  if (!("src" in item)) return item.node;
+  return <Image src={item.src} width={128} height={item.height ?? 36} alt={item.alt ?? ""}
+    draggable={false} style={{ height: item.height, width: "auto", maxWidth: 128 }} />;
+}
+
+/** Brand-strip layout around the actual React Bits animation component. */
 export function LogoLoop({ logos, heading, pauseLabel, playLabel }: {
   logos: { slug: string; name: string; height: number; src: string; href: string }[];
   heading: string;
   pauseLabel: string;
   playLabel: string;
 }) {
-  const viewport = useRef<HTMLDivElement>(null);
-  const cycle = useRef<HTMLDivElement>(null);
-  const [geometry, setGeometry] = useState({ width: 0, copies: 2 });
   const [paused, setPaused] = useState(false);
   const { reduced } = useShowroomMotion();
-
-  useEffect(() => {
-    const measure = () => {
-      const width = cycle.current?.getBoundingClientRect().width ?? 0;
-      const viewportWidth = viewport.current?.clientWidth ?? 0;
-      if (width > 0) {
-        const copies = Math.max(2, Math.ceil(viewportWidth / width) + 1);
-        setGeometry((previous) => previous.width === width && previous.copies === copies ? previous : { width, copies });
-      }
-    };
-    const observer = new ResizeObserver(measure);
-    if (viewport.current) observer.observe(viewport.current);
-    if (cycle.current) observer.observe(cycle.current);
-    measure();
-    return () => observer.disconnect();
-  }, []);
+  const items = useMemo<LogoItem[]>(() => logos.map(({ name, height, src, href }) => ({
+    src, alt: name, height, href,
+  })), [logos]);
 
   return (
     <section className="showroom-brands" aria-label={heading}>
@@ -45,23 +37,20 @@ export function LogoLoop({ logos, heading, pauseLabel, playLabel }: {
           <span>{paused ? playLabel : pauseLabel}</span>
         </button>}
       </div>
-      <div ref={viewport} className="showroom-marquee" data-paused={paused || undefined}>
-        <div className="showroom-marquee-track" style={{
-          "--loop-distance": `${geometry.width}px`,
-          animationDuration: `${geometry.width / 55}s`,
-          animationPlayState: paused || !geometry.width ? "paused" : undefined,
-        } as CSSProperties}>
-          {Array.from({ length: geometry.copies }, (_, index) => (
-            <div ref={index === 0 ? cycle : undefined} className="showroom-marquee-cycle" key={index} aria-hidden={index > 0 || undefined}>
-              {logos.map(({ slug, name, height, src, href }) => (
-                <Link key={slug} href={href} tabIndex={index > 0 ? -1 : undefined} aria-label={name}>
-                  <Image src={src} width={128} height={height} alt={index > 0 ? "" : name}
-                    style={{ height, width: "auto", maxWidth: 128 }} />
-                </Link>
-              ))}
-            </div>
-          ))}
-        </div>
+      <div className="showroom-logo-strip">
+        {reduced ? (
+          <div className="showroom-logos-static">
+            <ul>{logos.map(({ slug, name, height, src, href }) => (
+              <li key={slug}><Link href={href} aria-label={name}>
+                {renderLogo({ src, alt: name, height })}
+              </Link></li>
+            ))}</ul>
+          </div>
+        ) : (
+          <ReactBitsLogoLoop logos={items} speed={paused ? 0 : 80} direction="left"
+            logoHeight={36} gap={44} pauseOnHover scaleOnHover fadeOut fadeOutWidth={0.06}
+            intro={false} draggable renderItem={renderLogo} ariaLabel={heading} reducedMotion={false} />
+        )}
       </div>
     </section>
   );

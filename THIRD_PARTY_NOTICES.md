@@ -1,9 +1,11 @@
 
-## React Bits — Lattice Loader
+## React Bits — Lattice Loader and Logo Loop
 
-Source: https://reactbits.dev/micro/lattice-loader
+Sources:
+- https://reactbits.dev/micro/lattice-loader
+- https://reactbits.dev/animations/logo-loop
 
-Adapted for compact action indicators, localization, reduced motion, and optional timers.
+Adapted for compact action indicators, localization, reduced motion, and optional timers. Logo Loop uses storefront navigation and the site motion preference.
 
 MIT + Commons Clause License Condition v1.0
 
