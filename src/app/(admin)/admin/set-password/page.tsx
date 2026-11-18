@@ -29,7 +29,7 @@ export default async function SetPasswordPage() {
   if (!isSupabaseConfigured()) {
     return (
       <AuthPanel title="Not connected yet">
-        <p className="text-sm text-slate-600">
+        <p className="admin-auth-copy">
           This copy of Jojo Usafi has no Supabase settings, so there is no account to set a
           password for.
         </p>

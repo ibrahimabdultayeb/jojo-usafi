@@ -28,7 +28,7 @@ export default async function ForgotPasswordPage({
   if (!isSupabaseConfigured()) {
     return (
       <AuthPanel title="Not connected yet">
-        <p className="text-sm text-slate-600">
+        <p className="admin-auth-copy">
           This copy of Jojo Usafi has no Supabase settings, so there is no account to set a
           password for.
         </p>
@@ -44,7 +44,7 @@ export default async function ForgotPasswordPage({
       <ForgotPasswordForm problem={problem} />
 
       <p className="mt-6 text-center text-sm text-slate-500">
-        <Link href="/admin/sign-in" className="font-bold text-slate-700 underline">
+        <Link href="/admin/sign-in" className="admin-auth-link">
           Back to sign in
         </Link>
       </p>

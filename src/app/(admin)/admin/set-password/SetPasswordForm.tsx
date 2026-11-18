@@ -31,10 +31,7 @@ import { getBrowserSupabase } from "@/lib/supabase/client";
  * and a symbol produces `Password1!` in a shop rather than a better password.
  */
 
-const INPUT =
-  "min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base " +
-  "text-slate-900 outline-none placeholder:text-slate-400 " +
-  "focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600/30";
+const INPUT = "admin-auth-input";
 
 /** Supabase's own default. Stated here so the message can be specific. */
 const MINIMUM = 8;
@@ -157,7 +154,7 @@ export function SetPasswordForm({ alreadySignedIn }: { alreadySignedIn: boolean 
   }
 
   if (stage === "checking") {
-    return <p className="text-sm font-medium text-slate-500">Checking your link…</p>;
+    return <p className="admin-auth-copy">Checking your link…</p>;
   }
 
   if (stage === "no-session") {
@@ -165,13 +162,13 @@ export function SetPasswordForm({ alreadySignedIn }: { alreadySignedIn: boolean 
       <div className="space-y-3">
         <p
           role="alert"
-          className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900"
+          className="admin-auth-note admin-auth-warning"
         >
           This link is not valid any more. It may have been used already, or it may have expired.
         </p>
         <Link
           href="/admin/forgot-password"
-          className="flex min-h-12 items-center justify-center rounded-full bg-slate-900 px-6 text-base font-bold text-white"
+          className="admin-auth-submit"
         >
           Send me a new one
         </Link>
@@ -183,7 +180,7 @@ export function SetPasswordForm({ alreadySignedIn }: { alreadySignedIn: boolean 
     return (
       <p
         role="status"
-        className="rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-900"
+        className="admin-auth-note"
       >
         Saved. Taking you to the dashboard…
       </p>
@@ -191,18 +188,18 @@ export function SetPasswordForm({ alreadySignedIn }: { alreadySignedIn: boolean 
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} className="admin-auth-form">
       {error && (
         <p
           role="alert"
-          className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800"
+          className="admin-auth-note admin-auth-error"
         >
           {error}
         </p>
       )}
 
-      <div className="space-y-1.5">
-        <label htmlFor="password" className="block text-sm font-bold text-slate-900">
+      <div className="admin-auth-field">
+        <label htmlFor="password" className="admin-auth-label">
           New password
         </label>
         <input
@@ -214,14 +211,14 @@ export function SetPasswordForm({ alreadySignedIn }: { alreadySignedIn: boolean 
           onChange={(event) => setPassword(event.target.value)}
           className={INPUT}
         />
-        <p className="text-xs font-medium text-slate-500">
+        <p className="admin-auth-copy">
           At least {MINIMUM} characters. A few words you will remember beats something clever you
           will not.
         </p>
       </div>
 
-      <div className="space-y-1.5">
-        <label htmlFor="again" className="block text-sm font-bold text-slate-900">
+      <div className="admin-auth-field">
+        <label htmlFor="again" className="admin-auth-label">
           Type it again
         </label>
         <input
@@ -238,7 +235,7 @@ export function SetPasswordForm({ alreadySignedIn }: { alreadySignedIn: boolean 
       <button
         type="submit"
         disabled={stage === "saving"} aria-busy={stage === "saving"}
-        className="min-h-12 w-full rounded-full bg-slate-900 px-6 text-base font-bold text-white transition hover:bg-slate-800 disabled:opacity-60"
+        className="admin-auth-submit"
       >
         {stage === "saving" && <Spinner className="mr-2" />}
         {stage === "saving" ? "Saving…" : "Save password"}

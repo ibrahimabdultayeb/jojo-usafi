@@ -179,7 +179,7 @@ if (badTo.includes("/admin/forgot-password")) {
   bad("a bad code was not refused", `location: ${badTo || "none"}`);
 }
 
-if (/Set or reset your password/.test(String((await get("/admin/sign-in")).body))) {
+if (/href="\/admin\/forgot-password"/.test(String((await get("/admin/sign-in")).body))) {
   ok("the sign-in screen offers a way to set a password");
 } else {
   bad("the sign-in screen has no way to set a password");

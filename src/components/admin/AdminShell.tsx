@@ -39,7 +39,7 @@ function isActive(pathname: string, href: string) {
  * destinations they cannot reach, and the bottom navigation would cover a
  * password field on a phone.
  */
-const BARE_ROUTES = ["/admin/sign-in", "/admin/setup"];
+const BARE_ROUTES = ["/admin/sign-in", "/admin/setup", "/admin/forgot-password", "/admin/set-password"];
 
 function isBareRoute(pathname: string) {
   return BARE_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));

@@ -11,10 +11,7 @@ import { requestPasswordLinkAction, type ForgotState } from "./actions";
  * there and should not feel they have changed application.
  */
 
-const INPUT =
-  "min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base " +
-  "text-slate-900 outline-none placeholder:text-slate-400 " +
-  "focus-visible:border-brand-600 focus-visible:ring-2 focus-visible:ring-brand-600/30";
+const INPUT = "admin-auth-input";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -22,7 +19,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending} aria-busy={pending}
-      className="min-h-12 w-full rounded-full bg-slate-900 px-6 text-base font-bold text-white transition hover:bg-slate-800 disabled:opacity-60"
+      className="admin-auth-submit"
     >
       {pending && <Spinner className="mr-2" />}
       {pending ? "Sending…" : "Email me a link"}
@@ -41,12 +38,12 @@ export function ForgotPasswordForm({ problem }: { problem?: string }) {
       <div className="space-y-3">
         <p
           role="status"
-          className="rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-900"
+          className="admin-auth-note"
         >
           If that address has a Jojo Usafi account, a link is on its way. Open it on this phone or
           computer and you will be asked to choose a password.
         </p>
-        <p className="text-sm text-slate-500">
+        <p className="admin-auth-copy">
           The link works once and stops working after an hour. If it does not arrive, check the
           spam folder and then ask for another.
         </p>
@@ -55,7 +52,7 @@ export function ForgotPasswordForm({ problem }: { problem?: string }) {
   }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="admin-auth-form">
       {/*
         Sent here by the callback when a link could not be honoured. It never
         says which of the four reasons applied — expired, already used, forged,
@@ -65,7 +62,7 @@ export function ForgotPasswordForm({ problem }: { problem?: string }) {
       {problem === "link" && (
         <p
           role="alert"
-          className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900"
+          className="admin-auth-note admin-auth-warning"
         >
           That link did not work. It may have been used already, or it may have expired. Ask for a
           new one below.
@@ -75,14 +72,14 @@ export function ForgotPasswordForm({ problem }: { problem?: string }) {
       {state.error && (
         <p
           role="alert"
-          className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800"
+          className="admin-auth-note admin-auth-error"
         >
           {state.error}
         </p>
       )}
 
-      <div className="space-y-1.5">
-        <label htmlFor="email" className="block text-sm font-bold text-slate-900">
+      <div className="admin-auth-field">
+        <label htmlFor="email" className="admin-auth-label">
           Email address
         </label>
         <input
