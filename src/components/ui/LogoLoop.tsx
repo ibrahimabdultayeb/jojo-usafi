@@ -834,7 +834,8 @@ const createEngine = (
   };
 
   const onEnter = (e: PointerEvent) => {
-    st.hovered = true;
+    // Touch contact is a drag/tap, not a persistent hover pause.
+    st.hovered = e.pointerType !== 'touch';
     if (e.pointerType !== 'touch') {
       st.pointerInside = true;
       st.pointer = local(e);

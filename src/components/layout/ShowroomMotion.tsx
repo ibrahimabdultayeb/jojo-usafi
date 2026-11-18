@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
 const storageKey = "jojo-usafi.reduce-motion";
-const MotionContext = createContext({ reduced: false, systemReduced: false, toggle: () => {} });
+const MotionContext = createContext({ reduced: false, systemReduced: false, explicitlyReduced: false, toggle: () => {} });
 
 export function ShowroomMotion({ children }: { children: ReactNode }) {
   const [systemReduced, setSystemReduced] = useState(false);
@@ -44,7 +44,7 @@ export function ShowroomMotion({ children }: { children: ReactNode }) {
     }
   }
 
-  return <MotionContext.Provider value={{ reduced, systemReduced, toggle }}>{children}</MotionContext.Provider>;
+  return <MotionContext.Provider value={{ reduced, systemReduced, explicitlyReduced: preference === true, toggle }}>{children}</MotionContext.Provider>;
 }
 
 export function useShowroomMotion() {

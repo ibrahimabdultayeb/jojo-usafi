@@ -17,7 +17,9 @@ export function LogoLoop({ logos, heading }: {
   logos: { slug: string; name: string; height: number; src: string; href: string }[];
   heading: string;
 }) {
-  const { reduced } = useShowroomMotion();
+  // This strip is explicitly intended to autoplay. Only the visitor's in-site
+  // choice stops it; an inherited OS preference must not silently replace it.
+  const { explicitlyReduced } = useShowroomMotion();
   const items = useMemo<LogoItem[]>(() => logos.map(({ name, height, src, href }) => ({
     src, alt: name, height, href,
   })), [logos]);
@@ -28,7 +30,7 @@ export function LogoLoop({ logos, heading }: {
         <p className="showroom-label">{heading}</p>
       </div>
       <div className="showroom-logo-strip">
-        {reduced ? (
+        {explicitlyReduced ? (
           <div className="showroom-logos-static">
             <ul>{logos.map(({ slug, name, height, src, href }) => (
               <li key={slug}><Link href={href} aria-label={name}>
