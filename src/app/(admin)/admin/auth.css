@@ -38,7 +38,7 @@
 .admin-auth-logo > span { color: #f4f7fc; font-size: 25px; font-weight: 800; letter-spacing: -.9px; }
 .admin-auth-logo > span > span { color: var(--auth-blue); }
 .admin-auth-brand-caption { margin-top: 12px; color: #b1bfd2; font-size: 13px; font-weight: 500; }
-.admin-auth-watermark { position: absolute; z-index: -1; top: -105px; right: -130px; width: 490px; color: #dbe9fc; opacity: .075; pointer-events: none; }
+.admin-auth-watermark { position: absolute; z-index: -1; top: 86px; right: -78px; width: 470px; height: auto; transform: rotate(-9deg); color: #dbe9fc; opacity: .09; pointer-events: none; }
 .admin-auth-globe { width: 76px; height: 76px; color: #56a9f8; margin-bottom: 24px; }
 .admin-auth-pitch h2 { font-size: clamp(30px, 3vw, 40px); line-height: 1.12; letter-spacing: -1.8px; font-weight: 750; }
 .admin-auth-pitch h2 span { color: var(--auth-blue); }
@@ -96,7 +96,7 @@
   .admin-auth-logo img { width: 42px; height: 42px; }
   .admin-auth-logo > span { font-size: 23px; }
   .admin-auth-brand-caption { margin-top: 9px; font-size: 12px; }
-  .admin-auth-watermark { width: 260px; top: -90px; right: -40px; }
+  .admin-auth-watermark { width: 220px; top: -14px; right: -35px; }
   .admin-auth-pitch, .admin-auth-trust { display: none; }
   .admin-auth-content { padding: 28px 26px 32px; }
   .admin-auth-lock { width: 42px; height: 42px; margin-bottom: 18px; border-radius: 11px; }

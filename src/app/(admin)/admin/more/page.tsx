@@ -23,6 +23,9 @@ const ITEMS: {
   capability: Capability;
   soon?: boolean;
 }[] = [
+  {href:"/admin/inventory",label:"Inventory",hint:"On hand, reserved and available stock",icon:"store",capability:"products.view"},
+  {href:"/admin/more/media",label:"Media library",hint:"Product photographs and missing images",icon:"image",capability:"products.view"},
+  {href:"/admin/more/activity",label:"Activity log",hint:"Recorded order and stock events",icon:"clock",capability:"orders.view"},
   {
     href: "/admin/more/delivery-zones",
     label: "Delivery zones",

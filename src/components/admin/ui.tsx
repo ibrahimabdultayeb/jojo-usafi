@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Spinner } from "@/components/ui/Spinner";
 import { Icon, type IconName } from "@/components/ui/Icon";
 
@@ -16,7 +17,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)] ${className}`}>
+    <div className={`admin-card rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)] ${className}`}>
       {children}
     </div>
   );
@@ -45,7 +46,7 @@ export function StatTile({ label, value, sub }: { label: string; value: string; 
 
 const BADGE_TONES = {
   neutral: "bg-slate-100 text-slate-700 ring-slate-200",
-  good: "bg-brand-50 text-brand-800 ring-brand-200",
+  good: "bg-lime-50 text-lime-800 ring-lime-200",
   warn: "bg-amber-50 text-amber-800 ring-amber-200",
   bad: "bg-rose-50 text-rose-800 ring-rose-200",
   info: "bg-sky-50 text-sky-800 ring-sky-200",
@@ -63,7 +64,7 @@ export function Badge({
   const style = tone in BADGE_TONES ? BADGE_TONES[tone as keyof typeof BADGE_TONES] : tone;
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold whitespace-nowrap ring-1 ring-inset ${style} ${className}`}
+      className={`admin-badge inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold whitespace-nowrap ring-1 ring-inset ${style} ${className}`}
     >
       {children}
     </span>
@@ -112,7 +113,7 @@ export function Button({
       disabled={disabled || busy}
       aria-busy={busy}
       title={title}
-      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 font-display text-sm font-bold transition-colors disabled:pointer-events-none disabled:opacity-40 ${
+      className={`admin-button admin-button-${variant} inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 font-display text-sm font-bold transition-colors disabled:pointer-events-none disabled:opacity-40 ${
         BUTTONS[variant]
       } ${full ? "w-full" : ""} ${className}`}
     >
@@ -142,7 +143,7 @@ export function PrimaryAction({
       onClick={onClick}
       disabled={disabled || busy}
       aria-busy={busy}
-      className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-brand-600 px-5 font-display text-base font-bold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-40"
+      className="admin-primary-action flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-brand-600 px-5 font-display text-base font-bold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-40"
     >
       {children}
       {busy ? <Spinner /> : <Icon name={icon} className="h-5 w-5" />}
@@ -235,41 +236,63 @@ export function Sheet({
   onClose,
   title,
   children,
+  busy = false,
+  error,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  busy?: boolean;
+  error?: string | null;
 }) {
+  const dialog = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  const working = useRef(busy);
+  useEffect(() => { close.current = onClose; working.current = busy; }, [onClose, busy]);
   useEffect(() => {
     if (!open) return;
     const previous = document.body.style.overflow;
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     document.body.style.overflow = "hidden";
+    const focusable = () => Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]') ?? []).filter(el => el.getClientRects().length > 0);
+    (focusable()[0] ?? dialog.current)?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") { e.preventDefault(); if (!working.current) close.current(); }
+      if (e.key === "Tab") {
+        const nodes = focusable(), first = nodes[0], last = nodes.at(-1);
+        if (!first) { e.preventDefault(); dialog.current?.focus(); }
+        else if (e.shiftKey && (document.activeElement === first || document.activeElement === dialog.current)) { e.preventDefault(); last?.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = previous;
       window.removeEventListener("keydown", onKey);
+      if (trigger?.isConnected) trigger.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
-    <div className="fixed inset-0 z-60 flex items-end justify-center sm:items-center">
+  return createPortal(
+    <div className="admin-workspace admin-dialog-overlay fixed inset-0 z-60 flex items-end justify-center sm:items-center">
       <button
         type="button"
         aria-label="Close"
         onClick={onClose}
+        disabled={busy}
+        tabIndex={-1}
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
       />
       <div
+        ref={dialog}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative max-h-[88svh] w-full overflow-y-auto rounded-t-3xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:max-w-md sm:rounded-3xl sm:pb-5"
+        className="admin-dialog relative max-h-[90svh] w-full overflow-y-auto rounded-t-3xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:max-w-[520px] sm:rounded-3xl sm:pb-5"
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <h2 className="font-display text-lg font-bold text-slate-900">{title}</h2>
@@ -277,14 +300,16 @@ export function Sheet({
             type="button"
             onClick={onClose}
             aria-label="Close"
+            disabled={busy}
             className="-mt-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
           >
             <Icon name="close" className="h-5 w-5" />
           </button>
         </div>
-        {children}
+        <fieldset disabled={busy} className="min-w-0">{children}</fieldset>
+        {error && <p role="alert" className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
       </div>
-    </div>
+    </div>, document.body
   );
 }
 

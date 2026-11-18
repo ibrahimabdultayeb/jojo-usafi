@@ -49,7 +49,7 @@ export const STAGE_TONE: Record<OrderStage, string> = {
   confirmed: "bg-sky-50 text-sky-800 ring-sky-200",
   preparing: "bg-violet-50 text-violet-800 ring-violet-200",
   out_for_delivery: "bg-indigo-50 text-indigo-800 ring-indigo-200",
-  completed: "bg-slate-100 text-slate-700 ring-slate-200",
+  completed: "bg-lime-50 text-lime-800 ring-lime-200",
   cancelled: "bg-rose-50 text-rose-800 ring-rose-200",
   delivery_failed: "bg-rose-50 text-rose-800 ring-rose-200",
 };
@@ -120,7 +120,10 @@ export interface AdminOrder {
   stockReservationReleased: boolean;
   placed: string;
   customer: { id: string; name: string; phone: string };
-  delivery: { zone: string; address: string; fee: number; freeDelivery: boolean };
+  delivery: { zone: string; address: string; fee: number; freeDelivery: boolean; landmark?: string; instructions?: string };
+  totals?: { subtotal: number; discount: number; total: number };
+  exceptionReason?: string;
+  staffNote?: string;
   lines: OrderLine[];
   payment: {
     preference: "Cash on delivery" | "Pay digitally on delivery";
@@ -134,9 +137,10 @@ export const orderTotals = (order: AdminOrder) => {
   const subtotal = order.lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
   const delivery = order.delivery.freeDelivery ? 0 : order.delivery.fee;
   return {
-    subtotal,
+    subtotal: order.totals?.subtotal ?? subtotal,
+    discount: order.totals?.discount ?? 0,
     delivery,
-    total: subtotal + delivery,
+    total: order.totals?.total ?? subtotal + delivery,
     items: order.lines.reduce((n, l) => n + l.quantity, 0),
   };
 };

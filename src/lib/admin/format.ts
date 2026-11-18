@@ -23,22 +23,21 @@ export function shortPhone(phone: string): string {
  * is the same on the server and in the browser — a date that changes on
  * hydration is a layout shift the QA gate would catch.
  */
+/** Tanzania uses UTC+3 year-round. Keep day boundaries identical on every host. */
+export function shopDayStart(now = new Date()): string {
+  const day = new Date(now.getTime() + 3 * 3_600_000).toISOString().slice(0, 10);
+  return new Date(`${day}T00:00:00+03:00`).toISOString();
+}
 export function whenWords(iso: string | null | undefined): string {
   if (!iso) return "Never";
   const then = new Date(iso);
   if (Number.isNaN(then.getTime())) return "Unknown";
-
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const days = Math.floor((startOfToday.getTime() - then.getTime()) / 86_400_000);
-
-  if (days < 0) return "Today";
-  if (days === 0) return "Yesterday";
-  if (days < 7) return `${days + 1} days ago`;
-  return then.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const days = Math.round((Date.parse(shopDayStart()) - Date.parse(shopDayStart(then))) / 86_400_000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  return then.toLocaleDateString("en-GB", { timeZone: "Africa/Dar_es_Salaam", day: "numeric", month: "short", year: "numeric" });
 }
-
-/** A full timestamp, in one fixed format everywhere in the dashboard. */
 export function whenExactly(iso: string): string {
-  return new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+  return new Date(iso).toLocaleString("en-GB", { timeZone: "Africa/Dar_es_Salaam", dateStyle: "medium", timeStyle: "short" });
 }

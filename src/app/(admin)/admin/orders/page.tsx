@@ -14,8 +14,8 @@ export default async function AdminOrdersPage({
   const orders = await getAdminOrders();
 
   return (
-    <AdminPage title="Orders" subtitle="Newest first. Tap an order to work on it.">
-      <OrdersBrowser orders={orders} initialStage={stage} />
+    <AdminPage title="Orders" subtitle={`${orders.length} orders · Review, prepare and track each delivery.`}>
+      <OrdersBrowser key={stage ?? "all"} orders={orders} initialStage={stage} />
     </AdminPage>
   );
 }

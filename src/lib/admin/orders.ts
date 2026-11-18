@@ -1,4 +1,6 @@
 import "server-only";
+import { shopDayStart } from "./format";
+import { STAGE_LABEL } from "./model";
 
 import { getServerSupabase } from "@/lib/supabase/server";
 import type { AdminOrder, OrderStage, TimelineEntry } from "@/lib/admin/model";
@@ -57,6 +59,11 @@ type OrderRow = {
   payment_method: string | null;
   payment_reference: string | null;
   customer_note: string | null;
+  staff_note: string | null;
+  delivery_landmark: string | null;
+  delivery_instructions: string | null;
+  cancellation_reason: string | null;
+  delivery_failure_reason: string | null;
   order_items: {
     sku: string;
     product_name: string;
@@ -83,6 +90,8 @@ function toAdminOrder(row: OrderRow): AdminOrder {
     delivery: {
       zone: row.delivery_zone_name,
       address: row.delivery_address,
+      landmark: row.delivery_landmark ?? undefined,
+      instructions: row.delivery_instructions ?? undefined,
       fee: row.delivery_fee_tzs,
       freeDelivery: row.delivery_fee_tzs === 0,
     },
@@ -108,20 +117,35 @@ function toAdminOrder(row: OrderRow): AdminOrder {
             }
           : null,
     },
+    totals: { subtotal: row.subtotal_tzs, discount: row.discount_tzs, total: row.total_tzs },
+    exceptionReason: row.cancellation_reason ?? row.delivery_failure_reason ?? undefined,
+    staffNote: row.staff_note ?? undefined,
     note: row.customer_note ?? undefined,
   };
 }
 
-export async function getAdminOrders(limit = 200): Promise<AdminOrder[]> {
+export async function getAdminOrders(limit = Infinity): Promise<AdminOrder[]> {
   const supabase = await getServerSupabase();
-  const { data, error } = await supabase
-    .from("orders")
-    .select(ORDER_SELECT)
-    .order("placed_at", { ascending: false })
-    .limit(limit);
+  const result: AdminOrder[] = [];
+  // PostgREST caps a response. Page deliberately so older orders do not vanish.
+  for (let offset = 0; offset < limit; offset += 500) {
+    const size = Math.min(500, limit - offset);
+    const { data, error } = await supabase.from("orders").select(ORDER_SELECT)
+      .order("placed_at", { ascending: false }).order("id")
+      .range(offset, offset + size - 1);
+    if (error) throw new Error(`Could not read the orders: ${error.message}`);
+    const rows = data as unknown as OrderRow[];
+    result.push(...rows.map(toAdminOrder));
+    if (rows.length < size) break;
+  }
+  return result;
+}
 
-  if (error) throw new Error(`Could not read the orders: ${error.message}`);
-  return (data as unknown as OrderRow[]).map(toAdminOrder);
+export async function getNewOrderCount(): Promise<number> {
+  const supabase = await getServerSupabase();
+  const { count, error } = await supabase.from("orders").select("id", { count: "exact", head: true }).eq("state", "new");
+  if (error) throw new Error(`Could not count new orders: ${error.message}`);
+  return count ?? 0;
 }
 
 export async function getAdminOrder(id: string): Promise<AdminOrder | null> {
@@ -233,54 +257,51 @@ export async function getOrderTimeline(orderId: string): Promise<TimelineEntry[]
 export interface AdminSnapshot {
   todayOrders: number;
   todaySalesTzs: number;
-  needsAttention: { label: string; count: number; href: string; tone: "urgent" | "warn" | "calm"; hint: string }[];
+  cashTzs: number;
+  digitalTzs: number;
+  counts: Record<OrderStage, number>;
   recent: AdminOrder[];
 }
 
-/**
- * What needs attention right now — counted from the real orders and the real
- * shelf, and showing an honest zero when the answer is zero.
- */
 export async function getAdminSnapshot(): Promise<AdminSnapshot> {
   const supabase = await getServerSupabase();
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const [orders, todays, lowStock, outOfStock] = await Promise.all([
-    getAdminOrders(20),
-    supabase
-      .from("orders")
-      .select("total_tzs, state")
-      .gte("placed_at", startOfDay.toISOString()),
-    supabase
-      .from("product_shelf")
-      .select("sku", { count: "exact", head: true })
-      .eq("low_stock", true),
-    supabase
-      .from("product_shelf")
-      .select("sku", { count: "exact", head: true })
-      .eq("in_stock", false),
+  const start = shopDayStart();
+  const end = new Date(Date.parse(start) + 86_400_000).toISOString();
+  const stages = Object.keys(STAGE_LABEL) as OrderStage[];
+  const [recent, counts, today] = await Promise.all([
+    getAdminOrders(5),
+    Promise.all(stages.map(async stage => {
+      const result = await supabase.from("orders").select("id", { count: "exact", head: true }).eq("state", stage);
+      if (result.error) throw new Error(`Could not count orders: ${result.error.message}`);
+      return [stage, result.count ?? 0] as const;
+    })),
+    supabase.from("orders").select("id", { count: "exact", head: true }).gte("placed_at", start).lt("placed_at", end),
   ]);
+  if (today.error) throw new Error(`Could not read today's orders: ${today.error.message}`);
+  let cashTzs = 0, digitalTzs = 0;
+  // Collection follows paid_at, including orders placed on an earlier day.
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await supabase.from("orders").select("id, total_tzs, payment_method")
+      .eq("state", "completed").eq("payment_status", "paid").gte("paid_at", start).lt("paid_at", end)
+      .order("id").range(offset, offset + 499);
+    if (error) throw new Error(`Could not read collected payments: ${error.message}`);
+    for (const row of data ?? []) {
+      if (row.payment_method === "cash") cashTzs += row.total_tzs;
+      if (row.payment_method === "digital") digitalTzs += row.total_tzs;
+    }
+    if ((data?.length ?? 0) < 500) break;
+  }
+  return { recent, counts: Object.fromEntries(counts) as Record<OrderStage, number>, todayOrders: today.count ?? 0, todaySalesTzs: cashTzs + digitalTzs, cashTzs, digitalTzs };
+}
 
-  const countIn = (states: string[]) => orders.filter((order) => states.includes(order.stage)).length;
-  const todayRows = todays.data ?? [];
-
-  return {
-    todayOrders: todayRows.length,
-    todaySalesTzs: todayRows
-      .filter((row) => row.state === "completed")
-      .reduce((sum, row) => sum + row.total_tzs, 0),
-    needsAttention: [
-      { label: "New orders", count: countIn(["new"]), href: "/admin/orders?stage=new", tone: "urgent", hint: "Waiting to be confirmed" },
-      { label: "Awaiting confirmation", count: countIn(["awaiting_confirmation"]), href: "/admin/orders?stage=awaiting_confirmation", tone: "urgent", hint: "Customer contacted, not confirmed" },
-      { label: "Preparing", count: countIn(["preparing"]), href: "/admin/orders?stage=preparing", tone: "calm", hint: "Being packed now" },
-      { label: "Out for delivery", count: countIn(["out_for_delivery"]), href: "/admin/orders?stage=out_for_delivery", tone: "calm", hint: "On the way to the customer" },
-      { label: "Delivery failed", count: countIn(["delivery_failed"]), href: "/admin/orders?stage=delivery_failed", tone: "warn", hint: "Needs a decision" },
-      { label: "Out of stock", count: outOfStock.count ?? 0, href: "/admin/products?filter=out-of-stock", tone: "warn", hint: "Cannot be ordered" },
-      { label: "Low stock", count: lowStock.count ?? 0, href: "/admin/products?filter=low-stock", tone: "warn", hint: "Running out soon" },
-    ],
-    recent: orders.slice(0, 5),
-  };
+export interface StockActivityEntry { id: string; at: string; sku: string; name: string; delta: number; reservedDelta: number; reason: string; by: string }
+export async function getRecentStockActivity(limit = 4): Promise<StockActivityEntry[]> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase.from("inventory_movements")
+    .select("id, occurred_at, on_hand_delta, reserved_delta, kind, reason, actor_label, products!inventory_movements_product_id_fkey(sku, display_name)")
+    .order("occurred_at", { ascending: false }).limit(limit);
+  if (error) throw new Error(`Could not read stock activity: ${error.message}`);
+  return (data ?? []).map(row => ({ id: row.id, at: row.occurred_at, sku: row.products?.sku ?? "", name: row.products?.display_name ?? "Product", delta: row.on_hand_delta, reservedDelta: row.reserved_delta, reason: row.reason ?? row.kind.replaceAll("_", " "), by: row.actor_label ?? "Jojo Usafi" }));
 }
 
 /* --------------------------------------------------------------- activity */

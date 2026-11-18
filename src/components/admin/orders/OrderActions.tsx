@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Button, Field, PrimaryAction, Sheet, inputClass } from "@/components/admin/ui";
 import { Icon } from "@/components/ui/Icon";
+import { formatTsh } from "@/lib/admin/format";
 import { can, type Role } from "@/lib/admin/permissions";
 import {
   advanceOrderAction,
@@ -18,7 +20,7 @@ import {
   CANCELLATION_REASONS,
   DELIVERY_FAILURE_REASONS,
   NEXT_ACTION,
-  STAGE_LABEL,
+  orderTotals,
   type AdminOrder,
   type OrderStage,
 } from "@/lib/admin/model";
@@ -46,13 +48,19 @@ export function OrderActions({
   order,
   role,
   catalogue = [],
+  details,
+  sidebar,
 }: {
   order: AdminOrder;
   role: Role;
   catalogue?: readonly AmendableProduct[];
+  details?: ReactNode;
+  sidebar?: ReactNode;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const inFlight = useRef(false);
+  const [error, setError] = useState<string | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [failedOpen, setFailedOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
@@ -80,13 +88,16 @@ export function OrderActions({
    * The database decides whether the move was legal — this never asks twice.
    */
   function run(operation: () => Promise<ActionResult>, onDone?: () => void) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setError(null);
     startTransition(async () => {
-      const result = await operation();
-      announce(result.message, !result.ok);
-      if (result.ok) {
-        onDone?.();
-        router.refresh();
-      }
+      try {
+        const result = await operation();
+        if (result.ok) { announce(result.message); onDone?.(); router.refresh(); }
+        else { setError(result.message); announce(result.message, true); }
+      } catch { setError("Could not save the change. Check your connection and try again."); }
+      finally { inFlight.current = false; }
     });
   }
 
@@ -95,6 +106,7 @@ export function OrderActions({
     // Completing always asks for the payment first: an order must never reach
     // Completed without a record of what was actually collected.
     if (next.becomes === "completed") {
+      setError(null);
       setPayOpen(true);
       return;
     }
@@ -103,86 +115,56 @@ export function OrderActions({
 
   return (
     <>
-      <div className="space-y-2.5">
-        {next && can(role, "orders.advance") ? (
-          <PrimaryAction busy={pending} onClick={advance} disabled={pending}>
-            {pending ? "Working…" : next.label}
-          </PrimaryAction>
-        ) : writtenOff ? (
-          <p className="rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-900">
-            The items were written off. Cancel this order before arranging a replacement.
-          </p>
-        ) : (
-          <div className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-slate-100 px-5 text-sm font-bold text-slate-500">
-            <Icon name="check" className="h-4 w-4" />
-            {STAGE_LABEL[stage]} — nothing left to do
-          </div>
-        )}
-
-        {mayAmend && (
-          <Button variant="secondary" icon="pencil" full disabled={pending} onClick={() => setAmendOpen(true)}>
-            Change what is in this order
-          </Button>
-        )}
-
-        {/*
-          Once a rider has the box, its contents are a fact about the world.
-          Saying so is better than offering a button that would be refused, and
-          better than silently removing one that was there a minute ago.
-        */}
-        {stage === "out_for_delivery" && can(role, "orders.advance") && (
-          <p className="flex items-start gap-2 rounded-xl bg-slate-100 p-3 text-xs font-medium text-slate-600">
-            <Icon name="truck" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-            This order is already with the rider, so its items can no longer be changed.
-          </p>
-        )}
-
-        {(mayCancel || mayFailDelivery) && can(role, "orders.cancel") && (
-          <details className="group rounded-2xl border border-slate-200 bg-white">
-            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-sm font-bold text-slate-600 hover:text-slate-900">
-              Something went wrong with this order
-              <Icon name="chevronDown" className="h-4 w-4 transition-transform group-open:rotate-180" />
-            </summary>
-            <div className="grid gap-2 border-t border-slate-100 p-3 sm:grid-cols-2">
-              {mayCancel && (
-                <Button variant="secondary" icon="close" onClick={() => setCancelOpen(true)} full>
-                  Cancel order
-                </Button>
-              )}
-              {mayFailDelivery && (
-                <Button variant="danger" icon="truck" onClick={() => setFailedOpen(true)} full>
-                  Delivery failed
-                </Button>
-              )}
-            </div>
-          </details>
-        )}
+      <div className="admin-detail-grid">
+        <div className="admin-stack">
+          {next && can(role, "orders.advance") && <section className="admin-card admin-next-step">
+            <p className="admin-eyebrow">NEXT STEP</p>
+            <div><p>{stage === "new" || stage === "awaiting_confirmation" ? "Contact the customer and confirm the items, address and total before proceeding." : stage === "confirmed" ? "Pick the items and check the quantities before packing the order." : stage === "preparing" ? "Check the packed items and delivery address, then hand the order to the rider." : "Confirm delivery and record the payment actually collected."}</p>
+            <PrimaryAction busy={pending} onClick={advance} disabled={pending}>{pending ? "Working…" : next.label}</PrimaryAction></div>
+            {error && !payOpen && !amendOpen && !cancelOpen && !failedOpen && <p role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}
+          </section>}
+          {writtenOff && <p className="admin-exception">The items were written off. Cancel this order before arranging a replacement.</p>}
+          {details}
+        </div>
+        <div className="admin-stack">
+          {sidebar}
+          {(mayAmend || mayCancel || mayFailDelivery) && <section className="admin-card p-4"><p className="admin-eyebrow">OTHER ACTIONS</p><div className="flex flex-col gap-2">
+            {stage === "new" && can(role,"orders.advance") && <Button variant="quiet" icon="clock" disabled={pending} onClick={()=>run(()=>advanceOrderAction(order.id,"awaiting_confirmation"))}>Await customer confirmation</Button>}
+            {mayAmend && <Button variant="quiet" icon="pencil" disabled={pending} onClick={()=>{setError(null);setAmendOpen(true);}}>Amend items</Button>}
+            {mayCancel && can(role,"orders.cancel") && <Button variant="danger" icon="close" disabled={pending} onClick={()=>{setError(null);setCancelOpen(true);}}>Cancel order</Button>}
+            {mayFailDelivery && can(role,"orders.cancel") && <Button variant="danger" icon="truck" disabled={pending} onClick={()=>{setError(null);setFailedOpen(true);}}>Delivery failed</Button>}
+          </div></section>}
+        </div>
       </div>
 
-      {toast && (
+      {toast && createPortal(
         <div
           role="status"
-          className={`fixed inset-x-4 bottom-24 z-60 mx-auto max-w-sm rounded-2xl px-4 py-3 text-center text-sm font-bold text-white shadow-xl lg:bottom-6 ${
+          className={`fixed inset-x-4 bottom-24 z-70 mx-auto max-w-sm rounded-2xl px-4 py-3 text-center text-sm font-bold text-white shadow-xl lg:bottom-6 ${
             toast.bad ? "bg-rose-700" : "bg-slate-900"
           }`}
         >
           {toast.text}
-        </div>
+        </div>, document.body
       )}
 
-      <CancelSheet
+      {cancelOpen && <CancelSheet
         open={cancelOpen}
+        pending={pending}
+        error={error}
         onClose={() => setCancelOpen(false)}
         onConfirm={(reason) => run(() => cancelOrderAction(order.id, reason), () => setCancelOpen(false))}
-      />
+      />}
 
-      <DeliveryFailedSheet
+      {failedOpen && <DeliveryFailedSheet
         open={failedOpen}
+        pending={pending}
+        error={error}
         onClose={() => setFailedOpen(false)}
         onConfirm={(reason, returned) =>
           run(() => failDeliveryAction(order.id, returned, reason), () => setFailedOpen(false))
         }
-      />
+      />}
 
       {/*
         Mounted only while it is open, so every amendment starts from what the
@@ -194,6 +176,7 @@ export function OrderActions({
           order={order}
           catalogue={catalogue}
           pending={pending}
+          error={error}
           onClose={() => setAmendOpen(false)}
           onConfirm={(lines, reason) =>
             run(() => amendOrderAction(order.id, lines, reason), () => setAmendOpen(false))
@@ -201,8 +184,10 @@ export function OrderActions({
         />
       )}
 
-      <PaymentSheet
+      {payOpen && <PaymentSheet
         open={payOpen}
+        pending={pending}
+        error={error}
         order={order}
         onClose={() => setPayOpen(false)}
         onConfirm={(method, reference) =>
@@ -211,7 +196,7 @@ export function OrderActions({
             () => setPayOpen(false),
           )
         }
-      />
+      />}
     </>
   );
 }
@@ -222,8 +207,12 @@ function CancelSheet({
   open,
   onClose,
   onConfirm,
+  pending,
+  error,
 }: {
   open: boolean;
+  pending: boolean;
+  error: string | null;
   onClose: () => void;
   onConfirm: (reason: string) => void;
 }) {
@@ -232,7 +221,7 @@ function CancelSheet({
   const needsNote = reason === "Other";
 
   return (
-    <Sheet open={open} onClose={onClose} title="Cancel this order">
+    <Sheet open={open} onClose={onClose} busy={pending} error={error} title="Cancel this order">
       <p className="mb-4 text-sm font-medium text-slate-600">
         The customer will not receive this order, and the stock goes back on the shelf. Tell us why,
         so the shop can see the pattern later.
@@ -278,7 +267,8 @@ function CancelSheet({
           variant="danger"
           full
           disabled={!reason || (needsNote && note.trim().length === 0)}
-          onClick={() => onConfirm(reason)}
+          busy={pending}
+          onClick={() => onConfirm(needsNote ? `${reason}: ${note.trim()}` : reason)}
         >
           Cancel order
         </Button>
@@ -291,8 +281,12 @@ function DeliveryFailedSheet({
   open,
   onClose,
   onConfirm,
+  pending,
+  error,
 }: {
   open: boolean;
+  pending: boolean;
+  error: string | null;
   onClose: () => void;
   onConfirm: (reason: string, returned: boolean) => void;
 }) {
@@ -300,7 +294,7 @@ function DeliveryFailedSheet({
   const [returned, setReturned] = useState<boolean | null>(null);
 
   return (
-    <Sheet open={open} onClose={onClose} title="Delivery did not happen">
+    <Sheet open={open} onClose={onClose} busy={pending} error={error} title="Delivery did not happen">
       <div className="mb-4 grid gap-2">
         <p className="text-sm font-bold text-slate-900">What went wrong?</p>
         {DELIVERY_FAILURE_REASONS.map((option) => (
@@ -364,6 +358,7 @@ function DeliveryFailedSheet({
           variant="danger"
           full
           disabled={!reason || returned === null}
+          busy={pending}
           onClick={() => onConfirm(reason, returned === true)}
         >
           Save
@@ -378,8 +373,12 @@ function PaymentSheet({
   order,
   onClose,
   onConfirm,
+  pending,
+  error,
 }: {
   open: boolean;
+  pending: boolean;
+  error: string | null;
   order: AdminOrder;
   onClose: () => void;
   onConfirm: (method: string, reference: string) => void;
@@ -389,7 +388,8 @@ function PaymentSheet({
   const needsReference = method === "Digital";
 
   return (
-    <Sheet open={open} onClose={onClose} title="Record the payment">
+    <Sheet open={open} onClose={onClose} busy={pending} error={error} title="Record payment & complete">
+      <div className="admin-payment-amount"><span>Amount to collect</span><strong>{formatTsh(orderTotals(order).total)}</strong></div>
       <p className="mb-4 text-sm font-medium text-slate-600">
         The customer chose <span className="font-bold text-slate-900">{order.payment.preference}</span>.
         Record what was actually collected — an order cannot be completed without it.
@@ -435,7 +435,8 @@ function PaymentSheet({
           variant="accent"
           full
           disabled={!method || (needsReference && reference.trim().length === 0)}
-          onClick={() => onConfirm(method, reference)}
+          busy={pending}
+          onClick={() => onConfirm(method, reference.trim())}
         >
           Complete order
         </Button>

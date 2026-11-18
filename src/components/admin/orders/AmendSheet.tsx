@@ -42,12 +42,14 @@ export function AmendSheet({
   order,
   catalogue,
   pending,
+  error,
   onClose,
   onConfirm,
 }: {
   order: AdminOrder;
   catalogue: readonly AmendableProduct[];
   pending: boolean;
+  error?: string | null;
   onClose: () => void;
   onConfirm: (lines: { sku: string; quantity: number }[], reason: string) => void;
 }) {
@@ -129,7 +131,7 @@ export function AmendSheet({
   const ready = changes.length > 0 && reason.trim().length > 0 && lines.length > 0;
 
   return (
-    <Sheet open onClose={onClose} title={`Change ${order.number}`}>
+    <Sheet open onClose={onClose} busy={pending} error={error} title={`Change ${order.number}`}>
       <ul className="mb-4 divide-y divide-slate-100 rounded-xl border border-slate-200">
         {lines.map((line) => (
           <li key={line.sku} className="p-3">

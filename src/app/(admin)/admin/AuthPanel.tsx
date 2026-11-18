@@ -24,7 +24,7 @@ export function AuthPanel({ title, subtitle, children }: {
       <div className="admin-auth-wrap">
         <div className="admin-auth-card">
           <aside className="admin-auth-brand" aria-label="Jojo Usafi staff workspace">
-            <Globe className="admin-auth-watermark" />
+            <Image src="/showroom/jojo-usafi-wordmark.svg" alt="" width={575} height={385} className="admin-auth-watermark" priority aria-hidden="true" />
             <div className="admin-auth-brand-top">
               <Link href="/" className="admin-auth-logo" aria-label="Jojo Usafi storefront">
                 <Image src="/showroom/jojo-usafi.webp" alt="" width={52} height={52} priority />

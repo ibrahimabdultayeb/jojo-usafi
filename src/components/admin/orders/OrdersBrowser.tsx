@@ -1,144 +1,52 @@
 "use client";
-
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Badge, Card, EmptyState, inputClass } from "@/components/admin/ui";
-import { formatTsh, shortPhone } from "@/lib/admin/format";
+import { Badge, Card, EmptyState } from "@/components/admin/ui";
+import { formatTsh, shortPhone, whenExactly } from "@/lib/admin/format";
 import { Icon } from "@/components/ui/Icon";
-import { orderTotals, STAGE_LABEL, STAGE_TONE, type AdminOrder, type OrderStage } from "@/lib/admin/model";
+import { orderTotals, NEXT_ACTION, STAGE_LABEL, STAGE_TONE, type AdminOrder, type OrderStage } from "@/lib/admin/model";
 
-/**
- * The orders queue.
- *
- * Cards on phones, never a table — an order has six things worth knowing and a
- * table row hides half of them at 390px. The filters are the five stages staff
- * actually work through, not every internal state.
- */
-
-const FILTERS: { key: string; label: string; stages: OrderStage[] }[] = [
-  { key: "all", label: "All", stages: [] },
-  { key: "new", label: "New", stages: ["new"] },
-  { key: "confirm", label: "Confirm", stages: ["awaiting_confirmation", "confirmed"] },
-  { key: "preparing", label: "Preparing", stages: ["preparing"] },
-  { key: "delivery", label: "Delivery", stages: ["out_for_delivery"] },
-  { key: "completed", label: "Completed", stages: ["completed"] },
-  { key: "problems", label: "Problems", stages: ["cancelled", "delivery_failed"] },
+const FILTERS: {key:string;label:string;stages:OrderStage[]}[] = [
+  {key:"all",label:"All",stages:[]},
+  {key:"new",label:"New",stages:["new"]},
+  {key:"awaiting_confirmation",label:"Awaiting confirmation",stages:["awaiting_confirmation"]},
+  {key:"confirmed",label:"Confirmed",stages:["confirmed"]},
+  {key:"preparing",label:"Preparing",stages:["preparing"]},
+  {key:"out_for_delivery",label:"Out for delivery",stages:["out_for_delivery"]},
+  {key:"completed",label:"Completed",stages:["completed"]},
+  {key:"exceptions",label:"Exceptions",stages:["cancelled","delivery_failed"]},
 ];
-
-export function OrdersBrowser({
-  orders,
-  initialStage,
-}: {
-  orders: AdminOrder[];
-  initialStage?: string;
-}) {
-  const [filter, setFilter] = useState(() => {
-    const match = FILTERS.find((f) => f.stages.includes(initialStage as OrderStage));
-    return match?.key ?? "all";
-  });
-  const [term, setTerm] = useState("");
-
-  const visible = useMemo(() => {
-    const active = FILTERS.find((f) => f.key === filter);
-    const byStage =
-      !active || active.stages.length === 0 ? orders : orders.filter((o) => active.stages.includes(o.stage));
-
-    const q = term.trim().toLowerCase().replace(/\s/g, "");
-    if (!q) return byStage;
-
-    // Order number, customer name or phone — the three things staff have to hand.
-    return byStage.filter((o) =>
-      [o.number, o.customer.name, o.customer.phone].some((field) =>
-        field.toLowerCase().replace(/\s/g, "").includes(q),
-      ),
-    );
-  }, [orders, filter, term]);
-
-  return (
-    <>
-      <div className="relative mb-3">
-        <Icon
-          name="search"
-          className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-400"
-        />
-        <input
-          value={term}
-          onChange={(e) => setTerm(e.target.value)}
-          type="search"
-          inputMode="search"
-          placeholder="Order number, name or phone"
-          aria-label="Search orders"
-          className={`${inputClass} pl-10`}
-        />
-      </div>
-
-      <div className="no-scrollbar -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-        {FILTERS.map((f) => {
-          const active = f.key === filter;
-          const count = f.stages.length === 0 ? orders.length : orders.filter((o) => f.stages.includes(o.stage)).length;
-          return (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setFilter(f.key)}
-              aria-pressed={active}
-              className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3.5 text-sm font-bold transition-colors ${
-                active
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              {f.label}
-              <span className={`text-xs tabular-nums ${active ? "text-white/70" : "text-slate-400"}`}>{count}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {visible.length === 0 ? (
-        <EmptyState
-          title="No orders here"
-          body="Nothing matches this filter or search. Try another filter, or clear the search box."
-          icon="package"
-        />
-      ) : (
-        <ul className="grid gap-2.5">
-          {visible.map((order) => {
-            const totals = orderTotals(order);
-            return (
-              <li key={order.id}>
-                <Card className="p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-display text-base font-bold text-slate-900">{order.number}</p>
-                      <p className="text-sm font-semibold text-slate-700">{order.customer.name}</p>
-                      <p className="mt-0.5 text-xs font-medium text-slate-500">
-                        {shortPhone(order.customer.phone)} · {order.delivery.zone}
-                      </p>
-                    </div>
-                    <Badge tone={STAGE_TONE[order.stage]}>{STAGE_LABEL[order.stage]}</Badge>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
-                    <p className="text-sm font-medium text-slate-500">
-                      <span className="font-black text-slate-900 tabular-nums">{formatTsh(totals.total)}</span>
-                      <span className="mx-1.5 text-slate-300">·</span>
-                      {totals.items} {totals.items === 1 ? "item" : "items"}
-                    </p>
-                    <Link
-                      href={`/admin/orders/${order.id}`}
-                      className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white transition-colors hover:bg-brand-600"
-                    >
-                      Open order
-                      <Icon name="chevronRight" className="h-4 w-4" />
-                    </Link>
-                  </div>
-                </Card>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </>
-  );
+export function OrdersBrowser({orders,initialStage}: {orders:AdminOrder[];initialStage?:string}) {
+  const [filter,setFilter] = useState(FILTERS.some(f=>f.key===initialStage)?initialStage!:initialStage==="delivery_failed"||initialStage==="cancelled"?initialStage:"all");
+  const [term,setTerm] = useState("");
+  const [zone,setZone] = useState("");
+  const [sort,setSort] = useState("newest");
+  const zones = useMemo(()=>Array.from(new Set(orders.map(o=>o.delivery.zone))).sort(),[orders]);
+  const tabs = (filter==="delivery_failed"||filter==="cancelled")?[...FILTERS,{key:filter,label:STAGE_LABEL[filter],stages:[filter] as OrderStage[]}]:FILTERS;
+  const visible = useMemo(()=>{
+    const active = FILTERS.find(f=>f.key===filter);
+    const stages = active?.stages ?? [filter];
+    const q = term.trim().toLowerCase().replace(/\s/g,"");
+    return orders.filter(o=>(!stages.length||stages.includes(o.stage))&&(!zone||o.delivery.zone===zone)&&(!q||[o.number,o.customer.name,o.customer.phone].some(field=>field.toLowerCase().replace(/\s/g,"").includes(q))))
+      .sort((a,b)=>sort==="total"?orderTotals(b).total-orderTotals(a).total:sort==="oldest"?Date.parse(a.placed)-Date.parse(b.placed):Date.parse(b.placed)-Date.parse(a.placed));
+  },[orders,filter,term,zone,sort]);
+  const count = (stages:OrderStage[])=>stages.length?orders.filter(o=>stages.includes(o.stage)).length:orders.length;
+  const hasFilters = filter!=="all"||term||zone||sort!=="newest";
+  return <>
+    <div className="admin-order-tabs" aria-label="Filter orders by status">{tabs.map(f=><button type="button" key={f.key} aria-pressed={filter===f.key} onClick={()=>setFilter(f.key)}>{f.label}<span>{count(f.stages)}</span></button>)}</div>
+    <div className="admin-order-filters">
+      <select className="admin-mobile-status" aria-label="Order status" value={filter} onChange={e=>setFilter(e.target.value)}>{tabs.map(f=><option key={f.key} value={f.key}>{f.label} ({count(f.stages)})</option>)}</select>
+      <label className="admin-order-search"><Icon name="search"/><input type="search" value={term} onChange={e=>setTerm(e.target.value)} placeholder="Order number, customer or phone" aria-label="Search orders"/></label>
+      <select aria-label="Delivery zone" value={zone} onChange={e=>setZone(e.target.value)}><option value="">All zones</option>{zones.map(z=><option key={z}>{z}</option>)}</select>
+      <select aria-label="Sort orders" value={sort} onChange={e=>setSort(e.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="total">Highest total</option></select>
+      {hasFilters && <button type="button" onClick={()=>{setFilter("all");setTerm("");setZone("");setSort("newest");}}>Clear filters</button>}
+    </div>
+    <p className="admin-result-count" role="status">{visible.length} of {orders.length} orders</p>
+    {!visible.length?<EmptyState title="No orders match" body="Try another status, zone or search term."/>:<>
+      <Card className="admin-orders-table-wrap overflow-hidden"><table className="admin-orders-table"><thead><tr>{["ORDER","CUSTOMER","PLACED","ZONE","ITEMS","TOTAL","STATUS","NEXT ACTION"].map(label=><th key={label} scope="col">{label}</th>)}</tr></thead><tbody>{visible.map(order=>{
+        const totals=orderTotals(order);return <tr key={order.id}><td><Link href={`/admin/orders/${order.id}`}>{order.number}</Link></td><td><strong>{order.customer.name}</strong><small>{shortPhone(order.customer.phone)} · {order.payment.preference==="Cash on delivery"?"Cash":"Digital"}</small></td><td>{whenExactly(order.placed)}</td><td>{order.delivery.zone}</td><td>{totals.items}</td><td><strong>{formatTsh(totals.total)}</strong></td><td><Badge tone={STAGE_TONE[order.stage]}>{STAGE_LABEL[order.stage]}</Badge></td><td><Link href={`/admin/orders/${order.id}`}>{NEXT_ACTION[order.stage]?.label??"View order"}</Link></td></tr>;
+      })}</tbody></table></Card>
+      <ul className="admin-order-cards">{visible.map(order=>{const totals=orderTotals(order);return <li key={order.id}><Card className="p-4"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="font-display text-base">{order.number}</strong><Badge tone={STAGE_TONE[order.stage]}>{STAGE_LABEL[order.stage]}</Badge></div><p className="mt-2 text-sm font-semibold">{order.customer.name}</p><p className="mt-1 text-xs text-slate-500">{order.delivery.zone} · {totals.items} items · {whenExactly(order.placed)}</p><div className="mt-3 flex flex-wrap items-center justify-between gap-3"><strong className="font-display">{formatTsh(totals.total)}</strong><Link href={`/admin/orders/${order.id}`} className="admin-link-button">{NEXT_ACTION[order.stage]?.label??"View order"}</Link></div></Card></li>;})}</ul>
+    </>}
+  </>;
 }

@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
+import localFont from "next/font/local";
 import "../../globals.css";
+import "./admin.css";
+import { getNewOrderCount } from "@/lib/admin/orders";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { currentStaff } from "@/lib/admin/authorize";
 
@@ -22,8 +24,8 @@ import { currentStaff } from "@/lib/admin/authorize";
  * client component and must not be able to ask the database who it is.
  */
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-display", display: "swap" });
+const inter = localFont({ src: "../../../../public/showroom/manrope.woff2", variable: "--font-inter", display: "swap", weight: "200 800" });
+const spaceGrotesk = localFont({ src: "../../../../public/showroom/archivo.woff2", variable: "--font-display", display: "swap", weight: "100 900" });
 
 export const metadata: Metadata = {
   title: { default: "Jojo Usafi admin", template: "%s · Jojo Usafi admin" },
@@ -40,11 +42,12 @@ export const viewport: Viewport = {
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const staff = await currentStaff();
+  const newOrders = staff ? await getNewOrderCount() : 0;
 
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <body className="bg-slate-50 font-sans antialiased">
-        <AdminShell staff={staff && { name: staff.name, role: staff.role }}>{children}</AdminShell>
+        <AdminShell staff={staff && { name: staff.name, role: staff.role }} newOrders={newOrders}>{children}</AdminShell>
       </body>
     </html>
   );
