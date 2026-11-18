@@ -166,8 +166,8 @@
 @media (min-width: 2680px) {
   .showroom-backdrop { clip-path: inset(0 15% 0 25%); }
   .showroom-scene-edge { display: block; position: absolute; bottom: 0; height: calc(var(--showroom-canvas-width) / 3); background-image: url("/showroom/showroom-panorama.webp"); background-repeat: no-repeat; pointer-events: none; }
-  .showroom-scene-edge-left { left: 0; width: calc(50% - var(--showroom-canvas-width) * 0.283); background-size: 400% 100%; background-position: left bottom; }
-  .showroom-scene-edge-right { right: 0; width: calc(50% - var(--showroom-canvas-width) * 0.317); background-size: 666.666667% 100%; background-position: right bottom; }
+  .showroom-scene-edge-left { left: 0; width: calc(50% - var(--showroom-canvas-width) * 0.283 + 2px); background-size: 400% 100%; background-position: left bottom; }
+  .showroom-scene-edge-right { right: 0; width: calc(50% - var(--showroom-canvas-width) * 0.317 + 2px); background-size: 666.666667% 100%; background-position: right bottom; }
 }
 .showroom-hero-overlay { position: relative; pointer-events: none; }
 .showroom-hero-copy { width: min(44%, 490px); padding-block: 52px 84px; pointer-events: auto; }
