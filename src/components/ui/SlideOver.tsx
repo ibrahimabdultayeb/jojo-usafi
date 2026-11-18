@@ -23,6 +23,7 @@ export function SlideOver({ open, onClose, label, closeLabel, narrow = false, ch
     if (!present) return;
     const dialog = dialogRef.current;
     if (!dialog) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     dialog.showModal();
@@ -31,6 +32,9 @@ export function SlideOver({ open, onClose, label, closeLabel, narrow = false, ch
     return () => {
       dialog.close();
       document.body.style.overflow = previous;
+      // React removes the dialog before this dependency cleanup runs, so the
+      // browser may already have cleared its native focus restoration target.
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
   }, [present]);
 
