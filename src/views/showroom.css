@@ -147,20 +147,17 @@
   position: relative;
   display: grid;
   align-items: center;
-  min-height: clamp(720px, 56.28vw, 945px);
+  min-height: max(720px, min(56.28vw, 945px), 25vw);
   isolation: isolate;
   background: radial-gradient(ellipse at 15% 20%, #dce9ee, transparent 55%), #afc7d6;
   overflow: clip;
 }
 
-/* The photograph and its hotspots share one fixed-ratio coordinate system.
-   Cap the stage on ultrawides instead of stretching bottles across the screen. */
-.showroom-scene { position: absolute; inset: 0; overflow: hidden; }
-.showroom-canvas { position: absolute; bottom: 0; left: 50%; width: clamp(1280px, 100vw, 1680px); aspect-ratio: 1672 / 941; transform: translateX(-50%); }
+/* Cover the hero with one panoramic coordinate system so the photograph and
+   product hotspots scale and crop together, including on ultrawide screens. */
+.showroom-scene { position: absolute; inset: 0; overflow: hidden; container-type: size; }
+.showroom-canvas { position: absolute; top: 50%; left: 50%; width: max(100cqw, 300cqh); aspect-ratio: 3 / 1; transform: translate(-50%, -50%); }
 .showroom-backdrop { object-fit: contain; }
-@media (min-width: 1681px) {
-  .showroom-scene { mask-image: linear-gradient(90deg, transparent calc(50% - 840px), #000 calc(50% - 750px), #000 calc(50% + 750px), transparent calc(50% + 840px)); }
-}
 .showroom-hero-overlay { position: relative; pointer-events: none; }
 .showroom-hero-copy { width: min(40%, 490px); padding-block: 52px 84px; pointer-events: auto; }
 .showroom-hero-copy .showroom-label { color: #12406f; }
@@ -194,9 +191,9 @@
 }
 
 .showroom-stand-product img { width: 100%; height: 100%; object-fit: contain; }
-.showroom-stand-multix { left: 65.82%; top: 62.65%; width: 13.89%; height: 39.51%; }
-.showroom-stand-ozone { left: 86.99%; top: 68.17%; width: 7.83%; height: 32.22%; }
-.showroom-stand-softi { left: 47.85%; top: 74.1%; width: 5.69%; height: 23.78%; }
+.showroom-stand-multix { left: 62.5%; top: 64.15%; width: 7.83%; height: 37.6%; }
+.showroom-stand-ozone { left: 74.85%; top: 70.4%; width: 4.45%; height: 30.9%; }
+.showroom-stand-softi { left: 52.05%; top: 76.1%; width: 3.24%; height: 22.9%; }
 .showroom-stand-product:hover, .showroom-stand-product:focus-visible { filter: brightness(1.06) drop-shadow(0 0 10px rgb(255 255 255 / 54%)); }
 .showroom-stand-cue {
   position: absolute;
@@ -467,7 +464,7 @@
   .showroom-need-tile { padding: 21px; }
 }
 
-@media (max-width: 899px) {
+@media (max-width: 1199px) {
   .showroom-hero { min-height: 0; background: #d2e3ec; }
   .showroom-hero-overlay { order: -1; pointer-events: auto; background: radial-gradient(90% 140% at 32% 0%, #f3f9fb, #c9deeb); }
   .showroom-hero-copy { width: min(100%, 530px); padding-block: 43px 28px; }
@@ -476,8 +473,11 @@
   .showroom-hero-lede { margin-top: 17px; font-size: 15px; }
   .showroom-hero .showroom-actions { margin-top: 21px; }
   .showroom-stand-list { margin-top: 23px; }
-  .showroom-scene { position: relative; height: clamp(240px, 56vw, 450px); overflow: hidden; }
-  .showroom-canvas { left: auto; right: 0; bottom: auto; top: 50%; width: 150%; transform: translateY(-50%); }
+  .showroom-scene { position: relative; height: clamp(240px, 56vw, 600px); overflow: hidden; }
+  .showroom-canvas { width: max(200cqw, 300cqh); transform: translate(-63.5%, -50%); }
+}
+
+@media (max-width: 899px) {
   .showroom-brands { margin-top: -12px; }
   .showroom-needs-layout, .showroom-proof-layout { grid-template-columns: minmax(0, 1fr); gap: 28px; }
   .showroom-needs-intro, .showroom-proof-intro { position: static; }
@@ -497,6 +497,7 @@
   .showroom-logo > span { font-size: 16px; }
   .showroom-hero h1 { font-size: clamp(40px, 10vw, 53px); }
   .showroom-hero h1 br:first-of-type { display: initial; }
+  .showroom-canvas { width: max(220cqw, 300cqh); }
   .showroom-button { padding-inline: 16px; font-size: 13px; min-height: 48px; }
   .showroom-text-link { font-size: 13px; }
   .showroom-stand-list a { min-height: 44px; }

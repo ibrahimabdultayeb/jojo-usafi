@@ -60,7 +60,8 @@ export function ShowroomHero({ locale, content, products }: {
     <section className="showroom-hero" aria-labelledby="showroom-hero-title">
       <div className="showroom-scene">
         <div className="showroom-canvas">
-          <Image className="showroom-backdrop" src={showroomAsset("showroom")} alt="" fill sizes="100vw" priority />
+          <Image className="showroom-backdrop" src={showroomAsset("showroom-panorama")} alt="" fill
+            sizes="(max-width: 327px) 720px, (max-width: 639px) 220vw, (max-width: 1199px) 200vw, (max-width: 1279px) 2160px, (max-width: 1679px) 169vw, (max-width: 2835px) 2835px, 100vw" priority />
           {["one", "two", "three", "four"].map((position) => (
             <span className={`showroom-bubble showroom-bubble-${position}`} aria-hidden="true" key={position} />
           ))}
