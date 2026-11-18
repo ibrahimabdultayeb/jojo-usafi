@@ -467,6 +467,7 @@
 @media (min-width: 900px) and (max-width: 1199px) {
   .showroom-hero { min-height: 600px; }
   .showroom-canvas { left: calc(50% - 40px); }
+  .showroom-stand-ozone .showroom-stand-cue { right: 0; }
   .showroom-hero-copy { padding-block: 32px; }
   .showroom-hero h1 { font-size: 52px; }
   .showroom-hero-lede { font-size: 15px; }
