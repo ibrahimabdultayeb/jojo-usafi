@@ -7,6 +7,8 @@
  */
 
 export const en = {
+  serviceArea: "selected Dar es Salaam areas",
+
   meta: {
     siteTitle: "Jojo Usafi — Household essentials, delivered in Dar",
     siteDescription:

@@ -11,7 +11,7 @@ import { useCatalogue } from "@/lib/catalogue/CatalogueContext";
 import { formatPrice } from "@/lib/format";
 import { fill } from "@/lib/i18n";
 import { useLocale } from "@/lib/i18n/client";
-import { site } from "@/lib/site";
+import { cartQuantityLimit } from "@/lib/cart-lines";
 
 /** Floating layer: `z-60` — a modal surface, above the header and the dock. */
 export function CartDrawer() {
@@ -21,7 +21,7 @@ export function CartDrawer() {
 
   return (
     <SlideOver open={isOpen} onClose={closeCart} label={t.cart.title} closeLabel={t.cart.closeCart}>
-        <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-100 px-4 sm:px-5">
+        <div className="cart-drawer-header flex h-16 shrink-0 items-center justify-between border-b border-slate-100 px-4 sm:px-5">
           <h2 className="font-display text-lg font-bold text-slate-900">
             {t.cart.title} {count > 0 && <span className="text-slate-400">({count})</span>}
           </h2>
@@ -53,15 +53,15 @@ export function CartDrawer() {
             </Link>
           </div>
         ) : (
-          <AnimatedList as="ul" className="flex-1 divide-y divide-slate-100 overflow-y-auto overscroll-contain px-4 sm:px-5">
+          <AnimatedList as="ul" className="cart-drawer-items min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto overscroll-contain px-4 sm:px-5">
             {items.map(({ product, quantity, lineTotal }) => {
               const name = productName(product);
               return (
-                <li key={product.sku} className="cart-line-enter flex gap-3 py-4">
+                <li key={product.sku} className="cart-line-enter relative grid grid-cols-[4rem_minmax(0,1fr)] gap-3 py-4">
                   <Link
                     href={path(`/product/${product.slug}`)}
                     onClick={closeCart}
-                    className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-slate-100 bg-white"
+                    className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-slate-100 bg-white"
                   >
                     <ProductPhoto
                       product={product}
@@ -70,26 +70,28 @@ export function CartDrawer() {
                     />
                   </Link>
 
-                  <div className="flex min-w-0 flex-1 flex-col">
+                  <div className="relative flex min-w-0 flex-col pr-10">
                     <p className="text-[10px] font-black tracking-widest text-brand-700 uppercase">
                       {brandsById.get(product.brandId)?.name}
                     </p>
                     <Link
                       href={path(`/product/${product.slug}`)}
                       onClick={closeCart}
-                      className="inline-flex min-h-11 items-center truncate font-display text-sm font-bold text-slate-900 hover:text-brand-700"
+                      className="inline-flex min-h-11 items-center break-words font-display text-sm font-bold text-slate-900 hover:text-brand-700"
                     >
                       {name}
                     </Link>
                     <p className="text-xs font-semibold text-slate-500">{product.packSize}</p>
 
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="flex h-12 items-center overflow-hidden rounded-full border border-slate-200 bg-slate-50">
+                  </div>
+                  <div className="col-span-2 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-12 shrink-0 items-center overflow-hidden rounded-full border border-slate-200 bg-slate-50">
                         <button
                           type="button"
                           onClick={() => setQuantity(product.sku, quantity - 1)}
                           aria-label={fill(t.product.reduceAria, { name })}
-                          className="flex h-full w-11 items-center justify-center text-slate-600 hover:bg-slate-100"
+                          className="flex h-full w-11 items-center justify-center text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Icon name={quantity === 1 ? "trash" : "minus"} className="h-3.5 w-3.5" />
                         </button>
@@ -99,23 +101,24 @@ export function CartDrawer() {
                         <button
                           type="button"
                           onClick={() => add(product.sku)}
+                          disabled={quantity >= cartQuantityLimit(product)}
                           aria-label={fill(t.product.increaseAria, { name })}
-                          className="flex h-full w-11 items-center justify-center text-slate-600 hover:bg-slate-100"
+                          className="flex h-full w-11 items-center justify-center text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Icon name="plus" className="h-3.5 w-3.5" />
                         </button>
                       </div>
-                      <span className="ml-auto text-sm font-black whitespace-nowrap text-slate-900">
-                        {formatPrice(lineTotal)}
-                      </span>
                     </div>
+                    <span className="text-base font-black whitespace-nowrap text-slate-900">
+                      {formatPrice(lineTotal)}
+                    </span>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => remove(product.sku)}
                     aria-label={fill(t.product.removeAria, { name })}
-                    className="-mt-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center self-start rounded-full text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                    className="absolute right-0 top-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-600"
                   >
                     <Icon name="close" className="h-4 w-4" />
                   </button>
@@ -155,7 +158,7 @@ export function CartDrawer() {
               {t.cart.viewFullCart}
             </Link>
             <p className="text-center text-[11px] font-semibold text-slate-400">
-              {fill(t.cart.payOnDelivery, { area: site.serviceArea })}
+              {fill(t.cart.payOnDelivery, { area: t.serviceArea })}
             </p>
           </div>
         )}

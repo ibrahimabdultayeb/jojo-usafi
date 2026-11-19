@@ -15,6 +15,8 @@ import type { Dictionary } from "./en";
  */
 
 export const sw: Dictionary = {
+  serviceArea: "maeneo teule ya Dar es Salaam",
+
   meta: {
     siteTitle: "Jojo Usafi — Bidhaa za nyumbani, zinaletwa Dar",
     siteDescription:

@@ -4,7 +4,6 @@ import { MotionPreference } from "./ShowroomMotion";
 import { showroomCopy } from "@/components/home/showroom-copy";
 import { getCatalogue } from "@/lib/catalogue/queries";
 import { fill, getDictionary, localePath, type Locale } from "@/lib/i18n";
-import { site } from "@/lib/site";
 
 export async function Footer({ locale }: { locale: Locale }) {
   const t = getDictionary(locale);
@@ -28,7 +27,7 @@ export async function Footer({ locale }: { locale: Locale }) {
       <div className="showroom-wrap showroom-footer-grid">
         <div className="showroom-footer-brand">
           <Logo compact />
-          <p>{fill(t.footer.blurb, { area: site.serviceArea })}</p>
+          <p>{fill(t.footer.blurb, { area: t.serviceArea })}</p>
         </div>
         <div>
           <h2>{t.footer.shop}</h2>
@@ -57,7 +56,7 @@ export async function Footer({ locale }: { locale: Locale }) {
       </div>
       <div className="showroom-wrap showroom-footer-bottom">
         <span>{fill(t.footer.rights, { year: new Date().getFullYear() })}</span>
-        <span>{fill(t.footer.delivering, { area: site.serviceArea })}</span>
+        <span>{fill(t.footer.delivering, { area: t.serviceArea })}</span>
       </div>
     </footer>
   );

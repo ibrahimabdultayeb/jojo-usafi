@@ -10,7 +10,7 @@ import { useCatalogue } from "@/lib/catalogue/CatalogueContext";
 import { formatPrice } from "@/lib/format";
 import { fill } from "@/lib/i18n";
 import { useLocale } from "@/lib/i18n/client";
-import { site } from "@/lib/site";
+import { cartQuantityLimit } from "@/lib/cart-lines";
 
 export function CartView() {
   const { items, count, subtotal, add, setQuantity, remove, hydrated } = useCart();
@@ -60,7 +60,7 @@ export function CartView() {
                 >
                   <Link
                     href={path(`/product/${product.slug}`)}
-                    className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-slate-100 bg-white sm:h-28 sm:w-28"
+                    className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-slate-100 bg-white sm:h-28 sm:w-28"
                   >
                     <ProductPhoto
                       product={product}
@@ -89,19 +89,19 @@ export function CartView() {
                         type="button"
                         onClick={() => remove(product.sku)}
                         aria-label={fill(t.product.removeAria, { name })}
-                        className="-mt-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
                       >
                         <Icon name="close" className="h-4 w-4" />
                       </button>
                     </div>
 
-                    <div className="mt-auto flex items-center gap-2 pt-3">
-                      <div className="flex h-12 items-center overflow-hidden rounded-full border border-slate-200 bg-slate-50">
+                    <div className="mt-auto flex flex-wrap items-center gap-3 pt-3">
+                      <div className="flex h-12 shrink-0 items-center overflow-hidden rounded-full border border-slate-200 bg-slate-50">
                         <button
                           type="button"
                           onClick={() => setQuantity(product.sku, quantity - 1)}
                           aria-label={fill(t.product.reduceAria, { name })}
-                          className="flex h-full w-11 items-center justify-center text-slate-600 hover:bg-slate-100"
+                          className="flex h-full w-11 items-center justify-center text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Icon name={quantity === 1 ? "trash" : "minus"} className="h-4 w-4" />
                         </button>
@@ -111,8 +111,9 @@ export function CartView() {
                         <button
                           type="button"
                           onClick={() => add(product.sku)}
+                          disabled={quantity >= cartQuantityLimit(product)}
                           aria-label={fill(t.product.increaseAria, { name })}
-                          className="flex h-full w-11 items-center justify-center text-slate-600 hover:bg-slate-100"
+                          className="flex h-full w-11 items-center justify-center text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Icon name="plus" className="h-4 w-4" />
                         </button>
@@ -171,7 +172,7 @@ export function CartView() {
 
             <p className="mt-4 flex items-start gap-2 rounded-2xl bg-slate-50 p-3 text-xs leading-relaxed font-semibold text-slate-500">
               <Icon name="wallet" className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
-              {fill(t.cart.payNoteFull, { area: site.serviceArea })}
+              {fill(t.cart.payNoteFull, { area: t.serviceArea })}
             </p>
           </aside>
         </div>

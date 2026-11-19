@@ -229,3 +229,10 @@
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto; } }
 
 .shop-filter-tabs { margin-bottom:0; }
+
+/* Keep basket content reachable on landscape phones and at browser zoom. */
+.slide-over-panel { overflow-y: auto; overscroll-behavior: contain; }
+.cart-drawer-header { position: sticky; top: 0; z-index: 1; background: white; }
+@media (max-height: 620px) {
+  .cart-drawer-items { flex: 0 0 auto; overflow: visible; }
+}

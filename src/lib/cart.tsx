@@ -11,17 +11,10 @@ import {
 } from "react";
 import { useCatalogue } from "./catalogue/CatalogueContext";
 import type { CartLine, Product } from "./catalogue/types";
+import { MAX_PER_LINE, normalizeCartLines, cartQuantityLimit } from "./cart-lines";
 
-/**
- * Prototype cart.
- *
- * Lines are stored by SKU only, so the cart survives a catalogue price change and
- * is trivial to hand to a real order document later. Persistence is localStorage
- * for now; there is no order backend in this prototype.
- */
-
+/** SKU-only persistence; live checkout remains authoritative for prices and stock. */
 const STORAGE_KEY = "jojo-usafi.cart.v1";
-const MAX_PER_LINE = 99;
 
 export interface CartItem {
   product: Product;
@@ -52,20 +45,7 @@ function readStored(): CartLine[] {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter(
-        (l): l is CartLine =>
-          typeof l === "object" &&
-          l !== null &&
-          typeof (l as CartLine).sku === "string" &&
-          typeof (l as CartLine).quantity === "number",
-      )
-      // Shape only. Whether the SKU still exists is decided when the line is
-      // drawn, against the catalogue the server sent — a cart read at parse
-      // time has no catalogue to consult.
-      .filter((l) => l.quantity > 0);
+    return normalizeCartLines(JSON.parse(raw));
   } catch {
     return [];
   }
@@ -93,6 +73,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [lines, hydrated]);
 
   const setQuantity = useCallback((sku: string, quantity: number) => {
+    if (!Number.isFinite(quantity) || !sku.trim()) return;
     setLines((current) => {
       const next = Math.max(0, Math.min(MAX_PER_LINE, Math.round(quantity)));
       if (next === 0) return current.filter((l) => l.sku !== sku);
@@ -104,14 +85,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const add = useCallback((sku: string, quantity = 1) => {
+    const product = productsBySku.get(sku);
+    if (!product || !Number.isFinite(quantity) || quantity < 1) return;
+    const limit = cartQuantityLimit(product);
     setLines((current) => {
-      const existing = current.find((l) => l.sku === sku);
-      if (!existing) return [...current, { sku, quantity }];
-      return current.map((l) =>
-        l.sku === sku ? { ...l, quantity: Math.min(MAX_PER_LINE, l.quantity + quantity) } : l,
-      );
+      const existing = current.find((line) => line.sku === sku);
+      if ((existing?.quantity ?? 0) >= limit) return current;
+      const next = Math.min(limit, (existing?.quantity ?? 0) + Math.floor(quantity));
+      return existing
+        ? current.map((line) => line.sku === sku ? { ...line, quantity: next } : line)
+        : [...current, { sku, quantity: next }];
     });
-  }, []);
+  }, [productsBySku]);
 
   const remove = useCallback((sku: string) => {
     setLines((current) => current.filter((l) => l.sku !== sku));

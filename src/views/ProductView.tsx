@@ -38,7 +38,7 @@ export async function ProductView({ locale, slug }: { locale: Locale; slug: stri
     });
 
   const promises = [
-    { icon: "truck" as const, text: fill(t.product.promiseDelivery, { area: site.serviceArea }) },
+    { icon: "truck" as const, text: fill(t.product.promiseDelivery, { area: t.serviceArea }) },
     { icon: "wallet" as const, text: t.product.promisePay },
     { icon: "shield" as const, text: t.product.promiseGenuine },
   ];

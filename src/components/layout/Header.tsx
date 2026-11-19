@@ -52,7 +52,10 @@ export function Header() {
   function submitSearch(event: FormEvent) {
     event.preventDefault();
     const q = term.trim();
-    startSearch(() => router.push(q ? `${path("/shop")}?q=${encodeURIComponent(q)}` : path("/shop")));
+    startSearch(() => {
+      router.push(q ? `${path("/shop")}?q=${encodeURIComponent(q)}` : path("/shop"));
+      setSearchOpen(false);
+    });
   }
 
   // Compared without the language prefix so the active state is the same in both.

@@ -4,7 +4,7 @@ import { AnimatedList } from "@/components/ui/AnimatedList";
 
 
 import Link from "@/components/ui/LoadingLink";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import { useFormStatus } from "react-dom";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -30,6 +30,8 @@ export function TrackOrderView() {
   const { t, path } = useLocale();
   const helpHref = useWhatsAppLink(t.support.trackHelpMessage);
   const [state, formAction] = useActionState(trackOrderAction, emptyTrackState);
+  const [orderNumber, setOrderNumber] = useState("");
+  const [phone, setPhone] = useState("");
   const order = state.order;
 
   const timeline: { icon: IconName; label: string; note: string }[] = [
@@ -67,6 +69,8 @@ export function TrackOrderView() {
             <input
               id="order-number"
               name="orderNumber"
+              value={orderNumber}
+              onChange={(event) => setOrderNumber(event.target.value)}
               required
               inputMode="text"
               autoComplete="off"
@@ -82,6 +86,8 @@ export function TrackOrderView() {
             <input
               id="phone"
               name="phone"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
               required
               type="tel"
               inputMode="tel"

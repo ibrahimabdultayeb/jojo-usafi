@@ -14,7 +14,6 @@ import { productName } from "@/lib/catalogue/format";
 import { formatPrice } from "@/lib/format";
 import { fill } from "@/lib/i18n";
 import { useLocale } from "@/lib/i18n/client";
-import { site } from "@/lib/site";
 import { placeOrderAction, quoteAction } from "@/lib/commerce/actions";
 import { emptyCheckoutState } from "@/lib/commerce/state";
 import type { CartLine, CheckoutZone, Quote } from "@/lib/commerce/checkout";
@@ -419,7 +418,7 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
 
           <p className="mt-4 flex items-start gap-2 rounded-2xl bg-slate-50 p-3 text-xs leading-relaxed font-semibold text-slate-500">
             <Icon name="wallet" className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
-            {fill(t.checkout.payNote, { area: site.serviceArea })}
+            {fill(t.checkout.payNote, { area: t.serviceArea })}
           </p>
         </aside>
       </div>

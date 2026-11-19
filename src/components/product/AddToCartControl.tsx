@@ -2,6 +2,7 @@
 
 import { Spinner } from "@/components/ui/Spinner";
 import { Icon } from "@/components/ui/Icon";
+import { cartQuantityLimit } from "@/lib/cart-lines";
 import { useCart } from "@/lib/cart";
 import { fullProductNameWith } from "@/lib/catalogue/format";
 import { useBrand } from "@/lib/catalogue/CatalogueContext";
@@ -34,7 +35,7 @@ export function AddToCartControl({ product }: { product: Product }) {
       <button
         type="button"
         onClick={() => add(product.sku)}
-        disabled={!hydrated} aria-busy={!hydrated}
+        disabled={!hydrated || quantity >= cartQuantityLimit(product)} aria-busy={!hydrated}
         aria-label={fill(t.product.addAria, { name })}
         className="ml-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white shadow-sm transition-colors hover:bg-brand-600"
       >
@@ -49,7 +50,7 @@ export function AddToCartControl({ product }: { product: Product }) {
         type="button"
         onClick={() => setQuantity(product.sku, quantity - 1)}
         aria-label={fill(t.product.reduceAria, { name })}
-        className="flex h-full w-11 items-center justify-center text-brand-700 transition-colors hover:bg-brand-200"
+        className="flex h-full w-11 items-center justify-center text-brand-700 transition-colors hover:bg-brand-200 disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Icon name={quantity === 1 ? "trash" : "minus"} className="h-3.5 w-3.5" />
       </button>
@@ -59,9 +60,9 @@ export function AddToCartControl({ product }: { product: Product }) {
       <button
         type="button"
         onClick={() => add(product.sku)}
-        disabled={!hydrated} aria-busy={!hydrated}
+        disabled={!hydrated || quantity >= cartQuantityLimit(product)} aria-busy={!hydrated}
         aria-label={fill(t.product.increaseAria, { name })}
-        className="flex h-full w-11 items-center justify-center text-brand-700 transition-colors hover:bg-brand-200"
+        className="flex h-full w-11 items-center justify-center text-brand-700 transition-colors hover:bg-brand-200 disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Icon name="plus" className="h-3.5 w-3.5" />
       </button>
@@ -90,7 +91,7 @@ export function AddToCartButton({ product }: { product: Product }) {
       <button
         type="button"
         onClick={() => add(product.sku)}
-        disabled={!hydrated} aria-busy={!hydrated}
+        disabled={!hydrated || quantity >= cartQuantityLimit(product)} aria-busy={!hydrated}
         className="flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-6 font-display text-base font-bold text-white shadow-lg transition-colors hover:bg-brand-600"
       >
         {!hydrated ? <Spinner /> : <Icon name="cart" className="h-5 w-5" />}
@@ -100,13 +101,13 @@ export function AddToCartButton({ product }: { product: Product }) {
   }
 
   return (
-    <div className="flex w-full items-center gap-3">
-      <div className="flex h-14 flex-1 items-center overflow-hidden rounded-full border border-brand-200 bg-brand-100">
+    <div className="flex w-full flex-wrap items-center gap-3">
+      <div className="flex h-14 min-w-36 flex-1 items-center overflow-hidden rounded-full border border-brand-200 bg-brand-100">
         <button
           type="button"
           onClick={() => setQuantity(product.sku, quantity - 1)}
           aria-label={fill(t.product.reduceAria, { name })}
-          className="flex h-full w-14 items-center justify-center text-brand-700 transition-colors hover:bg-brand-200"
+          className="flex h-full w-14 items-center justify-center text-brand-700 transition-colors hover:bg-brand-200 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Icon name={quantity === 1 ? "trash" : "minus"} className="h-4 w-4" />
         </button>
@@ -119,9 +120,9 @@ export function AddToCartButton({ product }: { product: Product }) {
         <button
           type="button"
           onClick={() => add(product.sku)}
-        disabled={!hydrated} aria-busy={!hydrated}
+        disabled={!hydrated || quantity >= cartQuantityLimit(product)} aria-busy={!hydrated}
           aria-label={fill(t.product.increaseAria, { name })}
-          className="flex h-full w-14 items-center justify-center text-brand-700 transition-colors hover:bg-brand-200"
+          className="flex h-full w-14 items-center justify-center text-brand-700 transition-colors hover:bg-brand-200 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {!hydrated ? <Spinner /> : <Icon name="plus" className="h-4 w-4" />}
         </button>

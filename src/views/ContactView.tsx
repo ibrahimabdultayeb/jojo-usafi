@@ -86,7 +86,7 @@ export async function ContactView({ locale }: { locale: Locale }) {
             {t.contact.areaTitle}
           </h2>
           <p className="mt-2 text-sm leading-relaxed font-medium text-slate-500 md:text-base">
-            {fill(t.contact.areaBody, { area: site.serviceArea })}
+            {fill(t.contact.areaBody, { area: t.serviceArea })}
           </p>
           <p className="mt-4 flex items-center gap-2 text-sm font-bold text-slate-700">
             <Icon name="mapPin" className="h-4 w-4 text-brand-600" />

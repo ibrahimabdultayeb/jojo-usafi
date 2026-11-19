@@ -12,7 +12,6 @@ import { Logo } from "@/components/layout/Logo";
 import { useCategories } from "@/lib/catalogue/CatalogueContext";
 import { useLocale } from "@/lib/i18n/client";
 import { fill } from "@/lib/i18n";
-import { site } from "@/lib/site";
 import { useWhatsAppLink } from "@/lib/ContactContext";
 import { toneSet } from "@/lib/tones";
 
@@ -120,7 +119,7 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
             {t.header.chatWithSupport}
           </a>
           <p className="mt-3 text-center text-xs font-medium text-slate-500">
-            {fill(t.footer.delivering, { area: site.serviceArea })}
+            {fill(t.footer.delivering, { area: t.serviceArea })}
           </p>
         </div>
     </SlideOver>

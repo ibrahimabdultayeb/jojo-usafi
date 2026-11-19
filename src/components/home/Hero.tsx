@@ -3,7 +3,6 @@ import { Icon } from "@/components/ui/Icon";
 import { StableText } from "@/components/ui/StableText";
 import { ScrollToSection } from "@/components/ui/ScrollToSection";
 import { fill, getDictionary, localePath, type Locale } from "@/lib/i18n";
-import { site } from "@/lib/site";
 
 /** The id the down control scrolls to — the first shopping section on the page. */
 export const SHOP_SECTION_ID = "shop-start";
@@ -81,7 +80,7 @@ export function Hero({
         </ul>
 
         <p className="mx-auto mb-8 max-w-3xl text-base leading-relaxed font-medium text-slate-500 md:mb-10 md:text-xl lg:text-2xl">
-          {sub ?? fill(t.hero.body, { area: site.serviceArea })}
+          {sub ?? fill(t.hero.body, { area: t.serviceArea })}
         </p>
 
         {/* The two hero actions keep their size across languages, so the most

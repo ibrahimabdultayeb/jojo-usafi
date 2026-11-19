@@ -1,7 +1,6 @@
 import Link from "@/components/ui/LoadingLink";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { fill, getDictionary, localePath, type Locale } from "@/lib/i18n";
-import { site } from "@/lib/site";
 
 export function HowItWorks({ locale }: { locale: Locale }) {
   const t = getDictionary(locale);
@@ -29,7 +28,7 @@ export function HowItWorks({ locale }: { locale: Locale }) {
             {t.how.title}
           </h2>
           <p className="mt-3 text-base font-medium text-slate-300 md:text-lg">
-            {fill(t.how.subtitle, { area: site.serviceArea })}
+            {fill(t.how.subtitle, { area: t.serviceArea })}
           </p>
         </div>
 
