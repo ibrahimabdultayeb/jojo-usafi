@@ -30,13 +30,13 @@ export function CatalogueWorkspace({ products, mode }: { products: AdminCatalogu
     {value:"all",label:"All products"},{value:"low",label:"Low stock"},{value:"out",label:"Out of stock"},{value:"reserved",label:"Reserved"},
   ];
   const rows = products.filter(product => matches(product, filter) && (!brand || product.brandName === brand) &&
-    `${product.sku} ${product.name} ${product.brandName} ${product.packSize}`.toLowerCase().includes(term.trim().toLowerCase()))
+    `${product.sku} ${product.name} ${product.brandName} ${product.packSize} ${product.ean ?? ""} ${product.itf14 ?? ""}`.toLowerCase().includes(term.trim().toLowerCase()))
     .sort((a,b) => sort === "available" ? a.available - b.available || a.name.localeCompare(b.name) : sort === "reserved" ? b.reserved - a.reserved || a.name.localeCompare(b.name) : a.name.localeCompare(b.name) || a.packSize.localeCompare(b.packSize));
   const resetKey = `${term}:${filter}:${brand}:${sort}`;
   return <>
     <FilterTabs label={media ? "Filter photographs" : "Filter inventory"} value={filter} onChange={setFilter} items={tabs.map(tab => ({...tab,count:products.filter(product => matches(product,tab.value)).length}))}/>
     <div className="admin-order-filters">
-      <label className="admin-order-search"><Icon name="search"/><input aria-label="Search products" type="search" placeholder="Search by product, size, brand or SKU" value={term} onChange={event => setTerm(event.target.value)}/></label>
+      <label className="admin-order-search"><Icon name="search"/><input aria-label="Search products" type="search" placeholder="Search by product, size, brand, SKU or barcode" value={term} onChange={event => setTerm(event.target.value)}/></label>
       <GlideSelect ariaLabel="Filter by brand" value={brand} onChange={setBrand} options={[{value:"",label:"All brands"},...brands.map(value=>({value,label:value}))]}/>
       {!media && <GlideSelect ariaLabel="Sort inventory" value={sort} onChange={setSort} options={[{value:"name",label:"Product name"},{value:"available",label:"Lowest stock first"},{value:"reserved",label:"Most reserved first"}]}/>}
       {(term || brand || filter !== "all" || sort !== "name") && <button type="button" onClick={() => {setTerm("");setBrand("");setFilter("all");setSort("name");}}>Clear filters</button>}

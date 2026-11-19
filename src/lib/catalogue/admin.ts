@@ -22,6 +22,8 @@ import { publicStorageUrl } from "@/lib/supabase/public";
 export interface AdminCatalogueProduct {
   id: string;
   sku: string;
+  ean: string | null;
+  itf14: string | null;
   slug: string;
   name: string;
   brandName: string;
@@ -78,7 +80,7 @@ export async function getAdminCatalogue(): Promise<AdminCatalogue> {
   const products = await supabase
     .from("products")
     .select(
-      `id, sku, slug, display_name, pack_size_label, price_tzs, offer_price_tzs,
+      `id, sku, ean, itf14, slug, display_name, pack_size_label, price_tzs, offer_price_tzs,
        lifecycle, storefront_visible, low_stock_threshold, featured, best_seller, category_id,
        brands ( name ), categories ( name ),
        inventory ( ${stockColumns} ),
@@ -108,6 +110,8 @@ export async function getAdminCatalogue(): Promise<AdminCatalogue> {
     return {
       id: row.id,
       sku: row.sku,
+      ean: row.ean,
+      itf14: row.itf14,
       slug: row.slug,
       name: row.display_name,
       brandName: brand?.name ?? "",

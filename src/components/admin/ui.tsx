@@ -233,6 +233,17 @@ export function Toggle({
  * Bottom sheet on phones, centred dialog from `sm` up. Sits on z-60, the modal
  * layer of the floating-layer contract in `globals.css`.
  */
+/** Keep a conditionally mounted form alive just long enough to finish its exit. */
+export function useSheetPresence(open: boolean) {
+  const [mounted, setMounted] = useState(open);
+  useEffect(() => {
+    if (open) { setMounted(true); return; }
+    const timer = setTimeout(() => setMounted(false), 180);
+    return () => clearTimeout(timer);
+  }, [open]);
+  return open || mounted;
+}
+
 export function Sheet({
   open,
   onClose,
@@ -248,13 +259,7 @@ export function Sheet({
   busy?: boolean;
   error?: string | null;
 }) {
-  const [mounted, setMounted] = useState(open);
-  const present = open || mounted;
-  useEffect(() => {
-    if (open) { setMounted(true); return; }
-    const timer = setTimeout(() => setMounted(false), 180);
-    return () => clearTimeout(timer);
-  }, [open]);
+  const present = useSheetPresence(open);
   const dialog = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   const working = useRef(busy);

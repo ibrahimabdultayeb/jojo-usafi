@@ -66,6 +66,17 @@ export const movementQuantitySchema = z
   .min(1, { message: "Enter at least 1 unit." })
   .max(MAX_MOVEMENT_QUANTITY, { message: "That is more units than the store could hold." });
 
+/** Preserve typed input; never turn a decimal or a minus sign into extra stock. */
+export function parseStockInput(input: string, mode: "add" | "count"): Result<number> {
+  const value = input.trim();
+  if (!value) return err("invalid_quantity", "Enter a number of units.");
+  if (!/^\d+$/.test(value)) return err("invalid_quantity", "Enter a whole number of units, with no decimals or minus sign.");
+  const quantity = Number(value);
+  if (!Number.isSafeInteger(quantity) || quantity > MAX_MOVEMENT_QUANTITY) return err("invalid_quantity", "That quantity is too large. Check the number of units.");
+  if (mode === "add" && quantity === 0) return err("invalid_quantity", "Enter at least 1 unit to add.");
+  return ok(quantity);
+}
+
 export interface StockLevel {
   readonly onHand: number;
   readonly reserved: number;

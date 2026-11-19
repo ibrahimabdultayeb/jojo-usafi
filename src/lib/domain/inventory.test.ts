@@ -187,3 +187,17 @@ describe("replaying the ledger", () => {
     expect(result.ok === false && result.code).toBe("insufficient_stock");
   });
 });
+
+
+describe("typed stock quantities", () => {
+  it("rejects decimals, signs, empty input and excessive values without changing their meaning", async () => {
+    const { parseStockInput } = await import("./inventory");
+    for (const value of ["2.5", "-2", "", "1e3", "NaN", "1000001"]) expect(parseStockInput(value, "add").ok, value).toBe(false);
+  });
+  it("allows a zero physical count but refuses a zero addition", async () => {
+    const { parseStockInput } = await import("./inventory");
+    expect(parseStockInput("0", "add").ok).toBe(false);
+    expect(parseStockInput("0", "count")).toEqual({ok:true,value:0});
+    expect(parseStockInput(" 24 ", "add")).toEqual({ok:true,value:24});
+  });
+});

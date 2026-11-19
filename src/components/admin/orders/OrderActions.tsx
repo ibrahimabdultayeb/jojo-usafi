@@ -3,7 +3,7 @@
 import { useState, useTransition, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Button, Field, PrimaryAction, Sheet, inputClass } from "@/components/admin/ui";
+import { Button, Field, PrimaryAction, Sheet, useSheetPresence, inputClass } from "@/components/admin/ui";
 import { Icon } from "@/components/ui/Icon";
 import { formatTsh } from "@/lib/admin/format";
 import { can, type Role } from "@/lib/admin/permissions";
@@ -65,6 +65,10 @@ export function OrderActions({
   const [failedOpen, setFailedOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [amendOpen, setAmendOpen] = useState(false);
+  const cancelPresent = useSheetPresence(cancelOpen);
+  const failedPresent = useSheetPresence(failedOpen);
+  const payPresent = useSheetPresence(payOpen);
+  const amendPresent = useSheetPresence(amendOpen);
   const [toast, setToast] = useState<{ text: string; bad: boolean } | null>(null);
 
   // The stage comes from the server on every render. Keeping a local copy would
@@ -148,7 +152,7 @@ export function OrderActions({
         </div>, document.body
       )}
 
-      {cancelOpen && <CancelSheet
+      {cancelPresent && <CancelSheet
         open={cancelOpen}
         pending={pending}
         error={error}
@@ -156,7 +160,7 @@ export function OrderActions({
         onConfirm={(reason) => run(() => cancelOrderAction(order.id, reason), () => setCancelOpen(false))}
       />}
 
-      {failedOpen && <DeliveryFailedSheet
+      {failedPresent && <DeliveryFailedSheet
         open={failedOpen}
         pending={pending}
         error={error}
@@ -167,12 +171,13 @@ export function OrderActions({
       />}
 
       {/*
-        Mounted only while it is open, so every amendment starts from what the
+        Unmounted after its exit finishes, so every amendment starts from what the
         order says NOW. A sheet that stayed mounted would reopen showing the
         draft from the last time somebody changed their mind.
       */}
-      {mayAmend && amendOpen && (
+      {mayAmend && amendPresent && (
         <AmendSheet
+          open={amendOpen}
           order={order}
           catalogue={catalogue}
           pending={pending}
@@ -184,7 +189,7 @@ export function OrderActions({
         />
       )}
 
-      {payOpen && <PaymentSheet
+      {payPresent && <PaymentSheet
         open={payOpen}
         pending={pending}
         error={error}

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -22,6 +22,8 @@ import {
   type ProductPatch,
 } from "@/lib/admin/actions";
 
+import { parseStockInput } from "@/lib/domain/inventory";
+import { parseMoneyInput } from "@/lib/domain/money";
 import type { AdminProduct } from "@/lib/admin/model";
 
 /**
@@ -51,6 +53,7 @@ const COUNT_REASONS = [
 
 export function ProductEditor({ product, role }: { product: AdminProduct; role: Role }) {
   const router = useRouter();
+  const inFlight = useRef(false);
   const [pending, startTransition] = useTransition();
   const [workingKey, setWorkingKey] = useState("save");
 
@@ -82,6 +85,8 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
    * guess this component just made.
    */
   function run(operation: () => Promise<ActionResult>, onDone?: () => void, key = "stock") {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setWorkingKey(key);
     setSave("saving");
     setProblem(null);
@@ -90,8 +95,10 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
       try { result = await operation(); } catch {
         setSave("failed");
         setProblem("Could not save the change. Check your connection and try again.");
+        inFlight.current = false;
         return;
       }
+      inFlight.current = false;
       if (result.ok) {
         setSave("saved");
         onDone?.();
@@ -115,21 +122,37 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
       setProblem("The offer price must be lower than the price.");
       return;
     }
+    const parsedPrice = parseMoneyInput(price);
+    const parsedOffer = offerPrice.trim() === "" ? { ok: true as const, value: null } : parseMoneyInput(offerPrice);
+    if (!parsedPrice.ok || !parsedOffer.ok) {
+      setSave("failed");
+      setProblem(!parsedPrice.ok ? parsedPrice.reason : !parsedOffer.ok ? parsedOffer.reason : "Check the price.");
+      return;
+    }
+    if (parsedOffer.value !== null && parsedOffer.value >= parsedPrice.value) {
+      setSave("failed"); setProblem("The offer price must be lower than the price."); return;
+    }
     const patch: ProductPatch = {
-      priceTzs: Number(price) || 0,
-      offerPriceTzs: offerPrice === "" ? null : Number(offerPrice),
+      priceTzs: parsedPrice.value,
+      offerPriceTzs: parsedOffer.value,
       storefrontVisible: visible,
       featured,
       bestSeller,
       lifecycle: lifecycle as ProductPatch["lifecycle"],
       ...overrides,
     };
-    run(() => saveProductAction(product.id, patch), undefined, Object.keys(overrides)[0] ?? "save");
+    run(() => saveProductAction(product.id, patch), () => {
+      setVisible(patch.storefrontVisible); setFeatured(patch.featured);
+      setBestSeller(patch.bestSeller); setLifecycle(patch.lifecycle);
+      setPrice(String(patch.priceTzs)); setOfferPrice(patch.offerPriceTzs === null ? "" : String(patch.offerPriceTzs));
+    }, Object.keys(overrides)[0] ?? "save");
   }
 
   function applyStock() {
-    const n = Number(stockAmount);
-    if (!Number.isFinite(n) || n < 0) return;
+    const parsed = parseStockInput(stockAmount, stockMode);
+    if (!parsed.ok) { setProblem(parsed.reason); setSave("failed"); return; }
+    if (stockMode === "count" && !countReason) { setProblem("Choose a reason for the count."); return; }
+    const n = parsed.value;
 
     if (stockMode === "add") {
       run(() => addStockAction(product.id, n, stockNote.trim() || "Added in the dashboard"), reset);
@@ -146,8 +169,8 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
     }
   }
 
-  const canApplyStock =
-    stockAmount !== "" && !pending && (stockMode === "add" || countReason !== "");
+  const stockEntry = parseStockInput(stockAmount, stockMode);
+  const canApplyStock = stockEntry.ok && !pending && (stockMode === "add" || countReason !== "");
 
   return (
     <>
@@ -197,7 +220,7 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
               </span>
               <input
                 value={price}
-                onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ""))}
+                onChange={(e) => setPrice(e.target.value)}
                 onBlur={() => price !== String(product.price) && saveEveryday()}
                 disabled={!editPricing || pending}
                 inputMode="numeric"
@@ -216,7 +239,7 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
               </span>
               <input
                 value={offerPrice}
-                onChange={(e) => setOfferPrice(e.target.value.replace(/[^0-9]/g, ""))}
+                onChange={(e) => setOfferPrice(e.target.value)}
                 onBlur={() =>
                   offerPrice !== (product.offerPrice ? String(product.offerPrice) : "") && saveEveryday()
                 }
@@ -276,17 +299,22 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
                 hint={
                   stockMode === "add"
                     ? "This is added to what is already here."
-                    : "This replaces the number above with what is actually on the shelf."
+                    : "Enter the total physically on the shelf, including units reserved for orders. Available stock is recalculated."
                 }
               >
                 <input
                   autoFocus
+                  disabled={pending}
+                  aria-invalid={stockAmount !== "" && !stockEntry.ok}
+                  aria-describedby="stock-entry-feedback"
                   value={stockAmount}
-                  onChange={(e) => setStockAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                  onChange={(e) => setStockAmount(e.target.value)}
                   inputMode="numeric"
                   className={`${inputClass} tabular-nums`}
                 />
               </Field>
+
+              {stockAmount !== "" && !stockEntry.ok && <p id="stock-entry-feedback" role="status" className="text-sm font-semibold text-rose-700">{stockEntry.reason}</p>}
 
               {/*
                 A count has to say why it differs — otherwise a missing item and
@@ -300,6 +328,7 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
                       <button
                         key={option}
                         type="button"
+                        disabled={pending}
                         onClick={() => setCountReason(option)}
                         aria-pressed={countReason === option}
                         className={`flex min-h-12 items-center justify-between rounded-xl border-2 px-4 text-left text-sm font-bold transition-colors ${
@@ -321,6 +350,7 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
                 hint="Optional. Kept with the stock record."
               >
                 <input
+                  disabled={pending}
                   value={stockNote}
                   onChange={(e) => setStockNote(e.target.value)}
                   className={inputClass}
@@ -329,7 +359,7 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
               </Field>
 
               <div className="grid gap-2 sm:grid-cols-2">
-                <Button variant="secondary" onClick={() => setStockOpen(false)} full>
+                <Button variant="secondary" disabled={pending} onClick={() => setStockOpen(false)} full>
                   Cancel
                 </Button>
                 <Button busy={pending && workingKey === "stock"} variant="accent" onClick={applyStock} disabled={!canApplyStock} full>
@@ -344,11 +374,10 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
           <Toggle
             label="Show on website"
             busy={pending && workingKey === "storefrontVisible"}
-            hint={visible ? "Customers can see and buy this." : "Hidden from the shop."}
+            hint={visible ? "Shown when active, in stock and approved for sale." : "Hidden from the shop."}
             checked={visible}
             disabled={!editVisibility || pending}
             onChange={(v) => {
-              setVisible(v);
               saveEveryday({ storefrontVisible: v });
             }}
           />
@@ -359,7 +388,6 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
             checked={featured}
             disabled={!editVisibility || pending}
             onChange={(v) => {
-              setFeatured(v);
               saveEveryday({ featured: v });
             }}
           />
@@ -370,7 +398,6 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
             checked={bestSeller}
             disabled={!editVisibility || pending}
             onChange={(v) => {
-              setBestSeller(v);
               saveEveryday({ bestSeller: v });
             }}
           />
@@ -450,7 +477,6 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
               busy={pending && workingKey === "lifecycle"}
               disabled={!editVisibility || pending}
               onClick={() => {
-                setLifecycle("active");
                 saveEveryday({ lifecycle: "active" });
               }}
             >
@@ -465,8 +491,6 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
               onClick={() => {
                 // Archiving also takes it off the shop: an archived product that
                 // is still buyable is a contradiction the customer would find.
-                setLifecycle("archived");
-                setVisible(false);
                 saveEveryday({ lifecycle: "archived", storefrontVisible: false });
               }}
             >

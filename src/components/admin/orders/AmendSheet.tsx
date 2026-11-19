@@ -42,6 +42,7 @@ interface Line {
 }
 
 export function AmendSheet({
+  open = true,
   order,
   catalogue,
   pending,
@@ -49,6 +50,7 @@ export function AmendSheet({
   onClose,
   onConfirm,
 }: {
+  open?: boolean;
   order: AdminOrder;
   catalogue: readonly AmendableProduct[];
   pending: boolean;
@@ -134,7 +136,7 @@ export function AmendSheet({
   const ready = changes.length > 0 && reason.trim().length > 0 && lines.length > 0;
 
   return (
-    <Sheet open onClose={onClose} busy={pending} error={error} title={`Change ${order.number}`}>
+    <Sheet open={open} onClose={onClose} busy={pending} error={error} title={`Change ${order.number}`}>
       <AnimatedList as="ul" className="mb-4 divide-y divide-slate-100 rounded-xl border border-slate-200">
         {lines.map((line) => (
           <li key={line.sku} className="p-3">

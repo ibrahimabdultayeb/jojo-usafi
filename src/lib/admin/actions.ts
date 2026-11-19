@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath, revalidateTag } from "next/cache";
+import { isMoneyTzs } from "@/lib/domain/money";
+import { parseStockInput } from "@/lib/domain/inventory";
 import { authorize } from "./authorize";
 import { getServiceRoleSupabase } from "@/lib/supabase/admin";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -230,10 +232,10 @@ export async function saveProductAction(
   const auth = await authorize("products.editPricing");
   if (!auth.ok) return failed(auth.message);
 
-  if (!Number.isInteger(patch.priceTzs) || patch.priceTzs < 0) {
+  if (!isMoneyTzs(patch.priceTzs)) {
     return failed("A price is a whole number of shillings.");
   }
-  if (patch.offerPriceTzs !== null && patch.offerPriceTzs >= patch.priceTzs) {
+  if (patch.offerPriceTzs !== null && (!isMoneyTzs(patch.offerPriceTzs) || patch.offerPriceTzs >= patch.priceTzs)) {
     return failed("An offer price has to be lower than the normal price.");
   }
 
@@ -279,6 +281,9 @@ export async function addStockAction(
   const auth = await authorize("products.editStock");
   if (!auth.ok) return failed(auth.message);
 
+  const parsed = parseStockInput(String(quantity), "add");
+  if (!parsed.ok) return failed(parsed.reason);
+
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.rpc("jojo_add_stock", {
     p_product_id: productId,
@@ -301,6 +306,10 @@ export async function countStockAction(
 ): Promise<ActionResult> {
   const auth = await authorize("products.editStock");
   if (!auth.ok) return failed(auth.message);
+
+  const parsed = parseStockInput(String(counted), "count");
+  if (!parsed.ok) return failed(parsed.reason);
+  if (!reason.trim()) return failed("Choose a reason for the stock count.");
 
   const supabase = await getServerSupabase();
   const { data, error } = await supabase.rpc("jojo_count_stock", {

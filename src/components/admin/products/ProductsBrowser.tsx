@@ -84,7 +84,7 @@ export function ProductsBrowser({
       if (!q) return true;
       // Name, SKU, barcode and brand — the four things printed on a shelf label.
       const brand = product.brandName ?? "";
-      const haystack = `${product.name} ${product.sku} ${brand} ${product.packSize}`.toLowerCase();
+      const haystack = `${product.name} ${product.sku} ${brand} ${product.packSize} ${product.ean ?? ""} ${product.itf14 ?? ""}`.toLowerCase();
       return haystack.includes(q);
     });
   }, [products, filter, term]);
@@ -129,7 +129,7 @@ export function ProductsBrowser({
               <Link
                 key={product.sku}
                 href={`/admin/products/${product.sku}`}
-                className="flex items-center gap-3 p-3 transition-colors hover:bg-slate-50"
+                className="admin-product-row transition-colors hover:bg-slate-50"
               >
                 <span className="admin-product-thumbnail relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
                   {product.image ? (
@@ -148,10 +148,10 @@ export function ProductsBrowser({
                 </span>
 
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-bold text-slate-900">
+                  <span className="block break-words text-base font-bold text-slate-900">
                     {product.name}
                   </span>
-                  <span className="block truncate text-xs font-medium text-slate-500">
+                  <span className="block break-words text-sm font-medium text-slate-500">
                     {brand} · {product.packSize} · {product.sku}
                   </span>
                   {badges.length > 0 && (
@@ -165,12 +165,12 @@ export function ProductsBrowser({
                   )}
                 </span>
 
-                <span className="shrink-0 text-right">
-                  <span className="block text-sm font-black text-slate-900 tabular-nums">
+                <span className="admin-product-row-price">
+                  <span className="block text-base font-black text-slate-900 tabular-nums">
                     {formatTsh(product.price)}
                   </span>
                   <span
-                    className={`block text-xs font-bold tabular-nums ${
+                    className={`block text-sm font-bold tabular-nums ${
                       product.available === 0 ? "text-rose-600" : "text-slate-500"
                     }`}
                   >
