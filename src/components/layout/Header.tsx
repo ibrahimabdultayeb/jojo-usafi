@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "@/components/ui/LoadingLink";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState, useTransition, type FormEvent } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import { Icon } from "@/components/ui/Icon";
 import { StableText } from "@/components/ui/StableText";
@@ -13,6 +13,15 @@ import { useCart } from "@/lib/cart";
 import { useLocale } from "@/lib/i18n/client";
 import type { Dictionary } from "@/lib/i18n";
 import { stripLocale } from "@/lib/i18n/config";
+
+/** Keep the editable field aligned with navigation, including Back and clearing filters. */
+function SearchTermSync({ onChange }: { onChange: (term: string) => void }) {
+  const params = useSearchParams();
+  const pathname = usePathname();
+  const query = stripLocale(pathname) === "/shop" ? params.get("q") ?? "" : "";
+  useEffect(() => { onChange(query); }, [query, onChange]);
+  return null;
+}
 
 /**
  * Floating layer: `z-40` — sticky, and below anything that floats over content.
@@ -64,6 +73,7 @@ export function Header() {
 
   return (
     <>
+      <Suspense fallback={null}><SearchTermSync onChange={setTerm} /></Suspense>
       <header className="showroom-header sticky top-0 z-40 w-full">
         <div className="showroom-wrap showroom-header-row flex items-center">
           <Logo />

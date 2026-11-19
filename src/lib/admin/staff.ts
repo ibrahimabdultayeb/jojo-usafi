@@ -35,7 +35,8 @@ export async function getStaff(): Promise<StaffMember[]> {
     .order("role")
     .order("full_name");
 
-  if (error) return [];
+  // An outage is not an empty team. Let the admin recovery boundary offer retry.
+  if (error) throw new Error("Could not load the staff list.");
 
   const activeOwners = (data ?? []).filter((row) => row.role === "owner" && row.active);
 
