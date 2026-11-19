@@ -1,5 +1,6 @@
+import { SubmitButton } from "@/components/ui/SubmitButton";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { getAdminSession, isActiveStaff, ownerExists } from "@/lib/admin/session";
 import { ROLE_LABELS } from "@/lib/admin/permissions";
@@ -91,12 +92,12 @@ export default async function AdminSignInPage() {
 function SignOutButton() {
   return (
     <form action={signOutAction} className="mt-3">
-      <button
+      <SubmitButton
         type="submit"
         className="admin-auth-submit admin-auth-secondary"
       >
         Sign out
-      </button>
+      </SubmitButton>
     </form>
   );
 }

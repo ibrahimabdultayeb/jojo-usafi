@@ -44,7 +44,12 @@ export function ShopSettingsEditor({
     setSave("saving");
     setProblem(null);
     startTransition(async () => {
-      const result = await saveBusinessAction(draft, times);
+      let result;
+      try { result = await saveBusinessAction(draft, times); } catch {
+        setSave("failed");
+        setProblem("Could not save the change. Check your connection and try again.");
+        return;
+      }
       if (result.ok) {
         setSave("saved");
         router.refresh();

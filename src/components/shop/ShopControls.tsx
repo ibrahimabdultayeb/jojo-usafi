@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "@/components/ui/LoadingLink";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useTransition } from "react";
-import { Spinner } from "@/components/ui/Spinner";
-import { Icon } from "@/components/ui/Icon";
+import { useCallback, useOptimistic, useTransition } from "react";
+import GlideSelect from "@/components/ui/GlideSelect";
+import { FilterTabs } from "@/components/ui/FilterTabs";
 import { StableText, WidthReserver } from "@/components/ui/StableText";
 import type { Category } from "@/lib/catalogue/types";
 import { localeVariants } from "@/lib/i18n";
@@ -32,6 +31,9 @@ interface ShopControlsProps {
 export function ShopControls({ categories, activeCategory, activeBrand, kitchen, activeSort }: ShopControlsProps) {
   const router = useRouter();
   const [sorting, startSort] = useTransition();
+  const [filtering, startFilter] = useTransition();
+  const active = kitchen ? "need:kitchen" : activeCategory ? `category:${activeCategory}` : activeBrand ? `brand:${activeBrand}` : "all";
+  const [optimisticFilter, setOptimisticFilter] = useOptimistic(active);
   const pathname = usePathname();
   const params = useSearchParams();
   const { locale, t } = useLocale();
@@ -67,77 +69,24 @@ export function ShopControls({ categories, activeCategory, activeBrand, kitchen,
     ...localeVariants((d) => d.shop.sortName),
   ];
 
-  const chip = (active: boolean) =>
-    `inline-flex min-h-11 items-center whitespace-nowrap rounded-full border px-5 text-sm font-bold shadow-sm transition-all ${
-      active
-        ? "border-brand-600 bg-brand-600 text-white"
-        : "border-slate-200 bg-slate-50 text-slate-600 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-    }`;
-
-  return (
-    <div className="mb-8 flex flex-col gap-4 border-y border-slate-100 py-5 md:flex-row md:items-center md:justify-between md:gap-6">
-      <div
-        data-qa-anchor="shop-filters"
-        className="no-scrollbar min-w-0 -mx-4 flex gap-2.5 overflow-x-auto px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0"
-      >
-        <Link
-          href={hrefWith("category")}
-          data-qa-anchor="shop-filter-all"
-          className={chip(!activeCategory && !activeBrand && !kitchen)}
-        >
-          <StableText pick={(d) => d.shop.filterAll}>{t.shop.filterAll}</StableText>
-        </Link>
-        {categories.map((category) => (
-          <Link
-            key={category.id}
-            href={hrefWith("category", category.slug)}
-            className={chip(activeCategory === category.slug)}
-          >
-            {category.name}
-          </Link>
-        ))}
-        <Link href={hrefWith("need", "kitchen")} className={chip(kitchen)}>
-          {showroomCopy(locale).categories[1][0]}
-        </Link>
-      </div>
-
-      {/* A `<select>` cannot hold the hidden alternates itself, so they share
-          its grid cell: the cell is as wide as the longest option in either
-          language and the select fills it. The reservers copy the select's own
-          padding and type so the width they ask for is the width it needs. */}
-      <div
-        data-qa-anchor="shop-sort"
-        className="relative grid w-full shrink-0 grid-cols-1 grid-rows-1 md:w-auto"
-      >
-        {sorting && <span role="status" className="absolute right-10 top-4"><Spinner /><span className="sr-only">{locale === "sw" ? "Inapakia…" : "Loading…"}</span></span>}
-        <label htmlFor="sort" className="sr-only">
-          {t.shop.sortLabel}
-        </label>
-        <select
-          id="sort"
-          value={activeSort}
-          onChange={(e) => startSort(() => router.push(hrefWith("sort", e.target.value)))}
-          disabled={sorting} aria-busy={sorting}
-          className="col-start-1 row-start-1 h-12 w-full cursor-pointer appearance-none rounded-full border border-slate-200 bg-white pr-11 pl-5 text-sm font-bold shadow-sm outline-none focus:border-brand-500"
-        >
-          {sortOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        {/* Same padding, type and border as the select, so the width these ask
-            for is the width the select would need for that option. Boxes are
-            border-box, so the 1px border really does count. */}
-        <WidthReserver
-          className="h-12 rounded-full border border-transparent pr-11 pl-5 text-sm font-bold"
-          variants={sortReserveVariants}
-        />
-        <Icon
-          name="chevronDown"
-          className="pointer-events-none absolute top-1/2 right-4 h-4 w-4 -translate-y-1/2 text-slate-400"
-        />
-      </div>
+  const filters = [
+    {value:"all",label:<StableText pick={d=>d.shop.filterAll}>{t.shop.filterAll}</StableText>},
+    ...categories.map(category=>({value:`category:${category.slug}`,label:category.name})),
+    {value:"need:kitchen",label:showroomCopy(locale).categories[1][0]},
+    ...(activeBrand ? [{value:`brand:${activeBrand}`,label:activeBrand}] : []),
+  ];
+  return <div className="mb-8 flex flex-col gap-4 border-y border-slate-100 py-5 xl:flex-row xl:items-center xl:justify-between xl:gap-6">
+    <div data-qa-anchor="shop-filters" className="min-w-0 flex-1">
+      <FilterTabs className="shop-filter-tabs" label={t.shop.filterAll} value={optimisticFilter} busy={filtering || sorting} items={filters} onChange={value=>startFilter(()=>{
+        setOptimisticFilter(value);
+        const [key,slug] = value.split(":");
+        router.push(hrefWith(key === "need" ? "need" : "category",value === "all" ? undefined : slug),{scroll:false});
+      })}/>
     </div>
-  );
+    <div data-qa-anchor="shop-sort" className="relative grid w-full shrink-0 grid-cols-1 grid-rows-1 xl:w-auto">
+      <GlideSelect id="sort" ariaLabel={t.shop.sortLabel} value={activeSort} onChange={value=>startSort(()=>router.push(hrefWith("sort",value),{scroll:false}))}
+        options={sortOptions} busy={sorting} disabled={filtering} className="col-start-1 row-start-1 w-full"/>
+      <WidthReserver className="h-12 rounded-xl border border-transparent pr-12 pl-4 text-sm font-bold" variants={sortReserveVariants}/>
+    </div>
+  </div>;
 }

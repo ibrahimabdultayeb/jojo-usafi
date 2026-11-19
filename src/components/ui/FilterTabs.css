@@ -1,0 +1,4 @@
+.filter-tabs { position:relative; min-width:0; max-width:100%; margin-bottom:16px; }
+.filter-tabs-scroll { overflow-x:auto; overflow-y:hidden; padding:4px; margin:-4px; scroll-padding-inline:12px; }
+.filter-tabs-scroll > .rubber-segment { min-width:max-content; }
+.filter-tabs-pending { position:absolute; top:50%; right:8px; display:grid; place-items:center; width:30px; height:30px; transform:translateY(-50%); border-radius:50%; background:var(--admin-surface,#fff); box-shadow:0 0 10px rgb(0 0 0 / 12%); }

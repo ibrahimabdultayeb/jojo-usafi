@@ -120,7 +120,12 @@ export function WebsiteSettings({ content, role }: { content: WebsiteContent; ro
     setSave("saving");
     setProblem(null);
     startTransition(async () => {
-      const result = await saveWebsiteAction(next);
+      let result;
+      try { result = await saveWebsiteAction(next); } catch {
+        setSave("failed");
+        setProblem("Could not save the change. Check your connection and try again.");
+        return;
+      }
       if (result.ok) {
         setSave("saved");
         router.refresh();
@@ -142,7 +147,7 @@ export function WebsiteSettings({ content, role }: { content: WebsiteContent; ro
 
       <SectionTitle action={<SaveState state={save} />}>The strip above the header</SectionTitle>
       <Card className="mb-5 space-y-4 p-4">
-        <Toggle
+        <Toggle busy={pending}
           label="Show the strip"
           hint={draft.showAnnouncement ? "Customers see it above the header." : "Hidden."}
           checked={draft.showAnnouncement}
@@ -208,7 +213,7 @@ export function WebsiteSettings({ content, role }: { content: WebsiteContent; ro
 
       <SectionTitle>Promotion band</SectionTitle>
       <Card className="mb-5 space-y-4 p-4">
-        <Toggle
+        <Toggle busy={pending}
           label="Show the promotion band"
           hint={draft.promoBannerVisible ? "Customers see it on the homepage." : "Hidden."}
           checked={draft.promoBannerVisible}
@@ -249,7 +254,7 @@ export function WebsiteSettings({ content, role }: { content: WebsiteContent; ro
             ["showHowItWorks", "How ordering works", "The three-step dark band"],
           ] as const
         ).map(([key, label, hint]) => (
-          <Toggle
+          <Toggle busy={pending}
             key={key}
             label={label}
             hint={hint}

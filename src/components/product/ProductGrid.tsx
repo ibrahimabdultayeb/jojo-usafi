@@ -1,3 +1,4 @@
+import { AnimatedList } from "@/components/ui/AnimatedList";
 import { ProductCard } from "@/components/product/ProductCard";
 import type { Product } from "@/lib/catalogue/types";
 import type { Locale } from "@/lib/i18n";
@@ -52,7 +53,7 @@ export function ProductGrid({
   variant = "grid",
 }: ProductGridProps) {
   return (
-    <div
+    <AnimatedList
       data-qa="product-grid"
       data-qa-variant={variant}
       className={`grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 lg:gap-6 xl:grid-cols-5 ${VARIANTS[variant]}`}
@@ -65,6 +66,6 @@ export function ProductGrid({
           priority={i < priorityCount}
         />
       ))}
-    </div>
+    </AnimatedList>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { useActionState } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import { useFormStatus } from "react-dom";

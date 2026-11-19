@@ -129,7 +129,7 @@ export function OrderActions({
         <div className="admin-stack">
           {sidebar}
           {(mayAmend || mayCancel || mayFailDelivery) && <section className="admin-card p-4"><p className="admin-eyebrow">OTHER ACTIONS</p><div className="flex flex-col gap-2">
-            {stage === "new" && can(role,"orders.advance") && <Button variant="quiet" icon="clock" disabled={pending} onClick={()=>run(()=>advanceOrderAction(order.id,"awaiting_confirmation"))}>Await customer confirmation</Button>}
+            {stage === "new" && can(role,"orders.advance") && <Button busy={pending} variant="quiet" icon="clock" disabled={pending} onClick={()=>run(()=>advanceOrderAction(order.id,"awaiting_confirmation"))}>Await customer confirmation</Button>}
             {mayAmend && <Button variant="quiet" icon="pencil" disabled={pending} onClick={()=>{setError(null);setAmendOpen(true);}}>Amend items</Button>}
             {mayCancel && can(role,"orders.cancel") && <Button variant="danger" icon="close" disabled={pending} onClick={()=>{setError(null);setCancelOpen(true);}}>Cancel order</Button>}
             {mayFailDelivery && can(role,"orders.cancel") && <Button variant="danger" icon="truck" disabled={pending} onClick={()=>{setError(null);setFailedOpen(true);}}>Delivery failed</Button>}

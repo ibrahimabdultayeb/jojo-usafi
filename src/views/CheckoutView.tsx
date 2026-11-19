@@ -2,6 +2,7 @@
 
 import Link from "@/components/ui/LoadingLink";
 import { useActionState, useEffect, useMemo, useState } from "react";
+import GlideSelect from "@/components/ui/GlideSelect";
 import { Spinner } from "@/components/ui/Spinner";
 import { useFormStatus } from "react-dom";
 import { Icon } from "@/components/ui/Icon";
@@ -233,22 +234,10 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                   <label htmlFor="zoneSlug" className={label}>
                     {t.checkout.zone} <Required text={t.checkout.required} />
                   </label>
-                  <select
-                    id="zoneSlug"
-                    name="zoneSlug"
-                    required
-                    value={zoneSlug}
-                    onChange={(event) => setZoneSlug(event.target.value)}
-                    className={field}
-                  >
-                    <option value="">{t.checkout.zoneChoose}</option>
-                    {zones.map((zone) => (
-                      <option key={zone.slug} value={zone.slug}>
-                        {zone.name} —{" "}
-                        {zone.freeDelivery ? t.checkout.free : formatPrice(zone.feeTzs)}
-                      </option>
-                    ))}
-                  </select>
+                  <GlideSelect id="zoneSlug" name="zoneSlug" ariaLabel={t.checkout.zone} required value={zoneSlug} onChange={setZoneSlug}
+                    className="w-full" disabled={placingOrder} busy={quoting && !!zoneSlug}
+                    options={[{value:"",label:t.checkout.zoneChoose},...zones.map(zone=>({value:zone.slug,label:`${zone.name} — ${zone.freeDelivery ? t.checkout.free : formatPrice(zone.feeTzs)}`}))]}/>
+
                 </div>
 
                 <div>

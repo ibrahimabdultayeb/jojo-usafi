@@ -52,6 +52,7 @@ const COUNT_REASONS = [
 export function ProductEditor({ product, role }: { product: AdminProduct; role: Role }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [workingKey, setWorkingKey] = useState("save");
 
   const editPricing = can(role, "products.editPricing");
   const editStock = can(role, "products.editStock");
@@ -80,11 +81,17 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
    * so the numbers on screen come back from the database rather than from the
    * guess this component just made.
    */
-  function run(operation: () => Promise<ActionResult>, onDone?: () => void) {
+  function run(operation: () => Promise<ActionResult>, onDone?: () => void, key = "stock") {
+    setWorkingKey(key);
     setSave("saving");
     setProblem(null);
     startTransition(async () => {
-      const result = await operation();
+      let result;
+      try { result = await operation(); } catch {
+        setSave("failed");
+        setProblem("Could not save the change. Check your connection and try again.");
+        return;
+      }
       if (result.ok) {
         setSave("saved");
         onDone?.();
@@ -117,7 +124,7 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
       lifecycle: lifecycle as ProductPatch["lifecycle"],
       ...overrides,
     };
-    run(() => saveProductAction(product.id, patch));
+    run(() => saveProductAction(product.id, patch), undefined, Object.keys(overrides)[0] ?? "save");
   }
 
   function applyStock() {
@@ -325,7 +332,7 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
                 <Button variant="secondary" onClick={() => setStockOpen(false)} full>
                   Cancel
                 </Button>
-                <Button busy={pending} variant="accent" onClick={applyStock} disabled={!canApplyStock} full>
+                <Button busy={pending && workingKey === "stock"} variant="accent" onClick={applyStock} disabled={!canApplyStock} full>
                   {pending ? "Working…" : stockMode === "add" ? "Add to stock" : "Save count"}
                 </Button>
               </div>
@@ -336,6 +343,7 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
         <div className="grid gap-2">
           <Toggle
             label="Show on website"
+            busy={pending && workingKey === "storefrontVisible"}
             hint={visible ? "Customers can see and buy this." : "Hidden from the shop."}
             checked={visible}
             disabled={!editVisibility || pending}
@@ -346,6 +354,7 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
           />
           <Toggle
             label="Featured"
+            busy={pending && workingKey === "featured"}
             hint="Highlighted on the homepage."
             checked={featured}
             disabled={!editVisibility || pending}
@@ -356,6 +365,7 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
           />
           <Toggle
             label="Best seller"
+            busy={pending && workingKey === "bestSeller"}
             hint="Shown in the Best sellers row."
             checked={bestSeller}
             disabled={!editVisibility || pending}
@@ -437,6 +447,7 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
             <Button
               variant="secondary"
               icon="package"
+              busy={pending && workingKey === "lifecycle"}
               disabled={!editVisibility || pending}
               onClick={() => {
                 setLifecycle("active");
@@ -449,6 +460,7 @@ export function ProductEditor({ product, role }: { product: AdminProduct; role: 
             <Button
               variant="secondary"
               icon="package"
+              busy={pending && workingKey === "lifecycle"}
               disabled={!editVisibility || pending}
               onClick={() => {
                 // Archiving also takes it off the shop: an archived product that

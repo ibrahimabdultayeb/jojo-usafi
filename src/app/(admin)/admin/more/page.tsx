@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { SubmitButton } from "@/components/ui/SubmitButton";
+import Link from "@/components/ui/LoadingLink";
 import { AdminPage } from "@/components/admin/AdminShell";
 import { Badge, Card } from "@/components/admin/ui";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -139,12 +140,12 @@ export default async function AdminMorePage() {
             : "Sign in to see and change anything here."}
         </p>
         <form action={signOutAction} className="mt-3">
-          <button
+          <SubmitButton
             type="submit"
             className="min-h-12 w-full rounded-xl border-2 border-slate-200 bg-white px-4 font-display text-sm font-bold text-slate-900 transition-colors hover:bg-slate-50"
           >
             {staff ? "Sign out" : "Go to sign in"}
-          </button>
+          </SubmitButton>
         </form>
       </Card>
     </AdminPage>

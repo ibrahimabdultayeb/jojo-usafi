@@ -1,5 +1,7 @@
 "use client";
 
+import { AnimatedList } from "@/components/ui/AnimatedList";
+import GlideSelect from "@/components/ui/GlideSelect";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Card, Field, Sheet, inputClass } from "@/components/admin/ui";
@@ -37,15 +39,18 @@ export function StaffManager({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [workingKey, setWorkingKey] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
 
   const isOwner = role === "owner";
 
-  function run(operation: () => Promise<ActionResult>, onDone?: () => void) {
+  function run(operation: () => Promise<ActionResult>, onDone?: () => void, key = "invite") {
+    setWorkingKey(key);
     setResult(null);
     startTransition(async () => {
-      const outcome = await operation();
+      let outcome: ActionResult;
+      try { outcome = await operation(); } catch { outcome = {ok:false,message:"Could not save the change. Check your connection and try again."}; }
       setResult(outcome);
       if (outcome.ok) {
         onDone?.();
@@ -88,36 +93,38 @@ export function StaffManager({
         </Card>
       )}
 
-      <ul className="mb-5 grid gap-2.5">
+      <AnimatedList as="ul" className="mb-5 grid gap-2.5">
         {active.map((person) => (
           <li key={person.id}>
             <StaffCard
               person={person}
               isYou={person.id === currentId}
+              workingKey={workingKey}
               pending={pending}
-              onRole={(next) => run(() => changeStaffRoleAction(person.id, next))}
-              onActive={(next) => run(() => setStaffActiveAction(person.id, next))}
+              onRole={(next) => run(() => changeStaffRoleAction(person.id, next), undefined, `${person.id}:role`)}
+              onActive={(next) => run(() => setStaffActiveAction(person.id, next), undefined, `${person.id}:active`)}
             />
           </li>
         ))}
-      </ul>
+      </AnimatedList>
 
       {inactive.length > 0 && (
         <>
           <p className="mb-2 text-sm font-bold text-slate-500">Switched off</p>
-          <ul className="mb-5 grid gap-2.5">
+          <AnimatedList as="ul" className="mb-5 grid gap-2.5">
             {inactive.map((person) => (
               <li key={person.id}>
                 <StaffCard
                   person={person}
                   isYou={person.id === currentId}
+                  workingKey={workingKey}
                   pending={pending}
-                  onRole={(next) => run(() => changeStaffRoleAction(person.id, next))}
-                  onActive={(next) => run(() => setStaffActiveAction(person.id, next))}
+                  onRole={(next) => run(() => changeStaffRoleAction(person.id, next), undefined, `${person.id}:role`)}
+                  onActive={(next) => run(() => setStaffActiveAction(person.id, next), undefined, `${person.id}:active`)}
                 />
               </li>
             ))}
-          </ul>
+          </AnimatedList>
         </>
       )}
 
@@ -130,7 +137,7 @@ export function StaffManager({
 
       <InviteSheet
         open={inviteOpen}
-        pending={pending}
+        pending={pending && workingKey === "invite"}
         onClose={() => setInviteOpen(false)}
         onInvite={(name, email, inviteRole) =>
           run(() => inviteStaffAction(name, email, inviteRole), () => setInviteOpen(false))
@@ -143,12 +150,14 @@ export function StaffManager({
 function StaffCard({
   person,
   isYou,
+  workingKey,
   pending,
   onRole,
   onActive,
 }: {
   person: StaffMember;
   isYou: boolean;
+  workingKey: string;
   pending: boolean;
   onRole: (role: Role) => void;
   onActive: (active: boolean) => void;
@@ -185,20 +194,15 @@ function StaffCard({
         <div className="mt-3 grid gap-2 border-t border-slate-100 pt-3 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1 block text-xs font-bold text-slate-500">What they can do</span>
-            <select
-              value={person.role}
-              disabled={pending || !person.active}
-              onChange={(event) => onRole(event.target.value as Role)}
-              className={`${inputClass} disabled:opacity-50`}
-            >
-              <option value="order_staff">Order staff</option>
-              <option value="manager">Manager</option>
-              <option value="owner">Owner</option>
-            </select>
+            <GlideSelect ariaLabel={`Role for ${person.name}`} value={person.role} disabled={pending || !person.active}
+              busy={pending && workingKey === `${person.id}:role`} onChange={value => onRole(value as Role)} className="w-full"
+              options={[{value:"order_staff",label:"Order staff"},{value:"manager",label:"Manager"},{value:"owner",label:"Owner"}]}/>
+
           </label>
 
           <div className="flex items-end">
             <Button
+              busy={pending && workingKey === `${person.id}:active`}
               variant={person.active ? "danger" : "secondary"}
               full
               disabled={pending}

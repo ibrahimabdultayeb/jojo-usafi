@@ -47,14 +47,17 @@ export function ProductPhoto({
   const router = useRouter();
   const chooser = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
+  const [workingKey, setWorkingKey] = useState("upload");
   const [result, setResult] = useState<MediaResult | null>(null);
 
   const mayEdit = can(role, "products.editVisibility");
 
-  function run(operation: () => Promise<MediaResult>) {
+  function run(operation: () => Promise<MediaResult>, key = "upload") {
+    setWorkingKey(key);
     setResult(null);
     startTransition(async () => {
-      const outcome = await operation();
+      let outcome: MediaResult;
+      try { outcome = await operation(); } catch { outcome = {ok:false,message:"Could not update the photo. Check your connection and try again."}; }
       setResult(outcome);
       if (outcome.ok) router.refresh();
     });
@@ -136,7 +139,7 @@ export function ProductPhoto({
               aria-hidden="true"
               tabIndex={-1}
             />
-            <Button busy={pending}
+            <Button busy={pending && workingKey === "upload"}
               variant="accent"
               icon="plus"
               full
@@ -147,12 +150,12 @@ export function ProductPhoto({
             </Button>
 
             {image && (
-              <Button
+              <Button busy={pending && workingKey === "remove"}
                 variant="danger"
                 icon="trash"
                 full
                 disabled={pending}
-                onClick={() => run(() => removeProductImageAction(sku))}
+                onClick={() => run(() => removeProductImageAction(sku), "remove")}
               >
                 Take it off
               </Button>

@@ -2,7 +2,7 @@
 
 import { Spinner } from "@/components/ui/Spinner";
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 
 /**

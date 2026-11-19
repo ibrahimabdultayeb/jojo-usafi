@@ -1,5 +1,8 @@
 "use client";
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
+import GlideSelect from "@/components/ui/GlideSelect";
+import { FilterTabs } from "@/components/ui/FilterTabs";
+import { AnimatedList } from "@/components/ui/AnimatedList";
 import { useMemo, useState } from "react";
 import { Badge, Card, EmptyState } from "@/components/admin/ui";
 import { formatTsh, shortPhone, whenExactly } from "@/lib/admin/format";
@@ -33,20 +36,20 @@ export function OrdersBrowser({orders,initialStage}: {orders:AdminOrder[];initia
   const count = (stages:OrderStage[])=>stages.length?orders.filter(o=>stages.includes(o.stage)).length:orders.length;
   const hasFilters = filter!=="all"||term||zone||sort!=="newest";
   return <>
-    <div className="admin-order-tabs" aria-label="Filter orders by status">{tabs.map(f=><button type="button" key={f.key} aria-pressed={filter===f.key} onClick={()=>setFilter(f.key)}>{f.label}<span>{count(f.stages)}</span></button>)}</div>
+    <FilterTabs label="Filter orders by status" value={filter} onChange={setFilter} items={tabs.map(tab=>({value:tab.key,label:tab.label,count:count(tab.stages)}))}/>
     <div className="admin-order-filters">
-      <select className="admin-mobile-status" aria-label="Order status" value={filter} onChange={e=>setFilter(e.target.value)}>{tabs.map(f=><option key={f.key} value={f.key}>{f.label} ({count(f.stages)})</option>)}</select>
+
       <label className="admin-order-search"><Icon name="search"/><input type="search" value={term} onChange={e=>setTerm(e.target.value)} placeholder="Order number, customer or phone" aria-label="Search orders"/></label>
-      <select aria-label="Delivery zone" value={zone} onChange={e=>setZone(e.target.value)}><option value="">All zones</option>{zones.map(z=><option key={z}>{z}</option>)}</select>
-      <select aria-label="Sort orders" value={sort} onChange={e=>setSort(e.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="total">Highest total</option></select>
+      <GlideSelect ariaLabel="Delivery zone" value={zone} onChange={setZone} options={[{value:"",label:"All zones"},...zones.map(value=>({value,label:value}))]}/>
+      <GlideSelect ariaLabel="Sort orders" value={sort} onChange={setSort} options={[{value:"newest",label:"Newest first"},{value:"oldest",label:"Oldest first"},{value:"total",label:"Highest total"}]}/>
       {hasFilters && <button type="button" onClick={()=>{setFilter("all");setTerm("");setZone("");setSort("newest");}}>Clear filters</button>}
     </div>
     <p className="admin-result-count" role="status">{visible.length} of {orders.length} orders</p>
     {!visible.length?<EmptyState title="No orders match" body="Try another status, zone or search term."/>:<>
-      <Card className="admin-orders-table-wrap overflow-hidden"><table className="admin-orders-table"><thead><tr>{["ORDER","CUSTOMER","PLACED","ZONE","ITEMS","TOTAL","STATUS","NEXT ACTION"].map(label=><th key={label} scope="col">{label}</th>)}</tr></thead><tbody>{visible.map(order=>{
+      <Card className="admin-orders-table-wrap overflow-hidden"><table className="admin-orders-table"><thead><tr>{["ORDER","CUSTOMER","PLACED","ZONE","ITEMS","TOTAL","STATUS","NEXT ACTION"].map(label=><th key={label} scope="col">{label}</th>)}</tr></thead><AnimatedList as="tbody" resetKey={`${filter}:${term}:${zone}:${sort}`}>{visible.map(order=>{
         const totals=orderTotals(order);return <tr key={order.id}><td><Link href={`/admin/orders/${order.id}`}>{order.number}</Link></td><td><strong>{order.customer.name}</strong><small>{shortPhone(order.customer.phone)} · {order.payment.preference==="Cash on delivery"?"Cash":"Digital"}</small></td><td>{whenExactly(order.placed)}</td><td>{order.delivery.zone}</td><td>{totals.items}</td><td><strong>{formatTsh(totals.total)}</strong></td><td><Badge tone={STAGE_TONE[order.stage]}>{STAGE_LABEL[order.stage]}</Badge></td><td><Link href={`/admin/orders/${order.id}`}>{NEXT_ACTION[order.stage]?.label??"View order"}</Link></td></tr>;
-      })}</tbody></table></Card>
-      <ul className="admin-order-cards">{visible.map(order=>{const totals=orderTotals(order);return <li key={order.id}><Card className="p-4"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="font-display text-base">{order.number}</strong><Badge tone={STAGE_TONE[order.stage]}>{STAGE_LABEL[order.stage]}</Badge></div><p className="mt-2 text-sm font-semibold">{order.customer.name}</p><p className="mt-1 text-xs text-slate-500">{order.delivery.zone} · {totals.items} items · {whenExactly(order.placed)}</p><div className="mt-3 flex flex-wrap items-center justify-between gap-3"><strong className="font-display">{formatTsh(totals.total)}</strong><Link href={`/admin/orders/${order.id}`} className="admin-link-button">{NEXT_ACTION[order.stage]?.label??"View order"}</Link></div></Card></li>;})}</ul>
+      })}</AnimatedList></table></Card>
+      <AnimatedList as="ul" className="admin-order-cards" resetKey={`${filter}:${term}:${zone}:${sort}`}>{visible.map(order=>{const totals=orderTotals(order);return <li key={order.id}><Card className="p-4"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="font-display text-base">{order.number}</strong><Badge tone={STAGE_TONE[order.stage]}>{STAGE_LABEL[order.stage]}</Badge></div><p className="mt-2 text-sm font-semibold">{order.customer.name}</p><p className="mt-1 text-xs text-slate-500">{order.delivery.zone} · {totals.items} items · {whenExactly(order.placed)}</p><div className="mt-3 flex flex-wrap items-center justify-between gap-3"><strong className="font-display">{formatTsh(totals.total)}</strong><Link href={`/admin/orders/${order.id}`} className="admin-link-button">{NEXT_ACTION[order.stage]?.label??"View order"}</Link></div></Card></li>;})}</AnimatedList>
     </>}
   </>;
 }

@@ -3,6 +3,8 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Card, PrimaryAction, SectionTitle, StatTile } from "@/components/admin/ui";
+import { Spinner } from "@/components/ui/Spinner";
+import { AnimatedList } from "@/components/ui/AnimatedList";
 import { Icon } from "@/components/ui/Icon";
 import { whenExactly } from "@/lib/admin/format";
 import { can, type Role } from "@/lib/admin/permissions";
@@ -31,6 +33,7 @@ export function SyncManager({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [workingKey, setWorkingKey] = useState("");
   const [result, setResult] = useState<SyncActionResult | null>(null);
   // Read here rather than at the point of use: hooks cannot be called inside a
   // conditional, and the value is needed by one tile.
@@ -38,10 +41,12 @@ export function SyncManager({
 
   const maySync = can(role, "catalogue.sync");
 
-  function run(operation: () => Promise<SyncActionResult>) {
+  function run(operation: () => Promise<SyncActionResult>, key: string) {
+    setWorkingKey(key);
     setResult(null);
     startTransition(async () => {
-      const outcome = await operation();
+      let outcome: SyncActionResult;
+      try { outcome = await operation(); } catch { outcome = {ok:false,headline:"Could not complete the request. Check your connection and try again.",detail:[]}; }
       setResult(outcome);
       router.refresh();
     });
@@ -102,10 +107,10 @@ export function SyncManager({
       {/* The action */}
       {maySync ? (
         <div className="mb-5 space-y-2.5">
-          <PrimaryAction busy={pending} icon="sparkle" onClick={() => run(() => runSyncAction(false))} disabled={pending}>
-            {pending ? "Working…" : "Sync now"}
+          <PrimaryAction busy={pending && workingKey === "sync"} icon="sparkle" onClick={() => run(() => runSyncAction(false), "sync")} disabled={pending}>
+            {pending && workingKey === "sync" ? "Working…" : "Sync now"}
           </PrimaryAction>
-          <Button variant="secondary" full disabled={pending} onClick={() => run(() => runSyncAction(true))}>
+          <Button busy={pending && workingKey === "check"} variant="secondary" full disabled={pending} onClick={() => run(() => runSyncAction(true), "check")}>
             Check first, change nothing
           </Button>
         </div>
@@ -123,14 +128,14 @@ export function SyncManager({
             {result.headline}
           </p>
           {result.detail.length > 0 && (
-            <ul className="mt-2 space-y-1">
+            <AnimatedList as="ul" className="mt-2 space-y-1">
               {result.detail.map((line) => (
                 <li key={line} className="flex gap-2 text-sm font-medium text-slate-600">
                   <Icon name="chevronRight" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-300" />
                   {line}
                 </li>
               ))}
-            </ul>
+            </AnimatedList>
           )}
         </Card>
       )}
@@ -143,7 +148,7 @@ export function SyncManager({
             The Google Sheet and Jojo Usafi were both changed, so neither was applied. Choose which
             one is right.
           </p>
-          <ul className="mb-5 grid gap-2.5">
+          <AnimatedList as="ul" className="mb-5 grid gap-2.5">
             {conflicts.map((conflict) => (
               <li key={conflict.id}>
                 <Card className="p-4">
@@ -159,13 +164,15 @@ export function SyncManager({
                       who="Google Sheet"
                       value={conflict.sheetValue}
                       disabled={pending || !maySync}
-                      onChoose={() => run(() => resolveConflictAction(conflict.id, "sheet"))}
+                      busy={pending && workingKey === `${conflict.id}:sheet`}
+                      onChoose={() => run(() => resolveConflictAction(conflict.id, "sheet"), `${conflict.id}:sheet`)}
                     />
                     <ConflictChoice
                       who="Jojo Usafi"
                       value={conflict.dbValue}
                       disabled={pending || !maySync}
-                      onChoose={() => run(() => resolveConflictAction(conflict.id, "database"))}
+                      busy={pending && workingKey === `${conflict.id}:database`}
+                      onChoose={() => run(() => resolveConflictAction(conflict.id, "database"), `${conflict.id}:database`)}
                     />
                   </div>
 
@@ -175,7 +182,7 @@ export function SyncManager({
                 </Card>
               </li>
             ))}
-          </ul>
+          </AnimatedList>
         </>
       )}
 
@@ -197,11 +204,13 @@ function ConflictChoice({
   who,
   value,
   disabled,
+  busy,
   onChoose,
 }: {
   who: string;
   value: string;
   disabled: boolean;
+  busy: boolean;
   onChoose: () => void;
 }) {
   return (
@@ -209,11 +218,12 @@ function ConflictChoice({
       type="button"
       onClick={onChoose}
       disabled={disabled}
+      aria-busy={busy}
       className="flex min-h-16 flex-col items-start justify-center rounded-xl border-2 border-slate-200 bg-white px-4 py-2 text-left transition-colors hover:border-brand-400 hover:bg-brand-50 disabled:pointer-events-none disabled:opacity-40"
     >
       <span className="text-[11px] font-bold tracking-wide text-slate-400 uppercase">{who}</span>
       <span className="font-display text-base font-bold text-slate-900">{value}</span>
-      <span className="mt-0.5 text-[11px] font-semibold text-brand-700">Use this one</span>
+      <span className="mt-0.5 text-[11px] font-semibold text-brand-700">{busy ? <><Spinner/> Saving…</> : "Use this one"}</span>
     </button>
   );
 }

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { notFound } from "next/navigation";
 import { AdminPage } from "@/components/admin/AdminShell";
 import { Badge, Card, SectionTitle, StatTile } from "@/components/admin/ui";

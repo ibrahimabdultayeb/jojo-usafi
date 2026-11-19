@@ -2,7 +2,7 @@
 
 // Adapted from React Bits Branched Menu (MIT + Commons Clause).
 // See THIRD_PARTY_NOTICES.md. Uses real Next links and the existing icon set.
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
 

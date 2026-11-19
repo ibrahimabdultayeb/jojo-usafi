@@ -1,7 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
+import { FilterTabs } from "@/components/ui/FilterTabs";
+import { AnimatedList } from "@/components/ui/AnimatedList";
 import { useMemo, useState } from "react";
 import { Badge, Card, EmptyState, inputClass } from "@/components/admin/ui";
 import { formatTsh } from "@/lib/admin/format";
@@ -104,28 +106,9 @@ export function ProductsBrowser({
         />
       </div>
 
-      <div className="no-scrollbar -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-        {FILTERS.map((f) => {
-          const active = f.key === filter;
-          const count = products.filter((p) => matchesFilter(p, f.key)).length;
-          return (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setFilter(f.key)}
-              aria-pressed={active}
-              className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3.5 text-sm font-bold transition-colors ${
-                active
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              {f.label}
-              <span className={`text-xs tabular-nums ${active ? "text-white/70" : "text-slate-400"}`}>{count}</span>
-            </button>
-          );
-        })}
-      </div>
+      <FilterTabs label="Filter products" value={filter} onChange={value => setFilter(value as FilterKey)}
+        items={FILTERS.map(item => ({value:item.key,label:item.label,count:products.filter(product => matchesFilter(product,item.key)).length}))}/>
+
 
       <p className="mb-3 text-xs font-bold text-slate-400">
         {visible.length} {visible.length === 1 ? "product" : "products"}
@@ -138,7 +121,7 @@ export function ProductsBrowser({
           icon="cart"
         />
       ) : (
-        <Card className="divide-y divide-slate-100">
+        <Card><AnimatedList className="divide-y divide-slate-100" resetKey={`${filter}:${term}`}>
           {visible.map((product) => {
             const badges = badgesFor(product);
             const brand = product.brandName;
@@ -148,7 +131,7 @@ export function ProductsBrowser({
                 href={`/admin/products/${product.sku}`}
                 className="flex items-center gap-3 p-3 transition-colors hover:bg-slate-50"
               >
-                <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
+                <span className="admin-product-thumbnail relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
                   {product.image ? (
                     <Image
                       src={product.image.src}
@@ -197,7 +180,7 @@ export function ProductsBrowser({
               </Link>
             );
           })}
-        </Card>
+        </AnimatedList></Card>
       )}
     </>
   );

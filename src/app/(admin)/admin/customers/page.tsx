@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { AnimatedList } from "@/components/ui/AnimatedList";
+import Link from "@/components/ui/LoadingLink";
 import { AdminPage } from "@/components/admin/AdminShell";
 import { Card, EmptyState } from "@/components/admin/ui";
 import { formatTsh, whenWords } from "@/lib/admin/format";
@@ -21,7 +22,7 @@ export default async function AdminCustomersPage() {
           body="A customer appears here the moment they place their first order."
         />
       ) : (
-        <Card className="divide-y divide-slate-100">
+        <Card><AnimatedList className="divide-y divide-slate-100">
           {customers.map((customer) => (
             <Link
               key={customer.id}
@@ -50,7 +51,7 @@ export default async function AdminCustomersPage() {
               <Icon name="chevronRight" className="h-4 w-4 shrink-0 text-slate-300" />
             </Link>
           ))}
-        </Card>
+        </AnimatedList></Card>
       )}
     </AdminPage>
   );

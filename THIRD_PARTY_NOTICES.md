@@ -1,12 +1,17 @@
 
-## React Bits — Lattice Loader, Logo Loop and Branched Menu
+## React Bits — Lattice Loader, Logo Loop, Branched Menu, Glide Select, Rubber Segment and Animated List
 
 Sources:
 - https://reactbits.dev/micro/lattice-loader
 - https://reactbits.dev/animations/logo-loop
 - https://reactbits.dev/micro/branched-menu
+- https://reactbits.dev/c/micro/glide-select
+- https://reactbits.dev/c/micro/rubber-segment
+- https://reactbits.dev/c/components/animated-list
 
 Adapted for compact action indicators, localization, reduced motion, and optional timers. Logo Loop uses storefront navigation. Branched Menu is adapted to route-aware Next.js links, permission-filtered sections, keyboard access, and the existing icon set.
+
+Glide Select adds viewport placement, native form validation, long-list scrolling and loading feedback. Rubber Segment supports touch scrolling and keyboard activation. Animated List uses the source spring curve and reveal pattern with semantic document lists/tables, capped staggering and reduced-motion support.
 
 MIT + Commons Clause License Condition v1.0
 

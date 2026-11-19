@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/ui/LoadingLink";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { getAdminSession, ownerExists } from "@/lib/admin/session";
 import { ClaimOwnerForm } from "./ClaimOwnerForm";

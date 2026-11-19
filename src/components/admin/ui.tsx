@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal, useFormStatus } from "react-dom";
 import { Spinner } from "@/components/ui/Spinner";
 import { Icon, type IconName } from "@/components/ui/Icon";
 
@@ -106,6 +106,8 @@ export function Button({
   className = "",
   title,
 }: ButtonProps) {
+  const form = useFormStatus();
+  busy = busy || (type === "submit" && form.pending);
   return (
     <button
       type={type}
@@ -214,13 +216,13 @@ export function Toggle({
         <span className="block text-sm font-bold text-slate-900">{label}</span>
         {hint && <span className="block text-xs font-medium text-slate-500">{hint}</span>}
       </span>
-      <span
+      {busy ? <Spinner/> : <span
         className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${checked ? "bg-brand-600" : "bg-slate-300"}`}
       >
         <span
           className={`admin-switch-thumb absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${checked ? "left-6" : "left-1"}`}
         />
-      </span>
+      </span>}
     </button>
   );
 }
@@ -246,12 +248,19 @@ export function Sheet({
   busy?: boolean;
   error?: string | null;
 }) {
+  const [mounted, setMounted] = useState(open);
+  const present = open || mounted;
+  useEffect(() => {
+    if (open) { setMounted(true); return; }
+    const timer = setTimeout(() => setMounted(false), 180);
+    return () => clearTimeout(timer);
+  }, [open]);
   const dialog = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   const working = useRef(busy);
   useEffect(() => { close.current = onClose; working.current = busy; }, [onClose, busy]);
   useEffect(() => {
-    if (!open) return;
+    if (!present) return;
     const previous = document.body.style.overflow;
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     document.body.style.overflow = "hidden";
@@ -272,12 +281,12 @@ export function Sheet({
       window.removeEventListener("keydown", onKey);
       if (trigger?.isConnected) trigger.focus();
     };
-  }, [open]);
+  }, [present]);
 
-  if (!open || typeof document === "undefined") return null;
+  if (!present || typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="admin-workspace admin-dialog-overlay fixed inset-0 z-60 flex items-end justify-center sm:items-center">
+    <div data-state={open ? "open" : "closing"} className="admin-workspace admin-dialog-overlay fixed inset-0 z-60 flex items-end justify-center sm:items-center">
       <button
         type="button"
         aria-label="Close"

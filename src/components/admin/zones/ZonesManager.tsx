@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatedList } from "@/components/ui/AnimatedList";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Card, Field, SaveState, Sheet, Toggle, inputClass } from "@/components/admin/ui";
@@ -55,7 +56,12 @@ export function ZonesManager({ zones, role }: { zones: AdminZoneRow[]; role: Rol
         active: draft.active,
         sortPriority: draft.sortPriority,
       };
-      const result = await saveZoneAction(draft.id, patch);
+      let result;
+      try { result = await saveZoneAction(draft.id, patch); } catch {
+        setSave("failed");
+        setProblem("Could not save the change. Check your connection and try again.");
+        return;
+      }
       if (result.ok) {
         setSave("saved");
         setEditing(null);
@@ -97,7 +103,7 @@ export function ZonesManager({ zones, role }: { zones: AdminZoneRow[]; role: Rol
         </p>
       )}
 
-      <ul className="grid gap-2.5">
+      <AnimatedList as="ul" className="grid gap-2.5">
         {zones.map((zone, index) => (
           <li key={zone.id}>
             <Card className={`p-4 ${zone.active ? "" : "opacity-60"}`}>
@@ -129,7 +135,7 @@ export function ZonesManager({ zones, role }: { zones: AdminZoneRow[]; role: Rol
             </Card>
           </li>
         ))}
-      </ul>
+      </AnimatedList>
 
       {zones.length === 0 && (
         <Card className="p-6 text-center">

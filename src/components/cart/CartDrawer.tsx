@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatedList } from "@/components/ui/AnimatedList";
 import Link from "@/components/ui/LoadingLink";
 import { SlideOver } from "@/components/ui/SlideOver";
 import { Icon } from "@/components/ui/Icon";
@@ -52,7 +53,7 @@ export function CartDrawer() {
             </Link>
           </div>
         ) : (
-          <ul className="flex-1 divide-y divide-slate-100 overflow-y-auto overscroll-contain px-4 sm:px-5">
+          <AnimatedList as="ul" className="flex-1 divide-y divide-slate-100 overflow-y-auto overscroll-contain px-4 sm:px-5">
             {items.map(({ product, quantity, lineTotal }) => {
               const name = productName(product);
               return (
@@ -121,7 +122,7 @@ export function CartDrawer() {
                 </li>
               );
             })}
-          </ul>
+          </AnimatedList>
         )}
 
         {items.length > 0 && (

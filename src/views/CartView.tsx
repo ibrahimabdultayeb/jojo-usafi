@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatedList } from "@/components/ui/AnimatedList";
 import Link from "@/components/ui/LoadingLink";
 import { ProductPhoto } from "@/components/product/ProductPhoto";
 import { Icon } from "@/components/ui/Icon";
@@ -49,7 +50,7 @@ export function CartView() {
         </div>
       ) : (
         <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_22rem] lg:items-start lg:gap-10">
-          <ul className="space-y-3">
+          <AnimatedList as="ul" className="space-y-3">
             {items.map(({ product, quantity, lineTotal }) => {
               const name = productName(product);
               return (
@@ -124,7 +125,7 @@ export function CartView() {
                 </li>
               );
             })}
-          </ul>
+          </AnimatedList>
 
           <aside className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-28">
             <h2 className="font-display text-lg font-bold text-slate-900">{t.cart.orderSummary}</h2>

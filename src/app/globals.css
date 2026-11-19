@@ -46,6 +46,7 @@
   html {
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
+    scrollbar-gutter: stable;
   }
 
   body {
@@ -222,3 +223,9 @@
 .cart-count-feedback { animation: cart-count-pop 260ms ease-out; }
 .cart-line-enter { animation: rise 260ms ease-out both; }
 @keyframes cart-count-pop { 0% { transform: scale(.72); } 55% { transform: scale(1.16); } 100% { transform: scale(1); } }
+
+/* Keep classic-scrollbar browsers stable even without scrollbar-gutter support. */
+@supports not (scrollbar-gutter: stable) { html { overflow-y:scroll; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto; } }
+
+.shop-filter-tabs { margin-bottom:0; }
