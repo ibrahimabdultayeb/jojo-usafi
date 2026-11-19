@@ -5,7 +5,8 @@ import { FilterTabs } from "@/components/ui/FilterTabs";
 import { AnimatedList } from "@/components/ui/AnimatedList";
 import { useMemo, useState } from "react";
 import { Badge, Card, EmptyState } from "@/components/admin/ui";
-import { formatTsh, shortPhone, whenExactly } from "@/lib/admin/format";
+import { formatTsh, whenExactly } from "@/lib/admin/format";
+import { formatPhoneE164 } from "@/lib/domain/phone";
 import { Icon } from "@/components/ui/Icon";
 import { orderTotals, NEXT_ACTION, STAGE_LABEL, STAGE_TONE, type AdminOrder, type OrderStage } from "@/lib/admin/model";
 
@@ -19,6 +20,25 @@ const FILTERS: {key:string;label:string;stages:OrderStage[]}[] = [
   {key:"completed",label:"Completed",stages:["completed"]},
   {key:"exceptions",label:"Exceptions",stages:["cancelled","delivery_failed"]},
 ];
+
+function OrderCustomer({ order }: { order: AdminOrder }) {
+  return <div className="admin-order-customer">
+    <strong>{order.customer.name}</strong>
+    <span className="admin-order-phone">{formatPhoneE164(order.customer.phone)}</span>
+  </div>;
+}
+
+function OrderButton({ order }: { order: AdminOrder }) {
+  const label = NEXT_ACTION[order.stage]?.label ?? "View order";
+  return <Link href={`/admin/orders/${order.id}`} className="admin-order-open" aria-label={`${label} ${order.number}`}>
+    <span>{label}</span>
+  </Link>;
+}
+
+function paymentLabel(order: AdminOrder) {
+  return order.payment.preference === "Cash on delivery" ? "Cash on delivery" : "Digital on delivery";
+}
+
 export function OrdersBrowser({orders,initialStage}: {orders:AdminOrder[];initialStage?:string}) {
   const [filter,setFilter] = useState(FILTERS.some(f=>f.key===initialStage)?initialStage!:initialStage==="delivery_failed"||initialStage==="cancelled"?initialStage:"all");
   const [term,setTerm] = useState("");
@@ -46,10 +66,56 @@ export function OrdersBrowser({orders,initialStage}: {orders:AdminOrder[];initia
     </div>
     <p className="admin-result-count" role="status">{visible.length} of {orders.length} orders</p>
     {!visible.length?<EmptyState fillPage title="No orders match" body="Try another status, zone or search term."/>:<>
-      <Card className="admin-orders-table-wrap overflow-hidden"><table className="admin-orders-table"><thead><tr>{["ORDER","CUSTOMER","PLACED","ZONE","ITEMS","TOTAL","STATUS","NEXT ACTION"].map(label=><th key={label} scope="col">{label}</th>)}</tr></thead><AnimatedList as="tbody" resetKey={`${filter}:${term}:${zone}:${sort}`}>{visible.map(order=>{
-        const totals=orderTotals(order);return <tr key={order.id}><td><Link href={`/admin/orders/${order.id}`}>{order.number}</Link></td><td><strong>{order.customer.name}</strong><small>{shortPhone(order.customer.phone)} · {order.payment.preference==="Cash on delivery"?"Cash":"Digital"}</small></td><td>{whenExactly(order.placed)}</td><td>{order.delivery.zone}</td><td>{totals.items}</td><td><strong>{formatTsh(totals.total)}</strong></td><td><Badge tone={STAGE_TONE[order.stage]}>{STAGE_LABEL[order.stage]}</Badge></td><td><Link href={`/admin/orders/${order.id}`}>{NEXT_ACTION[order.stage]?.label??"View order"}</Link></td></tr>;
-      })}</AnimatedList></table></Card>
-      <AnimatedList as="ul" className="admin-order-cards" resetKey={`${filter}:${term}:${zone}:${sort}`}>{visible.map(order=>{const totals=orderTotals(order);return <li key={order.id}><Card className="p-4"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="font-display text-base">{order.number}</strong><Badge tone={STAGE_TONE[order.stage]}>{STAGE_LABEL[order.stage]}</Badge></div><p className="mt-2 text-sm font-semibold">{order.customer.name}</p><p className="mt-1 text-xs text-slate-500">{order.delivery.zone} · {totals.items} items · {whenExactly(order.placed)}</p><div className="mt-3 flex flex-wrap items-center justify-between gap-3"><strong className="font-display">{formatTsh(totals.total)}</strong><Link href={`/admin/orders/${order.id}`} className="admin-link-button">{NEXT_ACTION[order.stage]?.label??"View order"}</Link></div></Card></li>;})}</AnimatedList>
+      <Card className="admin-orders-table-wrap">
+        <table className="admin-orders-table">
+          <caption className="sr-only">Orders with customer contact details, delivery zones, totals and next steps</caption>
+          <thead><tr>{["Order / placed", "Customer", "Delivery zone", "Total / payment", "Status", "Next step"].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+          <AnimatedList as="tbody" resetKey={`${filter}:${term}:${zone}:${sort}`}>
+            {visible.map(order => {
+              const totals = orderTotals(order);
+              return <tr key={order.id}>
+                <td>
+                  <Link className="admin-order-number" href={`/admin/orders/${order.id}`}>{order.number}</Link>
+                  <time className="admin-order-placed" dateTime={order.placed}>{whenExactly(order.placed)}</time>
+                </td>
+                <td><OrderCustomer order={order}/></td>
+                <td>{order.delivery.zone}</td>
+                <td>
+                  <strong className="admin-order-total">{formatTsh(totals.total)}</strong>
+                  <span className="admin-order-meta">{totals.items} {totals.items === 1 ? "item" : "items"}</span>
+                  <span className="admin-order-meta">{paymentLabel(order)}</span>
+                </td>
+                <td><Badge tone={STAGE_TONE[order.stage]}>{STAGE_LABEL[order.stage]}</Badge></td>
+                <td><OrderButton order={order}/></td>
+              </tr>;
+            })}
+          </AnimatedList>
+        </table>
+      </Card>
+      <AnimatedList as="ul" className="admin-order-cards" label="Orders" resetKey={`${filter}:${term}:${zone}:${sort}`}>
+        {visible.map(order => {
+          const totals = orderTotals(order);
+          return <li key={order.id}>
+            <Card className="admin-order-card">
+              <div className="admin-order-card-heading">
+                <Link className="admin-order-number" href={`/admin/orders/${order.id}`}>{order.number}</Link>
+                <Badge tone={STAGE_TONE[order.stage]}>{STAGE_LABEL[order.stage]}</Badge>
+              </div>
+              <OrderCustomer order={order}/>
+              <dl className="admin-order-facts">
+                <div><dt>Placed</dt><dd><time dateTime={order.placed}>{whenExactly(order.placed)}</time></dd></div>
+                <div><dt>Delivery zone</dt><dd>{order.delivery.zone}</dd></div>
+                <div><dt>Items</dt><dd>{totals.items} {totals.items === 1 ? "item" : "items"}</dd></div>
+                <div><dt>Payment</dt><dd>{paymentLabel(order)}</dd></div>
+              </dl>
+              <div className="admin-order-card-footer">
+                <div><span className="admin-order-meta">Order total</span><strong className="admin-order-total">{formatTsh(totals.total)}</strong></div>
+                <OrderButton order={order}/>
+              </div>
+            </Card>
+          </li>;
+        })}
+      </AnimatedList>
     </>}
   </>;
 }

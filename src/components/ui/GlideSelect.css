@@ -13,10 +13,10 @@
 .glide-select__menu[data-state=closing] { animation:gs-close .12s ease both; pointer-events:none; }
 .glide-select__list { position:relative; overflow-y:auto; overscroll-behavior:contain; min-height:0; scrollbar-width:thin; scrollbar-color:var(--gs-muted) transparent; }
 .glide-select__pill { position:absolute; top:0; right:0; left:0; height:44px; border-radius:9px; background:var(--gs-highlight); pointer-events:none; opacity:0; transition:transform .22s cubic-bezier(.23,1,.32,1),opacity .15s; }
-.glide-select__option { position:relative; display:flex; align-items:center; gap:10px; height:44px; margin-bottom:1px; padding:0 12px; border-radius:9px; font-size:14px; cursor:pointer; user-select:none; }
+.glide-select__option { position:relative; display:flex; align-items:center; gap:10px; min-height:44px; margin-bottom:1px; padding:10px 12px; border-radius:9px; font-size:14px; line-height:1.45; cursor:pointer; user-select:none; }
 .glide-select__option[aria-disabled=true] { opacity:.4; cursor:not-allowed; }
 .glide-select__option[aria-selected=true] { color:var(--gs-accent); font-weight:700; }
-.glide-select__name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.glide-select__name { flex:1; min-width:0; white-space:normal; overflow-wrap:anywhere; }
 .glide-select__tag { color:var(--gs-muted); font-size:12px; white-space:nowrap; }
 .glide-select__native { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; clip-path:inset(50%); }
 @keyframes gs-open { from { opacity:0; transform:scale(.95) translateY(-3px); } to { opacity:1; transform:none; } }
