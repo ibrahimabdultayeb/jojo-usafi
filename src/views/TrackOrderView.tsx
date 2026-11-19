@@ -1,5 +1,8 @@
 "use client";
 
+import { AnimatedList } from "@/components/ui/AnimatedList";
+
+
 import Link from "@/components/ui/LoadingLink";
 import { useActionState } from "react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -115,7 +118,7 @@ export function TrackOrderView() {
               </span>
             </div>
 
-            <ul className="mt-5 space-y-2.5 border-b border-slate-100 pb-4">
+            <AnimatedList as="ul" className="mt-5 space-y-2.5 border-b border-slate-100 pb-4">
               {order.items.map((item) => (
                 <li key={item.sku} className="flex justify-between gap-3 text-sm">
                   <span className="min-w-0 font-semibold text-slate-600">
@@ -127,7 +130,7 @@ export function TrackOrderView() {
                   </span>
                 </li>
               ))}
-            </ul>
+            </AnimatedList>
 
             <dl className="mt-4 space-y-2.5 text-sm">
               <div className="flex justify-between gap-3 text-base">
@@ -151,7 +154,7 @@ export function TrackOrderView() {
           <h2 className="font-display text-lg font-bold text-slate-900 md:text-xl">
             {t.track.stagesTitle}
           </h2>
-          <ol className="mt-4 space-y-3">
+          <AnimatedList as="ol" className="mt-4 space-y-3">
             {timeline.map((stage, i) => (
               <li
                 key={stage.label}
@@ -169,7 +172,7 @@ export function TrackOrderView() {
                 </div>
               </li>
             ))}
-          </ol>
+          </AnimatedList>
         </section>
 
         <div className="mt-8 flex flex-col gap-3 rounded-3xl bg-slate-50 p-5 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">

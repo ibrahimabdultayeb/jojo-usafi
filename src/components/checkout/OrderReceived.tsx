@@ -1,5 +1,8 @@
 "use client";
 
+import { AnimatedList } from "@/components/ui/AnimatedList";
+
+
 import Link from "@/components/ui/LoadingLink";
 import { Icon } from "@/components/ui/Icon";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
@@ -58,7 +61,7 @@ export function OrderReceived({ order }: { order: PlacedOrderSummary }) {
             {t.confirmation.items}
           </h2>
 
-          <ul className="mt-4 space-y-2.5 border-b border-slate-100 pb-4">
+          <AnimatedList as="ul" className="mt-4 space-y-2.5 border-b border-slate-100 pb-4">
             {order.items.map((item) => (
               <li key={item.sku} className="flex justify-between gap-3 text-sm">
                 <span className="min-w-0 font-semibold text-slate-600">
@@ -70,7 +73,7 @@ export function OrderReceived({ order }: { order: PlacedOrderSummary }) {
                 </span>
               </li>
             ))}
-          </ul>
+          </AnimatedList>
 
           <dl className="mt-4 space-y-2.5 text-sm">
             <div className="flex justify-between gap-3 font-semibold text-slate-600">

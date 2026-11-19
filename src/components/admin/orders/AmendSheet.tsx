@@ -1,5 +1,8 @@
 "use client";
 
+import { AnimatedList } from "@/components/ui/AnimatedList";
+
+
 import { useMemo, useState } from "react";
 import { Badge, Button, Field, Sheet, inputClass } from "@/components/admin/ui";
 import { Icon } from "@/components/ui/Icon";
@@ -132,7 +135,7 @@ export function AmendSheet({
 
   return (
     <Sheet open onClose={onClose} busy={pending} error={error} title={`Change ${order.number}`}>
-      <ul className="mb-4 divide-y divide-slate-100 rounded-xl border border-slate-200">
+      <AnimatedList as="ul" className="mb-4 divide-y divide-slate-100 rounded-xl border border-slate-200">
         {lines.map((line) => (
           <li key={line.sku} className="p-3">
             <div className="flex items-start justify-between gap-3">
@@ -188,7 +191,7 @@ export function AmendSheet({
             An order cannot be empty. Put something back, or cancel the order instead.
           </li>
         )}
-      </ul>
+      </AnimatedList>
 
       {adding ? (
         <div className="mb-4">
@@ -201,7 +204,7 @@ export function AmendSheet({
               placeholder="e.g. Multix"
             />
           </Field>
-          <ul className="mt-2 grid gap-1.5">
+          <AnimatedList as="ul" className="mt-2 grid gap-1.5">
             {matches.map((product) => (
               <li key={product.sku}>
                 <button
@@ -223,7 +226,7 @@ export function AmendSheet({
                 </button>
               </li>
             ))}
-          </ul>
+          </AnimatedList>
           <Button variant="quiet" full className="mt-2" onClick={() => setAdding(false)}>
             Never mind
           </Button>
@@ -238,13 +241,13 @@ export function AmendSheet({
       {changes.length > 0 && (
         <div className="mb-4 rounded-xl border-2 border-brand-200 bg-brand-50 p-3">
           <p className="text-sm font-black text-brand-900">What is changing</p>
-          <ul className="mt-1 space-y-0.5">
+          <AnimatedList as="ul" className="mt-1 space-y-0.5">
             {changes.map((change) => (
               <li key={change} className="text-sm font-semibold text-brand-900">
                 {change}
               </li>
             ))}
-          </ul>
+          </AnimatedList>
           <p className="mt-2 border-t border-brand-200 pt-2 text-sm font-bold text-brand-900">
             New total about {formatTsh(estimate)}
             <span className="block text-xs font-medium text-brand-800">

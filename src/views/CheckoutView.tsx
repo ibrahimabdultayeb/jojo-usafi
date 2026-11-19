@@ -1,5 +1,8 @@
 "use client";
 
+import { AnimatedList } from "@/components/ui/AnimatedList";
+
+
 import Link from "@/components/ui/LoadingLink";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import GlideSelect from "@/components/ui/GlideSelect";
@@ -135,11 +138,11 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
               <p className="font-bold">{t.checkout.basketProblem}</p>
               <p className="mt-1">{state.error}</p>
               {state.problems.length > 0 && (
-                <ul className="mt-2 list-disc space-y-1 pl-5">
+                <AnimatedList as="ul" className="mt-2 list-disc space-y-1 pl-5">
                   {state.problems.map((problem, index) => (
                     <li key={`${problem.kind}-${index}`}>{problem.message}</li>
                   ))}
-                </ul>
+                </AnimatedList>
               )}
               <Link
                 href={path("/cart")}
@@ -329,7 +332,7 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
             </p>
           ) : (
             <>
-              <ul className="mt-4 space-y-2.5 border-b border-slate-100 pb-4">
+              <AnimatedList as="ul" className="mt-4 space-y-2.5 border-b border-slate-100 pb-4">
                 {items.map(({ product, quantity }) => {
                   // The quote's figure, not the cart's — they can differ, and
                   // when they do the shop's number is the true one.
@@ -357,7 +360,7 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                     </li>
                   );
                 })}
-              </ul>
+              </AnimatedList>
 
               <dl className="mt-4 space-y-2.5 text-sm">
                 <Row label={t.checkout.subtotal} value={quote ? formatPrice(quote.subtotal_tzs) : "—"} />
@@ -399,11 +402,11 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                 {quote && !quote.ok && (
                   <div className="rounded-xl bg-amber-50 p-3 text-amber-900">
                     <p>{t.checkout.basketProblem}</p>
-                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                    <AnimatedList as="ul" className="mt-2 list-disc space-y-1 pl-5">
                       {quote.problems.map((problem, index) => (
                         <li key={`${problem.kind}-${index}`}>{problem.message}</li>
                       ))}
-                    </ul>
+                    </AnimatedList>
                     <Link href={path("/cart")} className="inline-flex min-h-11 items-center font-bold underline">
                       {t.checkout.fixBasket}
                     </Link>

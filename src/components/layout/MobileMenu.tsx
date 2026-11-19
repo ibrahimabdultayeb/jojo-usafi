@@ -1,5 +1,8 @@
 "use client";
 
+import { AnimatedList } from "@/components/ui/AnimatedList";
+
+
 import Link from "@/components/ui/LoadingLink";
 import { SlideOver } from "@/components/ui/SlideOver";
 import { Icon } from "@/components/ui/Icon";
@@ -47,7 +50,7 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
         </div>
 
         <nav className="flex-1 overflow-y-auto overscroll-contain px-4 py-5" aria-label="Mobile">
-          <ul className="space-y-1">
+          <AnimatedList as="ul" className="space-y-1">
             {nav.map((item) => (
               <li key={item.href}>
                 <Link
@@ -60,12 +63,12 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
                 </Link>
               </li>
             ))}
-          </ul>
+          </AnimatedList>
 
           <p className="mt-7 mb-3 px-4 text-[11px] font-black tracking-widest text-slate-400 uppercase">
             {t.header.shopByCategory}
           </p>
-          <ul className="space-y-1">
+          <AnimatedList as="ul" className="space-y-1">
             {categories.map((category) => {
               const tone = toneSet(category.tone);
               return (
@@ -96,7 +99,7 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
                 </li>
               );
             })}
-          </ul>
+          </AnimatedList>
 
           <div className="mt-7 flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
             <span className="text-[11px] font-black tracking-widest text-slate-400 uppercase">

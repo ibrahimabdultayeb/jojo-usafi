@@ -1,3 +1,4 @@
+import { AnimatedList } from "@/components/ui/AnimatedList";
 import Link from "@/components/ui/LoadingLink";
 import { notFound } from "next/navigation";
 import { AdminPage } from "@/components/admin/AdminShell";
@@ -82,7 +83,7 @@ export default async function AdminCustomerPage({ params }: { params: Promise<{ 
             <dd className="text-right font-bold text-slate-900">{customer.email ?? "Not given"}</dd>
           </div>
         </dl>
-        <ul className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+        <AnimatedList as="ul" className="mt-3 space-y-2 border-t border-slate-100 pt-3">
           {addresses.length === 0 ? (
             <li className="text-sm font-medium text-slate-500">No delivery address on record yet.</li>
           ) : (
@@ -96,7 +97,7 @@ export default async function AdminCustomerPage({ params }: { params: Promise<{ 
               </li>
             ))
           )}
-        </ul>
+        </AnimatedList>
       </Card>
 
       <SectionTitle>Order history</SectionTitle>

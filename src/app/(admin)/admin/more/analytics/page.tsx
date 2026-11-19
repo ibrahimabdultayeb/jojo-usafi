@@ -1,3 +1,4 @@
+import { AnimatedList } from "@/components/ui/AnimatedList";
 import Link from "@/components/ui/LoadingLink";
 import { AdminPage } from "@/components/admin/AdminShell";
 import { Badge, Card, SectionTitle, StatTile } from "@/components/admin/ui";
@@ -106,7 +107,7 @@ export default async function AdminReportsPage() {
             Nothing has been sold yet, so there is nothing to rank.
           </p>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <AnimatedList as="ul" className="divide-y divide-slate-100">
             {reports.topProducts.map((product) => (
               <li key={product.sku} className="flex items-center gap-3 p-4">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-sm font-black text-brand-800 tabular-nums">
@@ -121,7 +122,7 @@ export default async function AdminReportsPage() {
                 </span>
               </li>
             ))}
-          </ul>
+          </AnimatedList>
         )}
       </Card>
 
@@ -132,7 +133,7 @@ export default async function AdminReportsPage() {
             Nothing on the website is low or out of stock.
           </p>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <AnimatedList as="ul" className="divide-y divide-slate-100">
             {reports.outOfStock.map((row) => (
               <li key={row.sku} className="flex items-center justify-between gap-3 p-4">
                 <span className="min-w-0">
@@ -151,7 +152,7 @@ export default async function AdminReportsPage() {
                 <Badge tone="warn">{row.available} left</Badge>
               </li>
             ))}
-          </ul>
+          </AnimatedList>
         )}
       </Card>
 
@@ -173,7 +174,7 @@ export default async function AdminReportsPage() {
                 largest piece of catalogue work left.
               </p>
             </div>
-            <ul className="divide-y divide-slate-100">
+            <AnimatedList as="ul" className="divide-y divide-slate-100">
               {media.missingPhoto.slice(0, 12).map((row) => (
                 <li key={row.sku}>
                   <Link
@@ -190,7 +191,7 @@ export default async function AdminReportsPage() {
                   </Link>
                 </li>
               ))}
-            </ul>
+            </AnimatedList>
             {media.missingPhotoCount > 12 && (
               <p className="border-t border-slate-100 p-4 text-xs font-medium text-slate-500">
                 and {media.missingPhotoCount - 12} more.
@@ -209,14 +210,14 @@ export default async function AdminReportsPage() {
               automatically — matching a file to a product by its name would be a guess, and a
               guess puts the wrong photograph on a product.
             </p>
-            <ul className="divide-y divide-slate-100">
+            <AnimatedList as="ul" className="divide-y divide-slate-100">
               {media.orphans.slice(0, 10).map((row) => (
                 <li key={row.path} className="p-4">
                   <p className="truncate text-sm font-bold text-slate-900">{row.filename ?? row.path}</p>
                   <p className="truncate text-xs font-medium text-slate-500">{row.path}</p>
                 </li>
               ))}
-            </ul>
+            </AnimatedList>
           </Card>
         </>
       )}
