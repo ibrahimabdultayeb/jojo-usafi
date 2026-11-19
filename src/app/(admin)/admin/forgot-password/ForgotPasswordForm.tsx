@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import { useFormStatus } from "react-dom";
 import { requestPasswordLinkAction, type ForgotState } from "./actions";
@@ -28,12 +28,16 @@ function SubmitButton() {
 }
 
 export function ForgotPasswordForm({ problem }: { problem?: string }) {
-  const [state, formAction] = useActionState<ForgotState, FormData>(requestPasswordLinkAction, {
+  const [state, formAction, pending] = useActionState<ForgotState, FormData>(requestPasswordLinkAction, {
     sent: false,
     error: null,
   });
 
-  if (state.sent) {
+  const [email, setEmail] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  useEffect(() => { if (state.sent) setShowForm(false); }, [state]);
+
+  if (state.sent && !showForm) {
     return (
       <div className="space-y-3">
         <p
@@ -47,6 +51,7 @@ export function ForgotPasswordForm({ problem }: { problem?: string }) {
           The link works once and stops working after an hour. If it does not arrive, check the
           spam folder and then ask for another.
         </p>
+        <button type="button" className="admin-auth-submit" onClick={() => setShowForm(true)}>Use another email or request a new link</button>
       </div>
     );
   }
@@ -85,6 +90,9 @@ export function ForgotPasswordForm({ problem }: { problem?: string }) {
         <input
           id="email"
           name="email"
+          value={email}
+          onChange={event => setEmail(event.target.value)}
+          disabled={pending}
           type="email"
           autoComplete="username"
           inputMode="email"

@@ -19,8 +19,8 @@ export interface ForgotState {
  *
  * A server action rather than a browser call, deliberately: `@supabase/ssr`
  * stores the PKCE code verifier as a cookie when the flow starts, and starting
- * it on the server means that cookie is HttpOnly. The link then comes back to
- * `/admin/auth/callback`, which is the only place able to exchange it.
+ * it on the server uses the shared SSR cookie configuration. The link comes
+ * back to `/admin/auth/callback` to exchange the code.
  */
 export async function requestPasswordLinkAction(
   _previous: ForgotState,
@@ -33,11 +33,15 @@ export async function requestPasswordLinkAction(
     return { sent: false, error: "That is not an email address." };
   }
 
-  const supabase = await getServerSupabase();
-
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${site.url}/admin/auth/callback`,
-  });
+  let error;
+  try {
+    const supabase = await getServerSupabase();
+    ({ error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${site.url}/admin/auth/callback`,
+    }));
+  } catch {
+    return { sent: false, error: "Could not request the link right now. Please try again." };
+  }
 
   // Rate limiting is the one failure worth saying out loud: it is temporary,
   // it is the person's own doing, and waiting is the fix.
@@ -45,6 +49,11 @@ export async function requestPasswordLinkAction(
     return { sent: false, error: "Too many requests. Wait a minute and try again." };
   }
 
-  // Every other failure — including "no such user" — is answered as success.
+  // Service outages are not evidence about whether an address exists.
+  if (error && typeof error.status === "number" && error.status >= 500) {
+    return { sent: false, error: "Could not request the link right now. Please try again." };
+  }
+
+  // Account-specific failures, including "no such user", share the success response.
   return { sent: true, error: null };
 }

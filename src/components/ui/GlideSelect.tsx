@@ -147,6 +147,7 @@ export default function GlideSelect({ options, value, onChange, ariaLabel, id, n
     const enabled = options.map((option, index) => option.disabled ? -1 : index).filter(index => index >= 0);
     if (["ArrowDown", "ArrowUp", "Home", "End"].includes(key)) {
       event.preventDefault();
+      if (!enabled.length) return;
       const i = enabled.indexOf(active);
       setActive(key === "Home" ? enabled[0] : key === "End" ? enabled.at(-1)! : enabled[Math.min(enabled.length - 1, Math.max(0, i + (key === "ArrowDown" ? 1 : -1)))]);
     } else if (key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {

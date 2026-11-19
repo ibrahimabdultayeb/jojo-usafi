@@ -1,5 +1,7 @@
 # Launch checklist
 
+> **19 November 2026 audit update:** the Build 12 figures and completion statements below are historical. See [the current audit](AUDIT-2026-11-19.md) for verified checks, fixes and limits. Current staging is `https://jojo-usafi-git-release-storefront-staging-mushus.vercel.app`. Placeholder contact links are now hidden. Launch still requires verified business configuration, authenticated end-to-end checks, rate-limit review and protection against duplicate order submission after an ambiguous network failure. Do not infer production readiness from the older engineering-complete heading.
+
 The one document to read before Jojo Usafi opens. Four sections, in the order
 they matter:
 

@@ -10,9 +10,8 @@ export interface SignInState {
 /**
  * Sign in to the admin dashboard.
  *
- * A server action rather than a browser call, so the session cookie is written
- * by the server as `HttpOnly` and no access token is ever handed to JavaScript
- * running in the page.
+ * Uses the shared Supabase SSR client to establish the session and write
+ * cookies through the server response. Cookie policy belongs to that client.
  *
  * Supabase's own messages are replaced with plain language. "Invalid login
  * credentials" is developer wording; somebody standing in a shop needs to be
@@ -30,8 +29,13 @@ export async function signInAction(
   if (!email) return { error: "Type the email address you use for Jojo Usafi." };
   if (!password) return { error: "Type your password." };
 
-  const supabase = await getServerSupabase();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  let error;
+  try {
+    const supabase = await getServerSupabase();
+    ({ error } = await supabase.auth.signInWithPassword({ email, password }));
+  } catch {
+    return { error: "Could not connect to sign in. Please try again." };
+  }
 
   if (error) {
     if (/email not confirmed/i.test(error.message)) {
@@ -46,7 +50,7 @@ export async function signInAction(
     if (/rate limit|too many/i.test(error.message)) {
       return { error: "Too many attempts. Wait a minute and try again." };
     }
-    return { error: `Could not sign in: ${error.message}` };
+    return { error: "Could not sign in right now. Please try again." };
   }
 
   redirect("/admin");

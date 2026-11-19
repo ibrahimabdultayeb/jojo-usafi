@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "@/components/ui/LoadingLink";
 import { Spinner } from "@/components/ui/Spinner";
@@ -20,24 +20,28 @@ function SubmitButton() {
 }
 
 export function SignInForm() {
-  const [state, formAction] = useActionState<SignInState, FormData>(signInAction, { error: null });
+  const [state, formAction, pending] = useActionState<SignInState, FormData>(signInAction, { error: null });
+  const [email, setEmail] = useState("");
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (state.error) errorRef.current?.focus(); }, [state]);
   const [showPassword, setShowPassword] = useState(false);
 
   return (
     <>
       <form action={formAction} className="admin-auth-form">
-        {state.error && <p role="alert" className="admin-auth-note admin-auth-error">{state.error}</p>}
+        {state.error && <p ref={errorRef} tabIndex={-1} role="alert" className="admin-auth-note admin-auth-error">{state.error}</p>}
         <div className="admin-auth-field">
           <label htmlFor="email" className="admin-auth-label">Email address</label>
           <input id="email" name="email" type="email" autoComplete="username" inputMode="email"
-            autoCapitalize="none" spellCheck={false} required className="admin-auth-input" />
+            autoCapitalize="none" spellCheck={false} required value={email} onChange={event => setEmail(event.target.value)} disabled={pending} className="admin-auth-input" />
         </div>
         <div className="admin-auth-field">
           <label htmlFor="password" className="admin-auth-label">Password</label>
           <div className="admin-auth-password">
             <input id="password" name="password" type={showPassword ? "text" : "password"}
-              autoComplete="current-password" required className="admin-auth-input" />
+              autoComplete="current-password" disabled={pending} required className="admin-auth-input" />
             <button type="button" className="admin-auth-reveal" aria-controls="password"
+              disabled={pending} aria-pressed={showPassword}
               aria-label={showPassword ? "Hide password" : "Show password"}
               onClick={() => setShowPassword((visible) => !visible)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
