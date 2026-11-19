@@ -324,9 +324,9 @@ export function Sheet({
 
 /* --------------------------------------------------------------- states */
 
-export function EmptyState({ title, body, icon = "package" }: { title: string; body: string; icon?: IconName }) {
+export function EmptyState({ title, body, icon = "package", fillPage = false }: { title: string; body: string; icon?: IconName; fillPage?: boolean }) {
   return (
-    <Card className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+    <Card className={`flex flex-col items-center gap-3 px-6 py-12 text-center${fillPage ? " admin-empty-fill" : ""}`}>
       <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
         <Icon name={icon} className="h-6 w-6" />
       </span>

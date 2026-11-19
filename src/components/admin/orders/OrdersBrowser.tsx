@@ -36,7 +36,7 @@ export function OrdersBrowser({orders,initialStage}: {orders:AdminOrder[];initia
   const count = (stages:OrderStage[])=>stages.length?orders.filter(o=>stages.includes(o.stage)).length:orders.length;
   const hasFilters = filter!=="all"||term||zone||sort!=="newest";
   return <>
-    <FilterTabs label="Filter orders by status" value={filter} onChange={setFilter} items={tabs.map(tab=>({value:tab.key,label:tab.label,count:count(tab.stages)}))}/>
+    <FilterTabs className="admin-order-status-tabs" label="Filter orders by status" value={filter} onChange={setFilter} items={tabs.map(tab=>({value:tab.key,label:tab.label,count:count(tab.stages)}))}/>
     <div className="admin-order-filters">
 
       <label className="admin-order-search"><Icon name="search"/><input type="search" value={term} onChange={e=>setTerm(e.target.value)} placeholder="Order number, customer or phone" aria-label="Search orders"/></label>
@@ -45,7 +45,7 @@ export function OrdersBrowser({orders,initialStage}: {orders:AdminOrder[];initia
       {hasFilters && <button type="button" onClick={()=>{setFilter("all");setTerm("");setZone("");setSort("newest");}}>Clear filters</button>}
     </div>
     <p className="admin-result-count" role="status">{visible.length} of {orders.length} orders</p>
-    {!visible.length?<EmptyState title="No orders match" body="Try another status, zone or search term."/>:<>
+    {!visible.length?<EmptyState fillPage title="No orders match" body="Try another status, zone or search term."/>:<>
       <Card className="admin-orders-table-wrap overflow-hidden"><table className="admin-orders-table"><thead><tr>{["ORDER","CUSTOMER","PLACED","ZONE","ITEMS","TOTAL","STATUS","NEXT ACTION"].map(label=><th key={label} scope="col">{label}</th>)}</tr></thead><AnimatedList as="tbody" resetKey={`${filter}:${term}:${zone}:${sort}`}>{visible.map(order=>{
         const totals=orderTotals(order);return <tr key={order.id}><td><Link href={`/admin/orders/${order.id}`}>{order.number}</Link></td><td><strong>{order.customer.name}</strong><small>{shortPhone(order.customer.phone)} · {order.payment.preference==="Cash on delivery"?"Cash":"Digital"}</small></td><td>{whenExactly(order.placed)}</td><td>{order.delivery.zone}</td><td>{totals.items}</td><td><strong>{formatTsh(totals.total)}</strong></td><td><Badge tone={STAGE_TONE[order.stage]}>{STAGE_LABEL[order.stage]}</Badge></td><td><Link href={`/admin/orders/${order.id}`}>{NEXT_ACTION[order.stage]?.label??"View order"}</Link></td></tr>;
       })}</AnimatedList></table></Card>
