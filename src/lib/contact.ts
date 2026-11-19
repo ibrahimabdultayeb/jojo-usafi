@@ -78,7 +78,4 @@ export async function getContact(): Promise<Contact> {
   };
 }
 
-/** A WhatsApp link for a given number. Pure, so client components can call it. */
-export function whatsappHref(number: string, message: string): string {
-  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
-}
+export { whatsappHref } from "./contact-links";

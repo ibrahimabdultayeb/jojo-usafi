@@ -246,7 +246,7 @@ export const sw: Dictionary = {
     optional: "Si lazima",
     email: "Barua pepe",
     emailPlaceholder: "wewe@mfano.com",
-    emailHelp: "Ikiwa unataka nakala iliyoandikwa. Hatutumi matangazo kamwe.",
+    emailHelp: "Si lazima. Kwa mawasiliano kuhusu agizo hili.",
     zone: "Eneo la usafirishaji",
     zoneChoose: "Chagua eneo lako",
     zoneNone: "Bado hatujaweka maeneo ya usafirishaji. Tafadhali tuandikie ili kuagiza.",
@@ -298,6 +298,8 @@ export const sw: Dictionary = {
   },
 
   track: {
+    invalidPhone: "Weka namba ya simu ya Tanzania, kwa mfano 0712 884 210.",
+    unavailable: "Hatukuweza kutafuta agizo sasa. Tafadhali jaribu tena baada ya muda mfupi.",
     eyebrow: "Ufuatiliaji wa agizo",
     title: "Fuatilia agizo lako",
     subtitle: "Weka namba ya agizo na namba ya simu uliyotumia kuagiza.",
@@ -334,8 +336,10 @@ export const sw: Dictionary = {
 
   contact: {
     title: "Ongea nasi",
-    subtitle:
-      "Maswali kuhusu bidhaa, eneo la usafirishaji au agizo lililo njiani — tupo {hours}.",
+    subtitle: "Una swali kuhusu bidhaa, eneo la usafirishaji au agizo lako? Pata mawasiliano yetu hapa.",
+    callBody: "Ongea na timu yetu kuhusu agizo au usafirishaji.",
+    pendingTitle: "Mawasiliano yatapatikana hivi karibuni",
+    pendingBody: "Mawasiliano yetu bado hayajaorodheshwa. Unaweza kufuatilia agizo kwa kutumia namba ya agizo na namba yako ya simu.",
     whatsappTitle: "WhatsApp",
     whatsappBody: "Njia ya haraka zaidi kutufikia kuhusu agizo au eneo la usafirishaji.",
     whatsappCta: "Fungua WhatsApp",
@@ -343,8 +347,7 @@ export const sw: Dictionary = {
     emailTitle: "Barua pepe",
     emailBody: "Kwa ankara, maagizo makubwa na chochote kinachohitaji kumbukumbu.",
     areaTitle: "Tunapofikisha",
-    areaBody:
-      "Jojo Usafi inafikisha katika {area}. Kama huna uhakika kama tunafika mtaani kwako, tutumie eneo lako nasi tutakuambia mara moja — na tutakujulisha tutakapofika.",
+    areaBody: "Jojo Usafi inafikisha katika {area}. Chagua eneo lako unapokamilisha agizo ili kuona upatikanaji na gharama ya usafirishaji.",
   },
 
   notFound: {

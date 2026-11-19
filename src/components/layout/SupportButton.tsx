@@ -22,6 +22,8 @@ export function SupportButton() {
   const href = useWhatsAppLink(t.support.message);
   const liftedByDock = hydrated && count > 0;
 
+  if (!href) return null;
+
   return (
     <a
       href={href}

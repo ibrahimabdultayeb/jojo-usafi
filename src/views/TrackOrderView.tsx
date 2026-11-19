@@ -4,7 +4,7 @@ import { AnimatedList } from "@/components/ui/AnimatedList";
 
 
 import Link from "@/components/ui/LoadingLink";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import { useFormStatus } from "react-dom";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -27,12 +27,16 @@ import type { OrderState } from "@/lib/domain/orders";
  * nothing internal: no staff notes, no actor identities, no payment reference.
  */
 export function TrackOrderView() {
-  const { t, path } = useLocale();
+  const { t, path, locale } = useLocale();
   const helpHref = useWhatsAppLink(t.support.trackHelpMessage);
-  const [state, formAction] = useActionState(trackOrderAction, emptyTrackState);
+  const [state, formAction, checking] = useActionState(trackOrderAction, emptyTrackState);
   const [orderNumber, setOrderNumber] = useState("");
   const [phone, setPhone] = useState("");
-  const order = state.order;
+  const order = checking ? null : state.order;
+  const resultRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (state.order) resultRef.current?.focus();
+  }, [state]);
 
   const timeline: { icon: IconName; label: string; note: string }[] = [
     { icon: "check", label: t.track.stage1, note: t.track.stage1Note },
@@ -62,6 +66,7 @@ export function TrackOrderView() {
           action={formAction}
           className="mt-8 space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-7"
         >
+          <input type="hidden" name="locale" value={locale} />
           <div>
             <label htmlFor="order-number" className="mb-1.5 block text-sm font-bold text-slate-900">
               {t.track.orderNumber}
@@ -70,6 +75,7 @@ export function TrackOrderView() {
               id="order-number"
               name="orderNumber"
               value={orderNumber}
+              maxLength={40} disabled={checking}
               onChange={(event) => setOrderNumber(event.target.value)}
               required
               inputMode="text"
@@ -87,6 +93,7 @@ export function TrackOrderView() {
               id="phone"
               name="phone"
               value={phone}
+              maxLength={32} disabled={checking}
               onChange={(event) => setPhone(event.target.value)}
               required
               type="tel"
@@ -100,7 +107,7 @@ export function TrackOrderView() {
 
           <TrackButton label={t.track.submit} checking={t.track.checking} />
 
-          {state.error && (
+          {!checking && state.error && (
             <div
               role="alert"
               className="fade-in rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900"
@@ -112,7 +119,7 @@ export function TrackOrderView() {
 
         {order && (
           <section
-            data-qa-anchor="track-result"
+            data-qa-anchor="track-result" ref={resultRef} tabIndex={-1}
             className="fade-in mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-7"
           >
             <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -181,7 +188,7 @@ export function TrackOrderView() {
           </AnimatedList>
         </section>
 
-        <div className="mt-8 flex flex-col gap-3 rounded-3xl bg-slate-50 p-5 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
+        {helpHref && <div className="mt-8 flex flex-col gap-3 rounded-3xl bg-slate-50 p-5 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
           <p className="text-sm font-semibold text-slate-600">{t.track.helpText}</p>
           <a
             href={helpHref}
@@ -192,7 +199,7 @@ export function TrackOrderView() {
             <WhatsAppIcon className="h-5 w-5" />
             {t.track.helpCta}
           </a>
-        </div>
+        </div>}
 
         <p className="mt-6 text-center text-sm font-semibold text-slate-500">
           <Link href={path("/shop")} className="text-brand-700 hover:text-brand-800">

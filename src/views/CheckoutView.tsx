@@ -4,7 +4,7 @@ import { AnimatedList } from "@/components/ui/AnimatedList";
 
 
 import Link from "@/components/ui/LoadingLink";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import GlideSelect from "@/components/ui/GlideSelect";
 import { Spinner } from "@/components/ui/Spinner";
 import { useFormStatus } from "react-dom";
@@ -17,6 +17,7 @@ import { useLocale } from "@/lib/i18n/client";
 import { placeOrderAction, quoteAction } from "@/lib/commerce/actions";
 import { emptyCheckoutState } from "@/lib/commerce/state";
 import type { CartLine, CheckoutZone, Quote } from "@/lib/commerce/checkout";
+import { useShowroomMotion } from "@/components/layout/ShowroomMotion";
 import { OrderReceived } from "@/components/checkout/OrderReceived";
 
 /**
@@ -39,6 +40,9 @@ interface CheckoutViewProps {
 export function CheckoutView({ zones }: CheckoutViewProps) {
   const { items, count, hydrated, clear } = useCart();
   const { t, path, locale } = useLocale();
+
+  const { reduced } = useShowroomMotion();
+  const errorRef = useRef<HTMLDivElement>(null);
 
   const [zoneSlug, setZoneSlug] = useState("");
   const [details, setDetails] = useState({ fullName: "", phone: "", email: "", address: "", instructions: "" });
@@ -67,17 +71,32 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
     if (!needsQuote) return;
 
     let cancelled = false;
+    // Quotes are read-only: a slow request can safely time out and be retried.
+    const deadline = setTimeout(() => {
+      cancelled = true;
+      setQuoted({ request: quoteRequest, result: null });
+    }, 20000);
     quoteAction(quoteRequest.lines, quoteRequest.zoneSlug)
       .then((result) => {
+        clearTimeout(deadline);
         if (!cancelled) setQuoted({ request: quoteRequest, result });
       })
       .catch(() => {
+        clearTimeout(deadline);
         if (!cancelled) setQuoted({ request: quoteRequest, result: null });
       });
     return () => {
       cancelled = true;
+      clearTimeout(deadline);
     };
   }, [needsQuote, quoteRequest]);
+
+  useEffect(() => {
+    if (!state.error) return;
+    setQuoteAttempt((attempt) => attempt + 1);
+    errorRef.current?.focus({ preventScroll: true });
+    errorRef.current?.scrollIntoView({ block: "center", behavior: reduced ? "instant" : "smooth" });
+  }, [state, reduced]);
 
   // The basket has done its job once the order exists in the database.
   useEffect(() => {
@@ -87,6 +106,15 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
 
   if (state.placed) {
     return <OrderReceived order={state.placed} />;
+  }
+
+  if (hydrated && items.length === 0) {
+    return <div className="shell flex min-h-[60dvh] flex-col items-center justify-center gap-4 py-12 text-center">
+      <Icon name="cart" className="h-12 w-12 text-slate-400" />
+      <h1 className="font-display text-3xl font-bold text-slate-900">{t.cart.emptyTitle}</h1>
+      <p className="max-w-sm text-slate-600">{t.cart.emptyBody}</p>
+      <Link href={path("/shop")} className="inline-flex min-h-14 items-center rounded-full bg-slate-900 px-7 font-bold text-white">{t.cart.startShopping}</Link>
+    </div>;
   }
 
   const field =
@@ -131,7 +159,7 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
 
           {state.error && (
             <div
-              role="alert"
+              role="alert" ref={errorRef} tabIndex={-1}
               className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-900"
             >
               <p className="font-bold">{t.checkout.basketProblem}</p>
@@ -168,6 +196,7 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                   name="fullName"
                   required
                   autoComplete="name"
+                  minLength={2} maxLength={120} disabled={placingOrder}
                   value={details.fullName}
                   onChange={(event) => changeDetail("fullName", event.target.value)}
                   className={field}
@@ -186,6 +215,7 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                   required
                   inputMode="tel"
                   autoComplete="tel"
+                  disabled={placingOrder}
                   value={details.phone}
                   onChange={(event) => changeDetail("phone", event.target.value)}
                   className={field}
@@ -208,6 +238,7 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                   name="email"
                   type="email"
                   autoComplete="email"
+                  maxLength={160} disabled={placingOrder}
                   value={details.email}
                   onChange={(event) => changeDetail("email", event.target.value)}
                   className={field}
@@ -251,6 +282,7 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                     name="address"
                     required
                     rows={3}
+                    minLength={4} maxLength={400} disabled={placingOrder}
                     value={details.address}
                     onChange={(event) => changeDetail("address", event.target.value)}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-base font-semibold placeholder:text-slate-400 focus:border-brand-500 focus:bg-white focus:outline-none"
@@ -268,6 +300,7 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                   <input
                     id="instructions"
                     name="instructions"
+                    maxLength={400} disabled={placingOrder}
                     value={details.instructions}
                     onChange={(event) => changeDetail("instructions", event.target.value)}
                     className={field}
@@ -289,6 +322,7 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                 value="cash_on_delivery"
                 checked={paymentPreference === "cash_on_delivery"}
                 onSelect={setPaymentPreference}
+                disabled={placingOrder}
                 title={t.checkout.paymentCash}
                 note={t.checkout.paymentCashNote}
               />
@@ -296,6 +330,7 @@ export function CheckoutView({ zones }: CheckoutViewProps) {
                 value="digital_on_delivery"
                 checked={paymentPreference === "digital_on_delivery"}
                 onSelect={setPaymentPreference}
+                disabled={placingOrder}
                 title={t.checkout.paymentDigital}
                 note={t.checkout.paymentDigitalNote}
               />
@@ -445,15 +480,17 @@ function PaymentChoice({
   note,
   checked,
   onSelect,
+  disabled,
 }: {
   value: string;
   title: string;
   note: string;
   checked: boolean;
+  disabled: boolean;
   onSelect: (value: string) => void;
 }) {
   return (
-    <label className="relative flex min-h-14 cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-4 transition-colors has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+    <label className="relative flex min-h-14 cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-4 transition-colors has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand-500/25 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
       {/*
         The input covers the whole card rather than sitting inside it. What a
         thumb has to hit on a 390px phone is then the 56px card, not the 20px
@@ -466,6 +503,7 @@ function PaymentChoice({
         name="paymentPreference"
         value={value}
         checked={checked}
+        disabled={disabled}
         onChange={() => onSelect(value)}
         required
         className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
@@ -474,7 +512,7 @@ function PaymentChoice({
         aria-hidden="true"
         className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-slate-300 peer-checked:border-brand-600"
       >
-        <span className="h-2.5 w-2.5 rounded-full bg-transparent peer-checked:bg-brand-600" />
+        <span className={`h-2.5 w-2.5 rounded-full ${checked ? "bg-brand-600" : "bg-transparent"}`} />
       </span>
       <span>
         <span className="block text-sm font-bold text-slate-900">{title}</span>

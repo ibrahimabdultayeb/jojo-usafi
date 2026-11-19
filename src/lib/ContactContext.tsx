@@ -2,7 +2,8 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import { site } from "@/lib/site";
-import { whatsappHref, type Contact } from "@/lib/contact";
+import type { Contact } from "@/lib/contact";
+import { contactWhatsAppHref } from "@/lib/contact-links";
 
 /**
  * The shop's contact details, handed to the browser once.
@@ -13,9 +14,8 @@ import { whatsappHref, type Contact } from "@/lib/contact";
  * once in the layout and passes them down here, exactly as it does with the
  * catalogue.
  *
- * The default is the placeholder set in `src/lib/site.ts`, so a component
- * rendered outside the provider still produces a working link rather than
- * `wa.me/undefined`.
+ * The default is the placeholder set in `src/lib/site.ts`, so components can detect missing details. Support links stay hidden
+ * until the shop supplies a real contact number.
  */
 
 const FALLBACK: Contact = {
@@ -37,6 +37,6 @@ export function useContact(): Contact {
 }
 
 /** The common case: a WhatsApp link to whatever number the shop is using. */
-export function useWhatsAppLink(message: string): string {
-  return whatsappHref(useContact().whatsappNumber, message);
+export function useWhatsAppLink(message: string): string | null {
+  return contactWhatsAppHref(useContact(), message);
 }

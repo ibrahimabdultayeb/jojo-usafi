@@ -210,7 +210,7 @@ export const en = {
     subtitle: "Tell us where to deliver. You pay when your order arrives.",
     yourDetails: "Your details",
     fullName: "Full name",
-    fullNamePlaceholder: "Jina lako",
+    fullNamePlaceholder: "Your full name",
     phone: "Phone number",
     phonePlaceholder: "07XX XXX XXX",
     phoneHelp: "We call or message this number to confirm your delivery.",
@@ -234,7 +234,7 @@ export const en = {
     optional: "Optional",
     email: "Email address",
     emailPlaceholder: "you@example.com",
-    emailHelp: "Only if you would like a written copy. We never send marketing.",
+    emailHelp: "Optional contact detail for this order.",
     zone: "Delivery area",
     zoneChoose: "Choose your area",
     zoneNone: "We have not set up delivery areas yet. Please message us to order.",
@@ -286,6 +286,8 @@ export const en = {
   },
 
   track: {
+    invalidPhone: "Enter a Tanzanian mobile number, for example 0712 884 210.",
+    unavailable: "We could not look that up just now. Please try again in a moment.",
     eyebrow: "Order tracking",
     title: "Track your order",
     subtitle: "Enter your order number and the phone number you ordered with.",
@@ -322,8 +324,10 @@ export const en = {
 
   contact: {
     title: "Talk to us",
-    subtitle:
-      "Questions about a product, a delivery area or an order already on its way — we are here {hours}.",
+    subtitle: "Questions about a product, a delivery area or an existing order? Find our contact details here.",
+    callBody: "Speak to our team about an order or delivery.",
+    pendingTitle: "Contact details coming soon",
+    pendingBody: "Our contact details are not listed yet. You can still check an existing order using your order number and phone number.",
     whatsappTitle: "WhatsApp",
     whatsappBody: "Fastest way to reach us about an order or a delivery area.",
     whatsappCta: "Open WhatsApp",
@@ -331,8 +335,7 @@ export const en = {
     emailTitle: "Email",
     emailBody: "For invoices, bulk orders and anything that needs a paper trail.",
     areaTitle: "Where we deliver",
-    areaBody:
-      "Jojo Usafi delivers across {area}. If you are not sure whether we reach your street yet, send us your area and we will tell you straight away — and let you know when we do.",
+    areaBody: "Jojo Usafi delivers across {area}. Choose your area at checkout to see availability and the delivery fee.",
   },
 
   notFound: {

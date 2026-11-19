@@ -4,6 +4,7 @@ import { checkoutLinesSchema, checkoutSchema, placeOrder, quoteCart, type CartLi
 import { getPublicSupabase } from "@/lib/supabase/public";
 import type { CheckoutState, TrackState, TrackedOrder } from "./state";
 import { emptyCheckoutState } from "./state";
+import { getDictionary } from "@/lib/i18n";
 import { parseTanzanianPhone } from "@/lib/domain/phone";
 
 /**
@@ -132,34 +133,29 @@ export async function trackOrderAction(
   _previous: TrackState,
   formData: FormData,
 ): Promise<TrackState> {
+  const t = getDictionary(formData.get("locale") === "sw" ? "sw" : "en");
   const orderNumber = String(formData.get("orderNumber") ?? "").trim().toUpperCase();
   const rawPhone = String(formData.get("phone") ?? "").trim();
 
   if (!orderNumber || !rawPhone) {
-    return { error: "Enter your order number and the phone number you ordered with.", order: null };
+    return { error: t.track.subtitle, order: null };
   }
 
   const phone = parseTanzanianPhone(rawPhone);
   if (!phone.ok) {
-    return { error: phone.reason, order: null };
+    return { error: t.track.invalidPhone, order: null };
   }
 
-  const { data, error } = await getPublicSupabase().rpc("jojo_track_order", {
-    p_order_number: orderNumber,
-    p_phone_e164: phone.value.e164,
-  });
-
-  if (error) {
-    return { error: "We could not look that up just now. Try again in a moment.", order: null };
+  try {
+    const { data, error } = await getPublicSupabase().rpc("jojo_track_order", {
+      p_order_number: orderNumber,
+      p_phone_e164: phone.value.e164,
+    });
+    if (error) return { error: t.track.unavailable, order: null };
+    // Deliberately identical for an unknown order and a mismatched phone.
+    if (!data) return { error: t.track.notFound, order: null };
+    return { error: null, order: data as unknown as TrackedOrder };
+  } catch {
+    return { error: t.track.unavailable, order: null };
   }
-
-  if (!data) {
-    // Deliberately one message for "no such order" and "wrong phone".
-    return {
-      error: "We could not find an order with that number and phone number.",
-      order: null,
-    };
-  }
-
-  return { error: null, order: data as unknown as TrackedOrder };
 }

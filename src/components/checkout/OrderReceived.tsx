@@ -120,7 +120,7 @@ export function OrderReceived({ order }: { order: PlacedOrderSummary }) {
             <Icon name="arrowRight" className="h-5 w-5" />
           </Link>
 
-          <a
+          {helpHref && <a
             href={helpHref}
             target="_blank"
             rel="noopener noreferrer"
@@ -128,7 +128,7 @@ export function OrderReceived({ order }: { order: PlacedOrderSummary }) {
           >
             <WhatsAppIcon className="h-5 w-5" />
             {t.confirmation.whatsappUs}
-          </a>
+          </a>}
 
           <Link
             href={path("/shop")}

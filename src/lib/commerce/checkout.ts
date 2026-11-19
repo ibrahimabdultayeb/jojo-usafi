@@ -91,7 +91,7 @@ export async function quoteCart(lines: CartLine[], zoneSlug: string | null): Pro
 export const checkoutSchema = z.object({
   fullName: z.string().trim().min(2, "Please give us a name for the delivery.").max(120),
   phone: z.string().trim().min(1, "We need a phone number for the rider."),
-  email: z.string().trim().max(160).optional().or(z.literal("")),
+  email: z.string().trim().max(160).email("Enter a valid email address, or leave it empty.").optional().or(z.literal("")),
   zoneSlug: z.string().trim().min(1, "Choose where we are delivering to."),
   address: z.string().trim().min(4, "Please tell the rider where to bring it.").max(400),
   landmark: z.string().trim().max(200).optional().or(z.literal("")),

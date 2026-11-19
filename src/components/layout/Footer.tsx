@@ -41,7 +41,7 @@ export async function Footer({ locale }: { locale: Locale }) {
           <ul>
             <li><Link href={localePath(locale, "/track-order")}>{t.footer.trackOrder}</Link></li>
             <li><Link href={contact}>{t.footer.contactUs}</Link></li>
-            <li><Link href={localePath(locale, "/checkout")}>{copy.deliveryAreas}</Link></li>
+            <li><Link href={`${contact}#delivery-areas`}>{copy.deliveryAreas}</Link></li>
             <li><Link href={`${home}#how-ordering-works`}>{copy.ordering}</Link></li>
           </ul>
         </div>

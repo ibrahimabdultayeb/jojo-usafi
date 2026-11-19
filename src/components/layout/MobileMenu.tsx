@@ -109,7 +109,7 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
         </nav>
 
         <div className="shrink-0 border-t border-slate-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <a
+          {helpHref && <a
             href={helpHref}
             target="_blank"
             rel="noopener noreferrer"
@@ -117,7 +117,7 @@ export function MobileMenu({ open, onClose }: MobileMenuProps) {
           >
             <WhatsAppIcon className="h-5 w-5" />
             {t.header.chatWithSupport}
-          </a>
+          </a>}
           <p className="mt-3 text-center text-xs font-medium text-slate-500">
             {fill(t.footer.delivering, { area: t.serviceArea })}
           </p>

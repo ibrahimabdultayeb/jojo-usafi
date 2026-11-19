@@ -95,7 +95,7 @@ export async function StorefrontLayout({
             </main>
             <Footer locale={locale} />
             <MobileDock />
-            {contact.whatsappNumber !== site.whatsappNumber && <SupportButton />}
+            {!contact.placeholder.whatsapp && <SupportButton />}
             <CartDrawer />
             <LanguageGate />
           </CartProvider>
