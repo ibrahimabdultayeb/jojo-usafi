@@ -74,6 +74,7 @@
 .admin-rail-count { position:absolute; right:0; top:1px; font-size:9px; border-radius:5px; padding:0 3px; background:#366dab; color:white; }
 .admin-main-column { min-width:0; flex:1; container-type:inline-size; }
 .admin-content { width:100%; max-width:1760px; margin:0 auto; padding:32px clamp(20px,2.5vw,44px) 48px; }
+.admin-route-loading { position:fixed; inset:0; display:grid; place-items:center; color:var(--admin-blue,#8bbcff); pointer-events:none; }
 .admin-mobile-header,.admin-bottom-nav { display:none; }
 
 /* React Bits' branching paths and folding interaction, scoped to the admin. */

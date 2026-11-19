@@ -1,4 +1,10 @@
-import { Spinner } from "@/components/ui/Spinner";
+import LatticeLoader from "@/components/ui/LatticeLoader";
+
 export default function LoadingAdminPage() {
- return <div className="admin-card flex min-h-48 items-center justify-center gap-3 p-6 text-sm text-slate-500" role="status"><Spinner/>Loading workspace…</div>;
+  return (
+    <div className="admin-route-loading" role="status">
+      <LatticeLoader decorative showTimer={false} cellSize={8} gap={3} shape="square" pattern="orbit" />
+      <span className="sr-only">Loading workspace…</span>
+    </div>
+  );
 }
