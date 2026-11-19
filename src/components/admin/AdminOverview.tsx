@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { Badge, Card } from "./ui";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { can, type Role } from "@/lib/admin/permissions";
@@ -16,12 +17,12 @@ export function AdminOverview({name,role,snapshot,lowStock,outOfStock,missingIma
   const count = snapshot.counts;
   const showProducts = can(role,"products.view");
   const summary = [
-    {label:"New orders",value:count.new,dot:"#1e5fd0",href:"/admin/orders?stage=new"},
-    {label:"Awaiting confirmation",value:count.awaiting_confirmation,dot:"#c28a16",href:"/admin/orders?stage=awaiting_confirmation"},
-    {label:"Being prepared",value:count.preparing,dot:"#7c58bc",href:"/admin/orders?stage=preparing"},
-    {label:"Out for delivery",value:count.out_for_delivery,dot:"#16869a",href:"/admin/orders?stage=out_for_delivery"},
-    {label:"Need attention",value:count.delivery_failed,dot:"#c74b48",href:"/admin/orders?stage=delivery_failed"},
-    ...(showProducts?[{label:"Low stock",value:lowStock,dot:"#c28a16",href:"/admin/products?filter=low-stock"}]:[]),
+    {label:"New orders",value:count.new,color:"#8bbcff",icon:"bag" as const,href:"/admin/orders?stage=new"},
+    {label:"Awaiting confirmation",value:count.awaiting_confirmation,color:"#e4ba76",icon:"clock" as const,href:"/admin/orders?stage=awaiting_confirmation"},
+    {label:"Being prepared",value:count.preparing,color:"#baa0ee",icon:"package" as const,href:"/admin/orders?stage=preparing"},
+    {label:"Out for delivery",value:count.out_for_delivery,color:"#7ad3d6",icon:"truck" as const,href:"/admin/orders?stage=out_for_delivery"},
+    {label:"Need attention",value:count.delivery_failed,color:"#f0a0b2",icon:"shield" as const,href:"/admin/orders?stage=delivery_failed"},
+    ...(showProducts?[{label:"Low stock",value:lowStock,color:"#e4ba76",icon:"store" as const,href:"/admin/products?filter=low-stock"}]:[]),
   ];
   const attention: {title:string;detail:string;count:number;href:string;cta:string;icon:IconName}[] = [
     {title:"New orders to review",detail:"Check the items and contact the customer to confirm.",count:count.new,href:"/admin/orders?stage=new",cta:"Review",icon:"bag" as const},
@@ -36,13 +37,15 @@ export function AdminOverview({name,role,snapshot,lowStock,outOfStock,missingIma
   ].filter(item=>item.count>0);
   return <div className="admin-page">
     <div className="admin-overview-header"><div><p>{date.toLocaleDateString("en-GB",{timeZone:"Africa/Dar_es_Salaam",weekday:"long",day:"numeric",month:"long",year:"numeric"})}</p><h1>Good {greeting}{name?`, ${name.trim().split(/\s+/)[0]}`:""}</h1></div><Link href="/admin/orders?stage=new" className="admin-link-button"><Icon name="bag"/>Open new orders</Link></div>
-    <div className="admin-summary">{summary.map(item=><Link key={item.label} href={item.href}><span><i style={{background:item.dot}}/>{item.label}</span><strong>{item.value}</strong></Link>)}</div>
+    <div className="admin-summary">{summary.map(item=><Link key={item.label} href={item.href} style={{"--stat-accent":item.color} as CSSProperties}><span className="admin-summary-label"><span className="admin-summary-icon"><Icon name={item.icon}/></span>{item.label}</span><strong>{item.value}</strong></Link>)}</div>
     <div className="admin-overview-grid">
-      <Card><div className="admin-card-heading"><h2>Needs your attention</h2><span>{attention.length} {attention.length===1?"area":"areas"}</span></div>{attention.length?attention.map(item=><div className="admin-attention-row" key={item.title}><span className="admin-attention-icon"><Icon name={item.icon}/></span><div><strong>{item.count} · {item.title}</strong><p>{item.detail}</p></div><Link href={item.href}>{item.cta}</Link></div>):<p className="admin-empty-copy">All clear. No orders need attention right now.</p>}</Card>
-      <div className="admin-stack">
+      <div className="admin-overview-column">
+      <Card className="admin-attention-card"><div className="admin-card-heading"><h2>Needs your attention</h2><span>{attention.length} {attention.length===1?"area":"areas"}</span></div>{attention.length?attention.map(item=><div className="admin-attention-row" key={item.title}><span className="admin-attention-icon"><Icon name={item.icon}/></span><div><strong>{item.count} · {item.title}</strong><p>{item.detail}</p></div><Link href={item.href}>{item.cta}</Link></div>):<p className="admin-empty-copy">All clear. No orders need attention right now.</p>}</Card>
+        <Card className="admin-recent-card"><div className="admin-card-heading"><h2>Recent orders</h2><Link href="/admin/orders">All orders</Link></div>{snapshot.recent.length?snapshot.recent.map(order=><Link className="admin-recent-row" key={order.id} href={`/admin/orders/${order.id}`}><strong>{order.number}</strong><span>{order.customer.name}</span><Badge tone={STAGE_TONE[order.stage]}>{STAGE_LABEL[order.stage]}</Badge></Link>):<p className="admin-empty-copy">Orders will appear here when customers place them.</p>}</Card>
+      </div>
+      <div className="admin-overview-column">
         {can(role,"analytics.view") && <Card className="admin-sales"><h2>Collected today</h2><strong>{formatTsh(snapshot.todaySalesTzs)}</strong><p>Payments collected today in Dar es Salaam. Excludes unpaid and cancelled orders.</p><div><span>Cash · {formatTsh(snapshot.cashTzs)}</span><span>Digital · {formatTsh(snapshot.digitalTzs)}</span></div></Card>}
-        <Card><div className="admin-card-heading"><h2>Recent orders</h2><Link href="/admin/orders">All orders</Link></div>{snapshot.recent.length?snapshot.recent.map(order=><Link className="admin-recent-row" key={order.id} href={`/admin/orders/${order.id}`}><strong>{order.number}</strong><span>{order.customer.name}</span><Badge tone={STAGE_TONE[order.stage]}>{STAGE_LABEL[order.stage]}</Badge></Link>):<p className="admin-empty-copy">Orders will appear here when customers place them.</p>}</Card>
-        {showProducts && <Card><div className="admin-card-heading"><h2>Recent stock activity</h2><Link href="/admin/inventory">View stock</Link></div>{stockActivity.length?stockActivity.map(entry=><div className="admin-stock-row" key={entry.id}><strong className={entry.delta>0?"text-lime-700":"text-slate-600"}>{entry.delta===0?`${entry.reservedDelta>0?"+":""}${entry.reservedDelta} reserved`:`${entry.delta>0?"+":""}${entry.delta}`}</strong><span>{entry.name}<small>{entry.reason} · {entry.by}</small><small>{whenExactly(entry.at)}</small></span></div>):<p className="admin-empty-copy">No stock movements recorded yet.</p>}</Card>}
+        {showProducts && <Card className="admin-stock-card"><div className="admin-card-heading"><h2>Recent stock activity</h2><Link href="/admin/inventory">View stock</Link></div>{stockActivity.length?stockActivity.map(entry=><div className="admin-stock-row" key={entry.id}><strong className={entry.delta>0?"text-lime-700":"text-slate-600"}>{entry.delta===0?`${entry.reservedDelta>0?"+":""}${entry.reservedDelta} reserved`:`${entry.delta>0?"+":""}${entry.delta}`}</strong><span>{entry.name}<small>{entry.reason} · {entry.by}</small><small>{whenExactly(entry.at)}</small></span></div>):<p className="admin-empty-copy">No stock movements recorded yet.</p>}</Card>}
       </div>
     </div>
   </div>;

@@ -17,7 +17,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`admin-card rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)] ${className}`}>
+    <div className={`admin-card ${className}`}>
       {children}
     </div>
   );
@@ -218,7 +218,7 @@ export function Toggle({
         className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${checked ? "bg-brand-600" : "bg-slate-300"}`}
       >
         <span
-          className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${checked ? "left-6" : "left-1"}`}
+          className={`admin-switch-thumb absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${checked ? "left-6" : "left-1"}`}
         />
       </span>
     </button>

@@ -39,7 +39,6 @@
 .admin-auth-logo > span > span { color: var(--auth-blue); }
 .admin-auth-brand-caption { margin-top: 12px; color: #b1bfd2; font-size: 13px; font-weight: 500; }
 .admin-auth-watermark { position: absolute; z-index: -1; top: 86px; right: -78px; width: 470px; height: auto; transform: rotate(-9deg); color: #dbe9fc; opacity: .09; pointer-events: none; }
-.admin-auth-globe { width: 76px; height: 76px; color: #56a9f8; margin-bottom: 24px; }
 .admin-auth-pitch h2 { font-size: clamp(30px, 3vw, 40px); line-height: 1.12; letter-spacing: -1.8px; font-weight: 750; }
 .admin-auth-pitch h2 span { color: var(--auth-blue); }
 .admin-auth-pitch > p { margin-top: 22px; font-size: 14px; line-height: 1.8; color: #b3c0d2; }

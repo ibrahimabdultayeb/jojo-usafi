@@ -13,6 +13,8 @@ import type { SVGProps } from "react";
  */
 
 const paths = {
+  panelCollapse: ["M3 4h18v16H3z", "M9 4v16", "m16 9-3 3 3 3"],
+  panelExpand: ["M3 4h18v16H3z", "M9 4v16", "m14 9 3 3-3 3"],
   dashboard: ["M3 3h7v7H3z", "M14 3h7v7h-7z", "M3 14h7v7H3z", "M14 14h7v7h-7z"],
   users: ["M9 7m-3 0a3 3 0 1 0 6 0a3 3 0 1 0-6 0", "M3 21v-3a6 6 0 0 1 12 0v3", "M17 4a3 3 0 0 1 0 6", "M21 21v-3a6 6 0 0 0-4-5.6"],
   chart: ["M4 3v18h17", "M8 16v-5", "M13 16V7", "M18 16V4"],

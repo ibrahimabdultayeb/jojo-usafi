@@ -46,7 +46,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
-      <body className="bg-slate-50 font-sans antialiased">
+      <body className="admin-root font-sans antialiased">
         <AdminShell staff={staff && { name: staff.name, role: staff.role }} newOrders={newOrders}>{children}</AdminShell>
       </body>
     </html>
