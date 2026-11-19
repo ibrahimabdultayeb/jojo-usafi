@@ -4,6 +4,7 @@
 
 import React, { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { animate, motion, useMotionValue, useReducedMotion, useTransform, type MotionValue } from 'motion/react';
+import { useShowroomMotion } from '@/components/layout/ShowroomMotion';
 
 import './RubberSegment.css';
 
@@ -113,7 +114,9 @@ const RubberSegment: React.FC<RubberSegmentProps> = ({
     0,
     list.findIndex(item => item.value === current)
   );
-  const reduce = useReducedMotion();
+  const systemReduced = useReducedMotion();
+  const { reduced: preferenceReduced } = useShowroomMotion();
+  const reduce = systemReduced || preferenceReduced;
 
   const trackRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
