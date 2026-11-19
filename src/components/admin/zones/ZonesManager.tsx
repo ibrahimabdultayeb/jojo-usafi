@@ -1,9 +1,10 @@
 "use client";
 
 import { AnimatedList } from "@/components/ui/AnimatedList";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Button, Card, Field, SaveState, Sheet, Toggle, inputClass } from "@/components/admin/ui";
+import { Badge, Button, Card, Field, SaveState, Sheet, Toggle, inputClass, useSheetPresence } from "@/components/admin/ui";
+import { parseMoneyInput } from "@/lib/domain/money";
 import { formatTsh } from "@/lib/admin/format";
 import { Icon } from "@/components/ui/Icon";
 import { can, type Role } from "@/lib/admin/permissions";
@@ -40,12 +41,24 @@ export function ZonesManager({ zones, role }: { zones: AdminZoneRow[]; role: Rol
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState<ZoneDraft | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const editorPresent = useSheetPresence(editorOpen);
+  const inFlight = useRef(false);
   const [save, setSave] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const [problem, setProblem] = useState<string | null>(null);
 
   const mayEdit = can(role, "delivery.manage");
 
+  function edit(draft: ZoneDraft) {
+    setProblem(null);
+    setSave("idle");
+    setEditing(draft);
+    setEditorOpen(true);
+  }
+
   function upsert(draft: ZoneDraft) {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setSave("saving");
     setProblem(null);
     startTransition(async () => {
@@ -61,10 +74,12 @@ export function ZonesManager({ zones, role }: { zones: AdminZoneRow[]; role: Rol
         setSave("failed");
         setProblem("Could not save the change. Check your connection and try again.");
         return;
+      } finally {
+        inFlight.current = false;
       }
       if (result.ok) {
         setSave("saved");
-        setEditing(null);
+        setEditorOpen(false);
         router.refresh();
         window.setTimeout(() => setSave("idle"), 3000);
       } else {
@@ -91,13 +106,13 @@ export function ZonesManager({ zones, role }: { zones: AdminZoneRow[]; role: Rol
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <SaveState state={save} />
         {mayEdit && (
-          <Button variant="accent" icon="plus" disabled={pending} onClick={() => setEditing(newZone())}>
+          <Button variant="accent" icon="plus" disabled={pending} onClick={() => edit(newZone())}>
             Add a zone
           </Button>
         )}
       </div>
 
-      {problem && (
+      {problem && !editorOpen && (
         <p role="alert" className="mb-3 rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-800">
           {problem}
         </p>
@@ -127,7 +142,7 @@ export function ZonesManager({ zones, role }: { zones: AdminZoneRow[]; role: Rol
                   </p>
                 </div>
                 {mayEdit && (
-                  <Button variant="secondary" disabled={pending} onClick={() => setEditing(toDraft(zone))}>
+                  <Button variant="secondary" disabled={pending} onClick={() => edit(toDraft(zone))}>
                     Edit
                   </Button>
                 )}
@@ -152,29 +167,39 @@ export function ZonesManager({ zones, role }: { zones: AdminZoneRow[]; role: Rol
         removes it from checkout but never changes orders already placed.
       </p>
 
-      {editing && (
-        <ZoneEditor zone={editing} pending={pending} onCancel={() => setEditing(null)} onSave={upsert} />
+      {editorPresent && editing && (
+        <ZoneEditor key={editing.id ?? "new"} open={editorOpen} zone={editing} pending={pending} problem={problem} onCancel={() => setEditorOpen(false)} onSave={upsert} />
       )}
     </>
   );
 }
 
 function ZoneEditor({
+  open,
   zone,
   pending,
+  problem,
   onCancel,
   onSave,
 }: {
+  open: boolean;
   zone: ZoneDraft;
   pending: boolean;
+  problem: string | null;
   onCancel: () => void;
   onSave: (zone: ZoneDraft) => void;
 }) {
   const [draft, setDraft] = useState(zone);
+  const [feeInput, setFeeInput] = useState(String(zone.feeTzs));
+  const [priorityInput, setPriorityInput] = useState(String(zone.sortPriority));
+  const fee = parseMoneyInput(feeInput);
+  const priorityValid = /^\d+$/.test(priorityInput.trim()) && Number(priorityInput) <= 2_147_483_647;
+  const invalidFee = !draft.freeDelivery && !fee.ok;
+  const fieldProblem = invalidFee && !fee.ok ? fee.reason : !priorityValid ? "List position must be a whole number, starting at 0." : null;
   const isNew = zone.id === null;
 
   return (
-    <Sheet open onClose={onCancel} title={isNew ? "Add a delivery zone" : `Edit ${zone.name}`}>
+    <Sheet open={open} busy={pending} error={problem} onClose={onCancel} title={isNew ? "Add a delivery zone" : `Edit ${zone.name}`}>
       <div className="space-y-4">
         {draft.isDevelopmentFixture && (
           <p className="rounded-xl bg-amber-50 p-3 text-xs font-bold text-amber-900">
@@ -185,7 +210,8 @@ function ZoneEditor({
 
         <Field label="Area name" hint="What customers will see at checkout.">
           <input
-            autoFocus
+            disabled={pending}
+            maxLength={60}
             value={draft.name}
             onChange={(e) => setDraft({ ...draft, name: e.target.value })}
             placeholder="e.g. Mikocheni"
@@ -206,9 +232,10 @@ function ZoneEditor({
               TSh
             </span>
             <input
-              value={draft.freeDelivery ? "" : String(draft.feeTzs)}
-              onChange={(e) => setDraft({ ...draft, feeTzs: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })}
-              disabled={draft.freeDelivery}
+              value={draft.freeDelivery ? "" : feeInput}
+              onChange={(e) => setFeeInput(e.target.value)}
+              disabled={draft.freeDelivery || pending}
+              aria-invalid={invalidFee}
               inputMode="numeric"
               placeholder={draft.freeDelivery ? "No charge" : undefined}
               className={`${inputClass} pl-12 tabular-nums`}
@@ -218,6 +245,7 @@ function ZoneEditor({
 
         <Toggle
           label="Free delivery"
+          disabled={pending}
           hint="Customers in this area pay nothing for delivery."
           checked={draft.freeDelivery}
           onChange={(v) => setDraft({ ...draft, freeDelivery: v })}
@@ -225,6 +253,7 @@ function ZoneEditor({
 
         <Toggle
           label="Active"
+          disabled={pending}
           hint={draft.active ? "Customers can choose this area." : "Hidden from checkout."}
           checked={draft.active}
           onChange={(v) => setDraft({ ...draft, active: v })}
@@ -232,23 +261,25 @@ function ZoneEditor({
 
         <Field label="Where it appears in the list" hint="1 shows first.">
           <input
-            value={String(draft.sortPriority)}
-            onChange={(e) =>
-              setDraft({ ...draft, sortPriority: Number(e.target.value.replace(/[^0-9]/g, "")) || 1 })
-            }
+            value={priorityInput}
+            onChange={(e) => setPriorityInput(e.target.value)}
+            disabled={pending}
+            aria-invalid={!priorityValid}
             inputMode="numeric"
             className={`${inputClass} tabular-nums`}
           />
         </Field>
 
+        {fieldProblem && <p role="alert" className="text-sm font-semibold text-rose-700">{fieldProblem}</p>}
+
         <div className="grid gap-2 sm:grid-cols-2">
-          <Button variant="secondary" onClick={onCancel} full>
+          <Button variant="secondary" disabled={pending} onClick={onCancel} full>
             Cancel
           </Button>
           <Button busy={pending}
             variant="accent"
-            onClick={() => onSave(draft)}
-            disabled={draft.name.trim() === "" || pending}
+            onClick={() => { if (!fieldProblem) onSave({ ...draft, feeTzs: draft.freeDelivery ? 0 : fee.ok ? fee.value : 0, sortPriority: Number(priorityInput) }); }}
+            disabled={draft.name.trim().length < 2 || !!fieldProblem || pending}
             full
           >
             {pending ? "Saving…" : isNew ? "Add zone" : "Save changes"}

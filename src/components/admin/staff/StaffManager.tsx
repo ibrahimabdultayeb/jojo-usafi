@@ -2,9 +2,9 @@
 
 import { AnimatedList } from "@/components/ui/AnimatedList";
 import GlideSelect from "@/components/ui/GlideSelect";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Button, Card, Field, Sheet, inputClass } from "@/components/admin/ui";
+import { Badge, Button, Card, Field, Sheet, inputClass, useSheetPresence } from "@/components/admin/ui";
 import { Icon } from "@/components/ui/Icon";
 import { ROLE_LABELS, type Role } from "@/lib/admin/permissions";
 import { whenWords } from "@/lib/admin/format";
@@ -41,16 +41,20 @@ export function StaffManager({
   const [pending, startTransition] = useTransition();
   const [workingKey, setWorkingKey] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
+  const invitePresent = useSheetPresence(inviteOpen);
+  const inFlight = useRef(false);
   const [result, setResult] = useState<ActionResult | null>(null);
 
   const isOwner = role === "owner";
 
   function run(operation: () => Promise<ActionResult>, onDone?: () => void, key = "invite") {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setWorkingKey(key);
     setResult(null);
     startTransition(async () => {
       let outcome: ActionResult;
-      try { outcome = await operation(); } catch { outcome = {ok:false,message:"Could not save the change. Check your connection and try again."}; }
+      try { outcome = await operation(); } catch { outcome = {ok:false,message:"Could not save the change. Check your connection and try again."}; } finally { inFlight.current = false; }
       setResult(outcome);
       if (outcome.ok) {
         onDone?.();
@@ -80,14 +84,14 @@ export function StaffManager({
         <p className="text-sm font-semibold text-slate-500">
           {active.length} {active.length === 1 ? "person" : "people"} can sign in
         </p>
-        <Button variant="accent" icon="plus" disabled={pending} onClick={() => setInviteOpen(true)}>
+        <Button variant="accent" icon="plus" disabled={pending} onClick={() => { setResult(null); setInviteOpen(true); }}>
           Add someone
         </Button>
       </div>
 
-      {result && (
+      {result && !inviteOpen && (
         <Card className={`mb-4 p-4 ${result.ok ? "" : "border-amber-200 bg-amber-50"}`}>
-          <p className={`text-sm font-bold ${result.ok ? "text-slate-900" : "text-amber-900"}`}>
+          <p role={result.ok ? "status" : "alert"} className={`text-sm font-bold ${result.ok ? "text-slate-900" : "text-amber-900"}`}>
             {result.message}
           </p>
         </Card>
@@ -135,14 +139,15 @@ export function StaffManager({
         ever shown here or known to you.
       </p>
 
-      <InviteSheet
+      {invitePresent && <InviteSheet
         open={inviteOpen}
+        error={result && !result.ok ? result.message : null}
         pending={pending && workingKey === "invite"}
         onClose={() => setInviteOpen(false)}
         onInvite={(name, email, inviteRole) =>
           run(() => inviteStaffAction(name, email, inviteRole), () => setInviteOpen(false))
         }
-      />
+      />}
     </>
   );
 }
@@ -175,7 +180,7 @@ function StaffCard({
             {person.name}
             {isYou && <span className="ml-2 text-xs font-semibold text-slate-400">you</span>}
           </p>
-          <p className="truncate text-sm font-medium text-slate-500">{person.email ?? "No email"}</p>
+          <p className="break-all text-sm font-medium text-slate-500">{person.email ?? "No email"}</p>
           <p className="mt-1 flex flex-wrap items-center gap-1.5">
             <Badge tone={person.role === "owner" ? "good" : "neutral"}>
               {ROLE_LABELS[person.role]}
@@ -226,11 +231,13 @@ function StaffCard({
 
 function InviteSheet({
   open,
+  error,
   pending,
   onClose,
   onInvite,
 }: {
   open: boolean;
+  error: string | null;
   pending: boolean;
   onClose: () => void;
   onInvite: (name: string, email: string, role: Role) => void;
@@ -239,14 +246,12 @@ function InviteSheet({
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("order_staff");
 
-  if (!open) return null;
-
   return (
-    <Sheet open onClose={onClose} title="Add someone to the shop">
+    <Sheet open={open} busy={pending} error={error} onClose={onClose} title="Add someone to the shop">
       <div className="space-y-4">
         <Field label="Their name" hint="As you would say it to them.">
           <input
-            autoFocus
+            disabled={pending}
             value={name}
             onChange={(event) => setName(event.target.value)}
             className={inputClass}
@@ -257,6 +262,7 @@ function InviteSheet({
         <Field label="Their email address" hint="This is how they sign in and set a password.">
           <input
             value={email}
+            disabled={pending}
             onChange={(event) => setEmail(event.target.value)}
             type="email"
             inputMode="email"
@@ -273,6 +279,7 @@ function InviteSheet({
               <button
                 key={option}
                 type="button"
+                disabled={pending}
                 onClick={() => setRole(option)}
                 aria-pressed={role === option}
                 className={`flex min-h-14 items-start justify-between rounded-xl border-2 px-4 py-2 text-left transition-colors ${
@@ -302,7 +309,7 @@ function InviteSheet({
         </div>
 
         <div className="grid gap-2 sm:grid-cols-2">
-          <Button variant="secondary" onClick={onClose} full>
+          <Button variant="secondary" disabled={pending} onClick={onClose} full>
             Cancel
           </Button>
           <Button busy={pending}

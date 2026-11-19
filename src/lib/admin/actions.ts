@@ -357,11 +357,15 @@ export async function saveZoneAction(
 
   const name = patch.name.trim();
   if (name.length < 2) return failed("Give the area a name.");
+  if (name.length > 60) return failed("Keep the area name to 60 characters or fewer.");
 
   // A free area charges nothing. The database has the same CHECK, but saying it
   // here means the operator sees a sentence rather than a constraint name.
   const fee = patch.freeDelivery ? 0 : patch.feeTzs;
-  if (!Number.isInteger(fee) || fee < 0) return failed("A delivery fee is a whole number of shillings.");
+  if (!isMoneyTzs(fee)) return failed("Enter a valid delivery fee in whole shillings.");
+  if (!Number.isInteger(patch.sortPriority) || patch.sortPriority < 0 || patch.sortPriority > 2_147_483_647) {
+    return failed("List position must be a whole number, starting at 0.");
+  }
 
   const supabase = await getServerSupabase();
   const row = {
@@ -381,6 +385,8 @@ export async function saveZoneAction(
   revalidatePath("/admin/more/delivery-zones");
   revalidatePath("/checkout");
   revalidatePath("/sw/checkout");
+  revalidatePath("/contact");
+  revalidatePath("/sw/contact");
 
   return done(zoneId ? "Saved." : `${name} added.`);
 }

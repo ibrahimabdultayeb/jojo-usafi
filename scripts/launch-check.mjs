@@ -47,6 +47,20 @@ if (!URL_ || !KEY) {
 
 const db = createClient(URL_, KEY, { auth: { persistSession: false } });
 
+// A missing query result must never become a zero count or a false PASS.
+async function requireRead(query) {
+  let result;
+  try { result = await query; } catch {
+    console.error("\n  BLOCKED: Could not verify launch configuration because a database request failed. No readiness conclusion can be made.\n");
+    process.exit(1);
+  }
+  if (result.error) {
+    console.error("\n  BLOCKED: Could not verify launch configuration because a database request failed. No readiness conclusion can be made.\n");
+    process.exit(1);
+  }
+  return result;
+}
+
 const results = [];
 const record = (state, what, detail) => results.push({ state, what, detail });
 const pass = (what, detail) => record("PASS", what, detail);
@@ -57,13 +71,13 @@ const head = (t) => console.log(`\n  ── ${t} ${"─".repeat(Math.max(0, 54 -
 
 /* ------------------------------------------------ the shop's own details */
 
-const { data: settings } = await db
+const { data: settings } = await requireRead(db
   .from("shop_settings")
   .select(
     "whatsapp_e164, phone_e164, contact_email, address_line, logo_media_id, reservation_warning_minutes, reservation_expiry_minutes",
   )
   .eq("id", true)
-  .maybeSingle();
+  .maybeSingle());
 
 head("HOW CUSTOMERS REACH THE SHOP");
 
@@ -76,7 +90,7 @@ const contact = [
 
 for (const [label, value] of contact) {
   if (value) pass(label, "set");
-  else block(label, "not set — the storefront falls back to a placeholder nobody answers");
+  else block(label, "not set — customer contact is unavailable until configured");
 }
 
 if (settings?.logo_media_id) pass("Logo", "on file");
@@ -105,10 +119,10 @@ if (settings?.reservation_expiry_minutes) {
 
 head("DELIVERY");
 
-const { data: zones } = await db
+const { data: zones } = await requireRead(db
   .from("delivery_zones")
   .select("name, fee_tzs, free_delivery, active, notes")
-  .eq("active", true);
+  .eq("active", true));
 
 const active = zones ?? [];
 const placeholders = active.filter((z) => (z.notes ?? "").startsWith("DEVELOPMENT FIXTURE"));
@@ -128,16 +142,16 @@ if (active.length === 0) {
 
 head("THE CATALOGUE");
 
-const { count: products } = await db.from("products").select("*", { count: "exact", head: true });
-const { count: shelf } = await db.from("product_shelf").select("*", { count: "exact", head: true });
+const { count: products } = await requireRead(db.from("products").select("*", { count: "exact", head: true }));
+const { count: shelf } = await requireRead(db.from("product_shelf").select("*", { count: "exact", head: true }));
 
 pass("Products in the catalogue", String(products ?? 0));
 if ((shelf ?? 0) === 0) block("Products a shopper can buy", "none are on the shelf");
 else pass("Products a shopper can buy", String(shelf));
 
-const { data: withoutPhoto } = await db
+const { data: withoutPhoto } = await requireRead(db
   .from("products")
-  .select("sku, product_media ( role )");
+  .select("sku, product_media ( role )"));
 
 const missingPhoto = (withoutPhoto ?? []).filter(
   (row) => !(row.product_media ?? []).some((m) => m.role === "primary"),
@@ -153,11 +167,11 @@ if (missingPhoto.length === 0) {
 }
 
 // The two watchlist SKUs, by name, because both are decisions rather than bugs.
-const { data: blocked } = await db
+const { data: blocked } = await requireRead(db
   .from("products")
   .select("sku, price_tzs, lifecycle")
   .eq("sku", "EP01-A01")
-  .maybeSingle();
+  .maybeSingle());
 
 if (!blocked) {
   warn("EP01-A01", "not in this catalogue");
@@ -167,10 +181,10 @@ if (!blocked) {
   pass("EP01-A01", `priced at TSh ${blocked.price_tzs.toLocaleString("en-TZ")}`);
 }
 
-const { data: orphanAssets } = await db
+const { data: orphanAssets } = await requireRead(db
   .from("media_assets")
   .select("storage_path, product_media ( id )")
-  .eq("storage_bucket", "product-media");
+  .eq("storage_bucket", "product-media"));
 
 const orphans = (orphanAssets ?? []).filter((row) => (row.product_media ?? []).length === 0);
 if (orphans.length > 0) {
@@ -186,19 +200,19 @@ if (orphans.length > 0) {
 
 head("STOCK AND THE LEDGER");
 
-const { count: mismatches } = await db
+const { count: mismatches } = await requireRead(db
   .from("inventory_ledger_check")
   .select("*", { count: "exact", head: true })
-  .eq("matches", false);
+  .eq("matches", false));
 
 if ((mismatches ?? 0) === 0) pass("Stock reconciles with its ledger", "every product");
 else block("Stock does not reconcile", `${mismatches} product(s) disagree with their own ledger`);
 
-const { data: opening } = await db
+const { data: opening } = await requireRead(db
   .from("inventory_movements")
   .select("id")
   .eq("kind", "opening_count")
-  .limit(1);
+  .limit(1));
 
 if (PRODUCTION_MODE && (!opening || opening.length === 0)) {
   block(
@@ -215,7 +229,7 @@ if (PRODUCTION_MODE && (!opening || opening.length === 0)) {
 
 head("WHO CAN USE THE DASHBOARD");
 
-const { data: staff } = await db.from("admin_profiles").select("full_name, role, active, email");
+const { data: staff } = await requireRead(db.from("admin_profiles").select("full_name, role, active, email"));
 const owners = (staff ?? []).filter((s) => s.role === "owner" && s.active);
 
 if (owners.length === 0) block("Owner", "the shop has no active Owner");
@@ -236,7 +250,7 @@ if (PRODUCTION_MODE && fixtures.length > 0) {
 
 head("ORDERS");
 
-const { count: orders } = await db.from("orders").select("*", { count: "exact", head: true });
+const { count: orders } = await requireRead(db.from("orders").select("*", { count: "exact", head: true }));
 
 if (PRODUCTION_MODE && (orders ?? 0) > 0) {
   block("Orders in a fresh production database", `${orders} already exist — production starts empty`);
